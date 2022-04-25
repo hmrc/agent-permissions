@@ -14,23 +14,22 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.controllers
+package uk.gov.hmrc.agentpermissions.config
 
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
-import play.api.http.Status
-import play.api.test.Helpers._
-import play.api.test.{FakeRequest, Helpers}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpecLike
+import play.api.{Configuration, Environment}
 
-class MicroserviceHelloWorldControllerSpec extends AnyWordSpec with Matchers {
+class AppConfigTest extends AnyWordSpecLike with should.Matchers {
 
-  private val fakeRequest = FakeRequest("GET", "/")
-  private val controller = new MicroserviceHelloWorldController(Helpers.stubControllerComponents())
+  private val env = Environment.simple()
+  private val configuration = Configuration.load(env)
+  private val appConfig = new AppConfig(configuration)
 
-  "GET /" should {
-    "return 200" in {
-      val result = controller.hello()(fakeRequest)
-      status(result) shouldBe Status.OK
+
+  "App config" should {
+    "give correct app name" in {
+      appConfig.appName shouldBe "agent-permissions"
     }
   }
 }
