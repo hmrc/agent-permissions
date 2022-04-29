@@ -26,7 +26,6 @@ class AppConfigTest extends AnyWordSpecLike with should.Matchers {
   private val configuration = Configuration.load(env)
   private val appConfig = new AppConfig(configuration)
 
-
   "App config" should {
     "give correct app name" in {
       appConfig.appName shouldBe "agent-permissions"

@@ -3,7 +3,7 @@ import uk.gov.hmrc.sbtdistributables.SbtDistributablesPlugin.publishingSettings
 
 val appName = "agent-permissions"
 
-val silencerVersion = "1.7.7"
+val silencerVersion = "1.7.8"
 
 lazy val microservice = Project(appName, file("."))
   .enablePlugins(play.sbt.PlayScala, SbtDistributablesPlugin)
@@ -11,6 +11,8 @@ lazy val microservice = Project(appName, file("."))
     PlayKeys.playDefaultPort         := 9447,
     majorVersion                     := 0,
     scalaVersion                     := "2.12.15",
+    Compile / scalafmtOnCompile      := true,
+    Test / scalafmtOnCompile         := true,
     libraryDependencies              ++= AppDependencies.compile ++ AppDependencies.test,
     // ***************
     // Use the silencer plugin to suppress warnings
