@@ -9,6 +9,7 @@ lazy val microservice = Project(appName, file("."))
   .enablePlugins(play.sbt.PlayScala, SbtDistributablesPlugin)
   .settings(
     PlayKeys.playDefaultPort         := 9447,
+    routesImport                     ++= Seq("uk.gov.hmrc.agentpermissions.binders.Binders._"),
     majorVersion                     := 0,
     scalaVersion                     := "2.12.15",
     Compile / scalafmtOnCompile      := true,

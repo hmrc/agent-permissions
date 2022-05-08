@@ -14,23 +14,10 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.controllers
+package uk.gov.hmrc.agentpermissions
 
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
-import play.api.http.Status
-import play.api.test.Helpers._
-import play.api.test.{FakeRequest, Helpers}
+import org.scalatest.wordspec.AnyWordSpecLike
 
-class MicroserviceHelloWorldControllerSpec extends AnyWordSpec with Matchers {
-
-  private val fakeRequest = FakeRequest("GET", "/")
-  private val controller = new MicroserviceHelloWorldController(Helpers.stubControllerComponents())
-
-  "GET /" should {
-    "return 200" in {
-      val result = controller.hello()(fakeRequest)
-      status(result) shouldBe Status.OK
-    }
-  }
-}
+abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures {}

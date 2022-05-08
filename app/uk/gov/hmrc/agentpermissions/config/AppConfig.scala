@@ -16,11 +16,12 @@
 
 package uk.gov.hmrc.agentpermissions.config
 
+import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
+
 import javax.inject.{Inject, Singleton}
-import play.api.Configuration
 
 @Singleton
-class AppConfig @Inject() (config: Configuration) {
-
-  val appName: String = config.get[String]("appName")
+class AppConfig @Inject() (servicesConfig: ServicesConfig) {
+  val authHost: String = servicesConfig.getString("microservice.services.auth.host")
+  val authPort: String = servicesConfig.getString("microservice.services.auth.port")
 }

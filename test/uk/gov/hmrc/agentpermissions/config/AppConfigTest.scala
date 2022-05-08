@@ -16,19 +16,20 @@
 
 package uk.gov.hmrc.agentpermissions.config
 
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpecLike
 import play.api.{Configuration, Environment}
+import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
-class AppConfigTest extends AnyWordSpecLike with should.Matchers {
+class AppConfigTest extends BaseSpec {
 
   private val env = Environment.simple()
   private val configuration = Configuration.load(env)
-  private val appConfig = new AppConfig(configuration)
+  private val appConfig = new AppConfig(new ServicesConfig(configuration))
 
   "App config" should {
-    "give correct app name" in {
-      appConfig.appName shouldBe "agent-permissions"
+    "be set up correctly" in {
+      appConfig.authHost shouldBe "localhost"
+      appConfig.authPort shouldBe "8500"
     }
   }
 }

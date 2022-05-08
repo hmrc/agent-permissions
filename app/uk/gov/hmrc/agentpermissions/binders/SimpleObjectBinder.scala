@@ -14,22 +14,20 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.model
+package uk.gov.hmrc.agentpermissions.binders
 
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import play.api.mvc.PathBindable
 
-import java.time.LocalDateTime
+import scala.util.control.NonFatal
 
-sealed trait OptedStatus
-case object OptedIn extends OptedStatus
-case object OptedOut extends OptedStatus
+class SimpleObjectBinder[T](bind: String => T, unbind: T => String)(implicit m: Manifest[T]) extends PathBindable[T] {
+  override def bind(key: String, value: String): Either[String, T] =
+    try
+      Right(bind(value))
+    catch {
+      case NonFatal(_) =>
+        Left(s"Cannot parse parameter '$key' with value '$value' as '${m.runtimeClass.getSimpleName}'")
+    }
 
-case class OptedEvent(optedStatus: OptedStatus, userName: String, eventDateTime: LocalDateTime)
-
-case class OptedRecord(arn: Arn, history: List[OptedEvent]) {
-
-  val optedStatus: OptedStatus = history match {
-    case Nil => OptedOut
-    case events => events.sortWith(_.eventDateTime isAfter _.eventDateTime).head.optedStatus
-  }
+  def unbind(key: String, value: T): String = unbind(value)
 }

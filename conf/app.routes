@@ -1,3 +1,5 @@
 # microservice specific routes
 
-GET        /hello-world             uk.gov.hmrc.agentpermissions.controllers.MicroserviceHelloWorldController.hello
+POST    /arn/:arn/optin                     uk.gov.hmrc.agentpermissions.controllers.OptinController.optin(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+POST    /arn/:arn/optout                    uk.gov.hmrc.agentpermissions.controllers.OptinController.optout(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+
