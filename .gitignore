@@ -4,6 +4,7 @@
 !.scalafmt.conf
 bin
 .bloop/
+.bsp/
 .cache
 /.classpath
 db

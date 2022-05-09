@@ -14,14 +14,20 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.config
+package uk.gov.hmrc.agentpermissions.binders
 
-import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
+import play.api.mvc.PathBindable
 
-import javax.inject.{Inject, Singleton}
+import scala.util.control.NonFatal
 
-@Singleton
-class AppConfig @Inject() (servicesConfig: ServicesConfig) {
-  val authHost: String = servicesConfig.getString("microservice.services.auth.host")
-  val authPort: String = servicesConfig.getString("microservice.services.auth.port")
+class SimpleObjectBinder[T](bind: String => T, unbind: T => String)(implicit m: Manifest[T]) extends PathBindable[T] {
+  override def bind(key: String, value: String): Either[String, T] =
+    try
+      Right(bind(value))
+    catch {
+      case NonFatal(_) =>
+        Left(s"Cannot parse parameter '$key' with value '$value' as '${m.runtimeClass.getSimpleName}'")
+    }
+
+  def unbind(key: String, value: T): String = unbind(value)
 }
