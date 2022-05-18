@@ -293,7 +293,7 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
           .get()
           .futureValue
         response.status shouldBe OK
-        response.body shouldBe s"""{"status":"Opted-Out_ELIGIBLE"}"""
+        response.body shouldBe "Opted-Out_ELIGIBLE"
       }
     }
 
