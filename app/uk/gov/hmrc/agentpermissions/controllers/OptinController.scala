@@ -17,8 +17,9 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.Logging
+import play.api.libs.json.{JsValue, Json}
 import play.api.mvc._
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptedIn, OptedOut}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptedIn, OptedOut, OptinStatus}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.service.OptinService
 import uk.gov.hmrc.auth.core.NoActiveSession
@@ -83,6 +84,23 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
       }
       .recover(handleFailure)
   }
+
+  def optinStatus(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+    optinService
+      .optinStatus(arn)
+      .map(generateStatusJson)
+      .map {
+        case None             => NotFound
+        case Some(statusJson) => Ok(statusJson)
+      }
+      .recover { case ex =>
+        logger.info(s"Returning $InternalServerError: ${ex.getMessage}")
+        InternalServerError
+      }
+  }
+
+  private def generateStatusJson(maybeOptinStatus: Option[OptinStatus]): Option[JsValue] =
+    maybeOptinStatus.map(optinStatus => Json.toJson(Json.obj("status" -> optinStatus.value)))
 
   private def handleFailure: PartialFunction[Throwable, Result] = {
     case ex: NoActiveSession =>

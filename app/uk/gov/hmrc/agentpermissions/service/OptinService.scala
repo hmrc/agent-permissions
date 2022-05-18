@@ -16,20 +16,38 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
+import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, UpsertType}
+import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class OptinService @Inject() (optinRepository: OptinRepository, optinRecordBuilder: OptinRecordBuilder) {
+class OptinService @Inject() (
+  optinRepository: OptinRepository,
+  optinRecordBuilder: OptinRecordBuilder,
+  optedInStatusHandler: OptedInStatusHandler,
+  notOptedInStatusHandler: NotOptedInStatusHandler
+) extends Logging {
 
   def optin(arn: Arn, user: AgentUser)(implicit ec: ExecutionContext): Future[Option[UpsertType]] =
     handleOptinOptout(arn, user, OptedIn)
 
   def optout(arn: Arn, user: AgentUser)(implicit ec: ExecutionContext): Future[Option[UpsertType]] =
     handleOptinOptout(arn, user, OptedOut)
+
+  def optinStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
+    for {
+      maybeOptinRecord <- optinRepository.get(arn)
+      maybeOptinStatus <- maybeOptinRecord match {
+                            case Some(optinRecord) if optinRecord.status == OptedIn =>
+                              optedInStatusHandler.identifyStatus(arn)
+                            case _ =>
+                              notOptedInStatusHandler.identifyStatus(arn)
+                          }
+    } yield maybeOptinStatus
 
   private def handleOptinOptout(arn: Arn, user: AgentUser, optinEventTypeToMatch: OptinEventType)(implicit
     ec: ExecutionContext
@@ -45,5 +63,4 @@ class OptinService @Inject() (optinRepository: OptinRepository, optinRecordBuild
                                optinRepository.upsert(optinRecordToUpdate)
                            }
     } yield maybeUpsertResult
-
 }
