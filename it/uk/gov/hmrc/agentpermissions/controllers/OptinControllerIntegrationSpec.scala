@@ -17,24 +17,28 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import com.google.inject.AbstractModule
+import org.scalamock.handlers.CallHandler3
 import play.api.http.Status._
 import play.api.libs.ws.{WSClient, WSResponse}
-import uk.gov.hmrc.agentmtdidentifiers.model.{OptedIn, OptedOut, OptinRecord}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptedIn, OptedOut, OptinRecord}
 import uk.gov.hmrc.agentpermissions.BaseIntegrationSpec
-import uk.gov.hmrc.agentpermissions.repository.OptinRepository
+import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, OptinRepositoryImpl}
 import uk.gov.hmrc.auth.core._
 import uk.gov.hmrc.auth.core.retrieve.{Credentials, Name}
 import uk.gov.hmrc.auth.core.syntax.retrieved.authSyntaxForRetrieved
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPlayMongoRepositorySupport[OptinRecord] {
 
   val arn = "TARN0000001"
 
   implicit lazy val mockAuthConnector: AuthConnector = mock[AuthConnector]
+  implicit lazy val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
@@ -48,12 +52,29 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
     override def configure(): Unit = {
       bind(classOf[OptinRepository]).toInstance(repository.asInstanceOf[OptinRepository])
       bind(classOf[AuthAction]).toInstance(new AuthAction(mockAuthConnector, env, conf))
+      bind(classOf[UserClientDetailsConnector]).toInstance(mockUserClientDetailsConnector)
     }
   }
 
   trait TestScope {
     lazy val wsClient: WSClient = app.injector.instanceOf[WSClient]
     lazy val baseUrl = s"http://localhost:$port"
+
+    def mockUserClientDetailsConnectorAgentSize(
+      maybeSize: Option[Int]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Int]]] =
+      (mockUserClientDetailsConnector
+        .agentSize(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(Arn(arn), *, *)
+        .returning(Future.successful(maybeSize))
+
+    def mockUserClientDetailsConnectorCheckGroupAssignments(
+      maybeSingleUser: Option[Boolean]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
+      (mockUserClientDetailsConnector
+        .isSingleUserAgency(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(Arn(arn), *, *)
+        .returning(Future.successful(maybeSingleUser))
   }
 
   "Call to optin" when {
@@ -260,6 +281,35 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
     }
   }
 
+  "Call to optin status" when {
+
+    "backend calls return data" should {
+      s"return $OK" in new TestScope {
+        mockUserClientDetailsConnectorAgentSize(Some(10))
+        mockUserClientDetailsConnectorCheckGroupAssignments(Some(false))
+
+        val response: WSResponse = wsClient
+          .url(s"$baseUrl/agent-permissions/arn/$arn/optin-status")
+          .get()
+          .futureValue
+        response.status shouldBe OK
+        response.body shouldBe s"""{"status":"Opted-Out_ELIGIBLE"}"""
+      }
+    }
+
+    "backend calls do not return data" should {
+      s"return $NOT_FOUND" in new TestScope {
+        mockUserClientDetailsConnectorAgentSize(None)
+
+        val response: WSResponse = wsClient
+          .url(s"$baseUrl/agent-permissions/arn/$arn/optin-status")
+          .get()
+          .futureValue
+        response.status shouldBe NOT_FOUND
+      }
+    }
+  }
+
   private def buildAuthorisedResponse: GrantAccess =
     Enrolments(Set(Enrolment(agentEnrolment, agentEnrolmentIdentifiers, "Activated"))) and
       Some(User) and
@@ -290,5 +340,5 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
       Some(Name(Some("Jane"), Some("Doe"))) and
       None
 
-  override protected def repository: PlayMongoRepository[OptinRecord] = new OptinRepository(mongoComponent)
+  override protected def repository: PlayMongoRepository[OptinRecord] = new OptinRepositoryImpl(mongoComponent)
 }

@@ -16,15 +16,13 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import org.mockito.Mockito.when
-import org.scalatestplus.mockito.MockitoSugar.mock
 import play.api.inject.guice.GuiceApplicationBuilder
-import play.api.mvc.{AnyContentAsEmpty, ControllerComponents}
+import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.config.{AppConfig, AppConfigImpl}
 import uk.gov.hmrc.agentpermissions.repository.RecordInserted
 import uk.gov.hmrc.agentpermissions.service.OptinService
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -44,7 +42,7 @@ class OptinControllerSpec extends BaseSpec {
 
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val appConfig: AppConfig = new AppConfig(
+    implicit val appConfig: AppConfig = new AppConfigImpl(
       new ServicesConfig(
         GuiceApplicationBuilder()
           .configure(
@@ -65,7 +63,10 @@ class OptinControllerSpec extends BaseSpec {
       s"return $FORBIDDEN" in new TestScope {
         implicit val request = fakeRequest
 
-        when(authAction.getAuthorisedAgent()).thenReturn(Future.successful(None))
+        (authAction
+          .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+          .expects(*, *)
+          .returning(Future.successful(None))
 
         val result = controller.optin(arn)(request)
         status(result) shouldBe FORBIDDEN
@@ -77,10 +78,14 @@ class OptinControllerSpec extends BaseSpec {
       s"return $CREATED" in new TestScope {
         implicit val request = fakeRequest
 
-        when(authAction.getAuthorisedAgent())
-          .thenReturn(Future.successful(Some((arn, user))))
-        when(optinService.optin(arn, user))
-          .thenReturn(Future.successful(Some(RecordInserted)))
+        (authAction
+          .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+          .expects(*, *)
+          .returning(Future.successful(Some((arn, user))))
+        (optinService
+          .optin(_: Arn, _: AgentUser)(_: ExecutionContext))
+          .expects(arn, user, *)
+          .returning(Future.successful(Some(RecordInserted)))
 
         val result = controller.optin(arn)(request)
         status(result) shouldBe CREATED
@@ -92,10 +97,14 @@ class OptinControllerSpec extends BaseSpec {
       s"return $CONFLICT" in new TestScope {
         implicit val request = fakeRequest
 
-        when(authAction.getAuthorisedAgent())
-          .thenReturn(Future.successful(Some((arn, user))))
-        when(optinService.optin(arn, user))
-          .thenReturn(Future.successful(None))
+        (authAction
+          .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+          .expects(*, *)
+          .returning(Future.successful(Some((arn, user))))
+        (optinService
+          .optin(_: Arn, _: AgentUser)(_: ExecutionContext))
+          .expects(arn, user, *)
+          .returning(Future.successful(None))
 
         val result = controller.optin(arn)(request)
         status(result) shouldBe CONFLICT
@@ -107,8 +116,10 @@ class OptinControllerSpec extends BaseSpec {
       s"return $BAD_REQUEST" in new TestScope {
         implicit val request = fakeRequest
 
-        when(authAction.getAuthorisedAgent())
-          .thenReturn(Future.successful(Some((Arn("NARN0101010"), user))))
+        (authAction
+          .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+          .expects(*, *)
+          .returning(Future.successful(Some((Arn("NARN0101010"), user))))
 
         val result = controller.optin(arn)(request)
         status(result) shouldBe BAD_REQUEST
@@ -123,7 +134,10 @@ class OptinControllerSpec extends BaseSpec {
       s"return $FORBIDDEN" in new TestScope {
         implicit val request = fakeRequest
 
-        when(authAction.getAuthorisedAgent()).thenReturn(Future.successful(None))
+        (authAction
+          .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+          .expects(*, *)
+          .returning(Future.successful(None))
 
         val result = controller.optout(arn)(request)
         status(result) shouldBe FORBIDDEN
@@ -135,10 +149,14 @@ class OptinControllerSpec extends BaseSpec {
       s"return $CREATED" in new TestScope {
         implicit val request = fakeRequest
 
-        when(authAction.getAuthorisedAgent())
-          .thenReturn(Future.successful(Some((arn, user))))
-        when(optinService.optout(arn, user))
-          .thenReturn(Future.successful(Some(RecordInserted)))
+        (authAction
+          .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+          .expects(*, *)
+          .returning(Future.successful(Some((arn, user))))
+        (optinService
+          .optout(_: Arn, _: AgentUser)(_: ExecutionContext))
+          .expects(arn, user, *)
+          .returning(Future.successful(Some(RecordInserted)))
 
         val result = controller.optout(arn)(request)
         status(result) shouldBe CREATED
@@ -150,10 +168,14 @@ class OptinControllerSpec extends BaseSpec {
       s"return $CONFLICT" in new TestScope {
         implicit val request = fakeRequest
 
-        when(authAction.getAuthorisedAgent())
-          .thenReturn(Future.successful(Some((arn, user))))
-        when(optinService.optout(arn, user))
-          .thenReturn(Future.successful(None))
+        (authAction
+          .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+          .expects(*, *)
+          .returning(Future.successful(Some((arn, user))))
+        (optinService
+          .optout(_: Arn, _: AgentUser)(_: ExecutionContext))
+          .expects(arn, user, *)
+          .returning(Future.successful(None))
 
         val result = controller.optout(arn)(request)
         status(result) shouldBe CONFLICT
@@ -165,8 +187,10 @@ class OptinControllerSpec extends BaseSpec {
       s"return $BAD_REQUEST" in new TestScope {
         implicit val request = fakeRequest
 
-        when(authAction.getAuthorisedAgent())
-          .thenReturn(Future.successful(Some((Arn("NARN0101010"), user))))
+        (authAction
+          .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+          .expects(*, *)
+          .returning(Future.successful(Some((Arn("NARN0101010"), user))))
 
         val result = controller.optout(arn)(request)
         status(result) shouldBe BAD_REQUEST

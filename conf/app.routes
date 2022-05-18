@@ -2,4 +2,4 @@
 
 POST    /arn/:arn/optin                     uk.gov.hmrc.agentpermissions.controllers.OptinController.optin(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 POST    /arn/:arn/optout                    uk.gov.hmrc.agentpermissions.controllers.OptinController.optout(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-
+GET     /arn/:arn/optin-status              uk.gov.hmrc.agentpermissions.controllers.OptinController.optinStatus(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)

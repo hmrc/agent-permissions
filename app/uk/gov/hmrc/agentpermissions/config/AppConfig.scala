@@ -16,12 +16,19 @@
 
 package uk.gov.hmrc.agentpermissions.config
 
+import com.google.inject.ImplementedBy
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
 import javax.inject.{Inject, Singleton}
 
+@ImplementedBy(classOf[AppConfigImpl])
+trait AppConfig {
+  def agentUserClientDetailsBaseUrl: String
+  def agentSizeMaxClientCountAllowed: Int
+}
+
 @Singleton
-class AppConfig @Inject() (servicesConfig: ServicesConfig) {
-  val authHost: String = servicesConfig.getString("microservice.services.auth.host")
-  val authPort: String = servicesConfig.getString("microservice.services.auth.port")
+class AppConfigImpl @Inject() (servicesConfig: ServicesConfig) extends AppConfig {
+  lazy val agentUserClientDetailsBaseUrl: String = servicesConfig.baseUrl("agent-user-client-details")
+  lazy val agentSizeMaxClientCountAllowed: Int = servicesConfig.getInt("agentsize.maxClientCountAllowed")
 }

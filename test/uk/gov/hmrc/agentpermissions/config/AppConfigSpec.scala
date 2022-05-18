@@ -20,16 +20,16 @@ import play.api.{Configuration, Environment}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
-class AppConfigTest extends BaseSpec {
+class AppConfigSpec extends BaseSpec {
 
   private val env = Environment.simple()
   private val configuration = Configuration.load(env)
-  private val appConfig = new AppConfig(new ServicesConfig(configuration))
+  private val appConfig = new AppConfigImpl(new ServicesConfig(configuration))
 
   "App config" should {
     "be set up correctly" in {
-      appConfig.authHost shouldBe "localhost"
-      appConfig.authPort shouldBe "8500"
+      appConfig.agentUserClientDetailsBaseUrl shouldBe "http://localhost:9449"
+      appConfig.agentSizeMaxClientCountAllowed shouldBe 50
     }
   }
 }

@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
+import com.google.inject.ImplementedBy
 import com.mongodb.client.model.{IndexOptions, ReplaceOptions}
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.IndexModel
@@ -32,8 +33,14 @@ sealed trait UpsertType
 case object RecordInserted extends UpsertType
 case object RecordUpdated extends UpsertType
 
+@ImplementedBy(classOf[OptinRepositoryImpl])
+trait OptinRepository {
+  def get(arn: Arn): Future[Option[OptinRecord]]
+  def upsert(optinRecord: OptinRecord): Future[Option[UpsertType]]
+}
+
 @Singleton
-class OptinRepository @Inject() (
+class OptinRepositoryImpl @Inject() (
   mongoComponent: MongoComponent
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[OptinRecord](
@@ -43,7 +50,7 @@ class OptinRepository @Inject() (
       indexes = Seq(
         IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true))
       )
-    ) with Logging {
+    ) with OptinRepository with Logging {
 
   def get(arn: Arn): Future[Option[OptinRecord]] = collection.find(equal("arn", arn.value)).headOption()
 

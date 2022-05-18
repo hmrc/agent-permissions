@@ -39,7 +39,7 @@ class OptinRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySuppor
       )
     )
 
-    val optinRepository: OptinRepository = repository.asInstanceOf[OptinRepository]
+    val optinRepository: OptinRepositoryImpl = repository.asInstanceOf[OptinRepositoryImpl]
   }
 
   "OptinRepository" when {
@@ -77,5 +77,5 @@ class OptinRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySuppor
 
   }
 
-  override protected def repository: PlayMongoRepository[OptinRecord] = new OptinRepository(mongoComponent)
+  override protected def repository: PlayMongoRepository[OptinRecord] = new OptinRepositoryImpl(mongoComponent)
 }
