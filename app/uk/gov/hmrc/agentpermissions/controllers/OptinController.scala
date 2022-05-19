@@ -17,6 +17,7 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.Logging
+import play.api.libs.json.JsString
 import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptedIn, OptedOut}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
@@ -90,7 +91,7 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
       .map(_.map(_.value))
       .map {
         case None             => NotFound
-        case Some(statusJson) => Ok(statusJson)
+        case Some(statusJson) => Ok(JsString(statusJson))
       }
       .recover { case ex =>
         logger.info(s"Returning $InternalServerError: ${ex.getMessage}")
