@@ -44,7 +44,7 @@ class NotOptedInStatusHandlerImpl @Inject() (userClientDetailsConnector: UserCli
           case None =>
             Future.successful(None)
           case Some(size) =>
-            if (size < 1 || size > appConfig.agentSizeMaxClientCountAllowed) {
+            if (size < 2 || size > appConfig.agentSizeMaxClientCountAllowed) {
               Future.successful(Option(OptedOutWrongClientCount))
             } else {
               for {
