@@ -71,15 +71,15 @@ class NotOptedInStatusHandlerSpec extends BaseSpec {
 
     "UserClientDetailsConnector returns some value when fetching agent size" when {
 
-      "UserClientDetailsConnector returns less than one" should {
+      "UserClientDetailsConnector returns less than two" should {
         s"return $OptedOutWrongClientCount" in new TestScope {
-          mockUserClientDetailsConnectorAgentSize(Some(0))
+          mockUserClientDetailsConnectorAgentSize(Some(1))
 
           notOptedInStatusHandler.identifyStatus(arn).futureValue shouldBe Some(OptedOutWrongClientCount)
         }
       }
 
-      "UserClientDetailsConnector returns at least one" when {
+      "UserClientDetailsConnector returns at least two" when {
 
         "UserClientDetailsConnector returns more than the max client count allowed in config" should {
 
@@ -95,7 +95,7 @@ class NotOptedInStatusHandlerSpec extends BaseSpec {
 
           "UserClientDetailsConnector returns nothing when checking if single user agency" should {
             s"return nothing" in new TestScope {
-              mockUserClientDetailsConnectorAgentSize(Some(1))
+              mockUserClientDetailsConnectorAgentSize(Some(2))
               mockAppConfigAgentSizeMaxClientCountAllowed(10)
               mockUserClientDetailsConnectorCheckGroupAssignments(None)
 
@@ -107,7 +107,7 @@ class NotOptedInStatusHandlerSpec extends BaseSpec {
 
             "UserClientDetailsConnector returns true" should {
               s"return $OptedOutSingleUser" in new TestScope {
-                mockUserClientDetailsConnectorAgentSize(Some(1))
+                mockUserClientDetailsConnectorAgentSize(Some(2))
                 mockAppConfigAgentSizeMaxClientCountAllowed(10)
                 mockUserClientDetailsConnectorCheckGroupAssignments(Some(true))
 
@@ -117,7 +117,7 @@ class NotOptedInStatusHandlerSpec extends BaseSpec {
 
             "UserClientDetailsConnector returns false" should {
               s"return $OptedOutEligible" in new TestScope {
-                mockUserClientDetailsConnectorAgentSize(Some(1))
+                mockUserClientDetailsConnectorAgentSize(Some(2))
                 mockAppConfigAgentSizeMaxClientCountAllowed(10)
                 mockUserClientDetailsConnectorCheckGroupAssignments(Some(false))
 
