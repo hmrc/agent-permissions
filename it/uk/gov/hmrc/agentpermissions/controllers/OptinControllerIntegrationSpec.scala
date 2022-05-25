@@ -19,7 +19,6 @@ package uk.gov.hmrc.agentpermissions.controllers
 import com.google.inject.AbstractModule
 import org.scalamock.handlers.CallHandler3
 import play.api.http.Status._
-import play.api.libs.json.JsString
 import play.api.libs.ws.{WSClient, WSResponse}
 import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptedIn, OptedOut, OptinRecord}
 import uk.gov.hmrc.agentpermissions.BaseIntegrationSpec

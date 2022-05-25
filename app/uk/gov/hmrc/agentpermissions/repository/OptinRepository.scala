@@ -29,10 +29,6 @@ import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
-sealed trait UpsertType
-case object RecordInserted extends UpsertType
-case object RecordUpdated extends UpsertType
-
 @ImplementedBy(classOf[OptinRepositoryImpl])
 trait OptinRepository {
   def get(arn: Arn): Future[Option[OptinRecord]]
