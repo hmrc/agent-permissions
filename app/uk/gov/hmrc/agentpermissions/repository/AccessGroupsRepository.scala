@@ -1,0 +1,111 @@
+/*
+ * Copyright 2022 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package uk.gov.hmrc.agentpermissions.repository
+
+import com.google.inject.ImplementedBy
+import com.mongodb.client.model.{Collation, IndexOptions, ReplaceOptions}
+import org.mongodb.scala.model.CollationStrength.SECONDARY
+import org.mongodb.scala.model.Filters.{and, equal}
+import org.mongodb.scala.model.IndexModel
+import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
+import play.api.Logging
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, Arn}
+import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
+import uk.gov.hmrc.mongo.MongoComponent
+import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
+
+import javax.inject.{Inject, Singleton}
+import scala.concurrent.{ExecutionContext, Future}
+
+@ImplementedBy(classOf[AccessGroupsRepositoryImpl])
+trait AccessGroupsRepository {
+  def get(arn: Arn): Future[Seq[AccessGroup]]
+  def get(arn: Arn, groupName: String): Future[Option[AccessGroup]]
+  def upsert(accessGroup: AccessGroup): Future[Option[UpsertType]]
+}
+
+@Singleton
+class AccessGroupsRepositoryImpl @Inject() (
+  mongoComponent: MongoComponent
+)(implicit ec: ExecutionContext)
+    extends PlayMongoRepository[AccessGroup](
+      collectionName = "access-groups",
+      domainFormat = AccessGroup.formatAccessGroup,
+      mongoComponent = mongoComponent,
+      indexes = Seq(
+        IndexModel(ascending(FIELD_ARN), new IndexOptions().name("arnIdx").unique(false)),
+        IndexModel(
+          compoundIndex(ascending(FIELD_ARN), ascending(FIELD_GROUPNAME)),
+          new IndexOptions()
+            .name("arnGroupNameIdx")
+            .unique(true)
+            .collation(caseInsensitiveCollation)
+        )
+      )
+    ) with AccessGroupsRepository with Logging {
+
+  override def get(arn: Arn): Future[Seq[AccessGroup]] =
+    collection
+      .find(equal(FIELD_ARN, arn.value))
+      .collation(caseInsensitiveCollation)
+      .collect()
+      .toFuture()
+
+  override def get(arn: Arn, groupName: String): Future[Option[AccessGroup]] =
+    collection
+      .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)))
+      .collation(caseInsensitiveCollation)
+      .headOption()
+
+  override def upsert(accessGroup: AccessGroup): Future[Option[UpsertType]] = {
+
+    def dbUpsert(mergedAccessGroup: AccessGroup): Future[Option[UpsertType]] =
+      collection
+        .replaceOne(
+          and(equal(FIELD_ARN, mergedAccessGroup.arn.value), equal(FIELD_GROUPNAME, mergedAccessGroup.groupName)),
+          mergedAccessGroup,
+          upsertOptions
+        )
+        .headOption()
+        .map(_.map(_.getModifiedCount match {
+          case 0L => RecordInserted
+          case 1L => RecordUpdated
+          case x  => throw new RuntimeException(s"Update modified count should not have been $x")
+        }))
+
+    for {
+      maybeExistingAccessGroup <- get(accessGroup.arn, accessGroup.groupName)
+      mergedAccessGroup <- maybeExistingAccessGroup match {
+                             case None =>
+                               Future.successful(accessGroup)
+                             case Some(existingAccessGroup) =>
+                               Future.successful(accessGroup.copy(groupName = existingAccessGroup.groupName))
+                           }
+      maybeUpsertType <- dbUpsert(mergedAccessGroup)
+    } yield maybeUpsertType
+  }
+
+  private def upsertOptions = new ReplaceOptions().upsert(true)
+}
+
+object AccessGroupsRepositoryImpl {
+  private val FIELD_ARN = "arn"
+  private val FIELD_GROUPNAME = "groupName"
+
+  private def caseInsensitiveCollation: Collation =
+    Collation.builder().locale("en").collationStrength(SECONDARY).build()
+}
