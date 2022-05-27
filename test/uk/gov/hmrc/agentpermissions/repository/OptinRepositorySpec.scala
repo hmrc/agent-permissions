@@ -63,14 +63,14 @@ class OptinRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySuppor
 
     "fetching an existing record" should {
       "return the optin record" in new TestScope {
-        optinRepository.upsert(optinRecord).futureValue shouldBe Some(RecordInserted)
+        optinRepository.upsert(optinRecord).futureValue.get shouldBe a[RecordInserted]
         optinRepository.get(arn).futureValue shouldBe Some(optinRecord)
       }
     }
 
     "updating an existing record" should {
       s"return $RecordUpdated" in new TestScope {
-        optinRepository.upsert(optinRecord).futureValue shouldBe Some(RecordInserted)
+        optinRepository.upsert(optinRecord).futureValue.get shouldBe a[RecordInserted]
         optinRepository.upsert(optinRecord).futureValue shouldBe Some(RecordUpdated)
       }
     }

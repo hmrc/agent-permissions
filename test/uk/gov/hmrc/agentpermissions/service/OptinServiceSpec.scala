@@ -30,6 +30,7 @@ class OptinServiceSpec extends BaseSpec {
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
     val user: AgentUser = AgentUser("userId", "userName")
+    val insertedId = "insertedId"
 
     val mockOptinRepository: OptinRepository = mock[OptinRepository]
     val mockOptinRecordBuilder: OptinRecordBuilder = mock[OptinRecordBuilder]
@@ -40,7 +41,7 @@ class OptinServiceSpec extends BaseSpec {
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
     val optinService =
-      new OptinService(
+      new OptinServiceImpl(
         mockOptinRepository,
         mockOptinRecordBuilder,
         mockOptedInStatusHandler,
@@ -90,17 +91,16 @@ class OptinServiceSpec extends BaseSpec {
 
     "optin record does not exist" should {
 
-      "insert optin record" in new TestScope {
+      "create optin record" in new TestScope {
 
         mockOptinRepositoryGet(None)
         val maybeOptinRecordToUpdate: Option[OptinRecord] =
           Some(OptinRecord(arn, List(OptinEvent(OptedIn, user, LocalDateTime.now()))))
         mockOptinRecordBuilderForUpdating(None, maybeOptinRecordToUpdate, OptedIn)
-        mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordInserted))
+        mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordInserted(insertedId)))
 
-        whenReady(optinService.optin(arn, user)) { maybeUpsertType =>
-          val upsertType = maybeUpsertType.get
-          upsertType shouldBe RecordInserted
+        whenReady(optinService.optin(arn, user)) { maybeOptinRequestStatus =>
+          maybeOptinRequestStatus.get shouldBe OptinCreated
         }
       }
     }
@@ -114,8 +114,8 @@ class OptinServiceSpec extends BaseSpec {
         mockOptinRepositoryGet(maybeExistingOptinRecord)
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, None, OptedIn)
 
-        whenReady(optinService.optin(arn, user)) { maybeUpsertType =>
-          maybeUpsertType shouldBe None
+        whenReady(optinService.optin(arn, user)) { maybeOptinRequestStatus =>
+          maybeOptinRequestStatus shouldBe None
         }
       }
     }
@@ -133,9 +133,8 @@ class OptinServiceSpec extends BaseSpec {
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, maybeOptinRecordToUpdate, OptedIn)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordUpdated))
 
-        whenReady(optinService.optin(arn, user)) { maybeUpsertType =>
-          val upsertType = maybeUpsertType.get
-          upsertType shouldBe RecordUpdated
+        whenReady(optinService.optin(arn, user)) { maybeOptinRequestStatus =>
+          maybeOptinRequestStatus.get shouldBe OptinUpdated
         }
       }
     }
@@ -151,11 +150,10 @@ class OptinServiceSpec extends BaseSpec {
         val maybeOptinRecordToUpdate: Option[OptinRecord] =
           Some(OptinRecord(arn, List(OptinEvent(OptedOut, user, LocalDateTime.now()))))
         mockOptinRecordBuilderForUpdating(None, maybeOptinRecordToUpdate, OptedOut)
-        mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordInserted))
+        mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordInserted(insertedId)))
 
-        whenReady(optinService.optout(arn, user)) { maybeUpsertType =>
-          val upsertType = maybeUpsertType.get
-          upsertType shouldBe RecordInserted
+        whenReady(optinService.optout(arn, user)) { maybeOptoutRequestStatus =>
+          maybeOptoutRequestStatus.get shouldBe OptoutCreated
         }
       }
     }
@@ -169,8 +167,8 @@ class OptinServiceSpec extends BaseSpec {
         mockOptinRepositoryGet(maybeExistingOptinRecord)
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, None, OptedOut)
 
-        whenReady(optinService.optout(arn, user)) { maybeUpsertType =>
-          maybeUpsertType shouldBe None
+        whenReady(optinService.optout(arn, user)) { maybeOptoutRequestStatus =>
+          maybeOptoutRequestStatus shouldBe None
         }
       }
     }
@@ -188,9 +186,8 @@ class OptinServiceSpec extends BaseSpec {
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, maybeOptinRecordToUpdate, OptedOut)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordUpdated))
 
-        whenReady(optinService.optout(arn, user)) { maybeUpsertType =>
-          val upsertType = maybeUpsertType.get
-          upsertType shouldBe RecordUpdated
+        whenReady(optinService.optout(arn, user)) { maybeOptoutRequestStatus =>
+          maybeOptoutRequestStatus.get shouldBe OptoutUpdated
         }
       }
     }

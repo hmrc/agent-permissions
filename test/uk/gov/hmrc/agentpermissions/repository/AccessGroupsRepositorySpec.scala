@@ -95,20 +95,20 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
     "upserting a non-existing access group" should {
       s"return $RecordInserted" in new TestScope {
-        accessGroupsRepository.upsert(accessGroup).futureValue shouldBe Some(RecordInserted)
+        accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
       }
     }
 
     "upserting an existing access group" should {
       s"return $RecordUpdated" in new TestScope {
-        accessGroupsRepository.upsert(accessGroup).futureValue shouldBe Some(RecordInserted)
+        accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
         accessGroupsRepository.upsert(accessGroup).futureValue shouldBe Some(RecordUpdated)
       }
     }
 
     "upserting an access group with a group name differing only in case-sensitiveness" should {
       s"return $RecordUpdated" in new TestScope {
-        accessGroupsRepository.upsert(accessGroup).futureValue shouldBe Some(RecordInserted)
+        accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
 
         val accessGroupHavingGroupNameOfDifferentCase: AccessGroup =
           accessGroup.copy(groupName = accessGroup.groupName.toUpperCase)
