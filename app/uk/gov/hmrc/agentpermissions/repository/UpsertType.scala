@@ -18,5 +18,5 @@ package uk.gov.hmrc.agentpermissions.repository
 
 sealed trait UpsertType
 
-case object RecordInserted extends UpsertType
+case class RecordInserted(id: String) extends UpsertType
 case object RecordUpdated extends UpsertType

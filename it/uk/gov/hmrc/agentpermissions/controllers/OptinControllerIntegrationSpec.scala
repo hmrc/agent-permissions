@@ -68,6 +68,14 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
         .expects(Arn(arn), *, *)
         .returning(Future.successful(maybeSize))
 
+    def mockUserClientDetailsConnectorAgentSizeWithException(
+      ex: Exception
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Int]]] =
+      (mockUserClientDetailsConnector
+        .agentSize(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(Arn(arn), *, *)
+        .returning(Future.failed(ex))
+
     def mockUserClientDetailsConnectorCheckGroupAssignments(
       maybeSingleUser: Option[Boolean]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
@@ -306,6 +314,18 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
           .get()
           .futureValue
         response.status shouldBe NOT_FOUND
+      }
+    }
+
+    "backend calls thow exception" should {
+      s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+        mockUserClientDetailsConnectorAgentSizeWithException(new RuntimeException("boo boo"))
+
+        val response: WSResponse = wsClient
+          .url(s"$baseUrl/agent-permissions/arn/$arn/optin-status")
+          .get()
+          .futureValue
+        response.status shouldBe INTERNAL_SERVER_ERROR
       }
     }
   }

@@ -81,11 +81,15 @@ class AccessGroupsRepositoryImpl @Inject() (
           upsertOptions
         )
         .headOption()
-        .map(_.map(_.getModifiedCount match {
-          case 0L => RecordInserted
-          case 1L => RecordUpdated
-          case x  => throw new RuntimeException(s"Update modified count should not have been $x")
-        }))
+        .map(
+          _.map(result =>
+            result.getModifiedCount match {
+              case 0L => RecordInserted(result.getUpsertedId.asObjectId().getValue.toString)
+              case 1L => RecordUpdated
+              case x  => throw new RuntimeException(s"Update modified count should not have been $x")
+            }
+          )
+        )
 
     for {
       maybeExistingAccessGroup <- get(accessGroup.arn, accessGroup.groupName)

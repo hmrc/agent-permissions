@@ -48,8 +48,8 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
               case None =>
                 logger.info(s"Already has $OptedIn")
                 Future.successful(Conflict)
-              case Some(upsertType) =>
-                logger.info(s"Optin record created, type: $upsertType")
+              case Some(_) =>
+                logger.info(s"Optin record created")
                 Future.successful(Created)
             }
           } else {
@@ -73,8 +73,8 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
               case None =>
                 logger.info(s"Already has $OptedOut")
                 Future.successful(Conflict)
-              case Some(upsertType) =>
-                logger.info(s"Optin record created, type: $upsertType")
+              case Some(_) =>
+                logger.info(s"Optin record created")
                 Future.successful(Created)
             }
           } else {

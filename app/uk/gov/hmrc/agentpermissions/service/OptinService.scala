@@ -16,29 +16,43 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
+import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
-import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, UpsertType}
+import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, RecordInserted, RecordUpdated, UpsertType}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
+@ImplementedBy(classOf[OptinServiceImpl])
+trait OptinService {
+  def optin(arn: Arn, user: AgentUser)(implicit ec: ExecutionContext): Future[Option[OptinRequestStatus]]
+  def optout(arn: Arn, user: AgentUser)(implicit ec: ExecutionContext): Future[Option[OptoutRequestStatus]]
+  def optinStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]]
+}
+
 @Singleton
-class OptinService @Inject() (
+class OptinServiceImpl @Inject() (
   optinRepository: OptinRepository,
   optinRecordBuilder: OptinRecordBuilder,
   optedInStatusHandler: OptedInStatusHandler,
   notOptedInStatusHandler: NotOptedInStatusHandler
-) extends Logging {
+) extends OptinService with Logging {
 
-  def optin(arn: Arn, user: AgentUser)(implicit ec: ExecutionContext): Future[Option[UpsertType]] =
-    handleOptinOptout(arn, user, OptedIn)
+  override def optin(arn: Arn, user: AgentUser)(implicit ec: ExecutionContext): Future[Option[OptinRequestStatus]] =
+    handleOptinOptout(arn, user, OptedIn).map(_.map {
+      case RecordInserted(_) => OptinCreated
+      case RecordUpdated     => OptinUpdated
+    })
 
-  def optout(arn: Arn, user: AgentUser)(implicit ec: ExecutionContext): Future[Option[UpsertType]] =
-    handleOptinOptout(arn, user, OptedOut)
+  override def optout(arn: Arn, user: AgentUser)(implicit ec: ExecutionContext): Future[Option[OptoutRequestStatus]] =
+    handleOptinOptout(arn, user, OptedOut).map(_.map {
+      case RecordInserted(_) => OptoutCreated
+      case RecordUpdated     => OptoutUpdated
+    })
 
-  def optinStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
+  override def optinStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
     for {
       maybeOptinRecord <- optinRepository.get(arn)
       maybeOptinStatus <- maybeOptinRecord match {
@@ -64,3 +78,11 @@ class OptinService @Inject() (
                            }
     } yield maybeUpsertResult
 }
+
+sealed trait OptinRequestStatus
+case object OptinCreated extends OptinRequestStatus
+case object OptinUpdated extends OptinRequestStatus
+
+sealed trait OptoutRequestStatus
+case object OptoutCreated extends OptoutRequestStatus
+case object OptoutUpdated extends OptoutRequestStatus
