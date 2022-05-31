@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.{CallHandler1, CallHandler2}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated, UpsertType}
 
@@ -31,7 +31,29 @@ class AccessGroupsServiceSpec extends BaseSpec {
     val user: AgentUser = AgentUser("userId", "userName")
     val groupName = "some group"
     val insertedId = "insertedId"
-    val accessGroup: AccessGroup = AccessGroup(arn, groupName, now, now, user, user, None, None)
+    val user1: AgentUser = AgentUser("user1", "User 1")
+    val user2: AgentUser = AgentUser("user2", "User 2")
+    val enrolment1: Enrolment =
+      Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
+    val enrolment2: Enrolment = Enrolment(
+      "HMRC-PPT-ORG",
+      "Activated",
+      "Frank Wright",
+      Seq(Identifier("EtmpRegistrationNumber", "XAPPT0000012345"))
+    )
+    val enrolment3: Enrolment =
+      Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CgtRef", "XMCGTP123456789")))
+
+    val accessGroup: AccessGroup = AccessGroup(
+      arn,
+      groupName,
+      now,
+      now,
+      user,
+      user,
+      Some(Set(user, user1, user2)),
+      Some(Set(enrolment1, enrolment2, enrolment3))
+    )
 
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
@@ -48,6 +70,14 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .get(_: Arn, _: String))
         .expects(arn, groupName)
         .returning(Future.successful(maybeAccessGroup))
+
+    def mockAccessGroupsRepositoryGetAll(
+      accessGroups: Seq[AccessGroup]
+    ): CallHandler1[Arn, Future[Seq[AccessGroup]]] =
+      (mockAccessGroupsRepository
+        .get(_: Arn))
+        .expects(arn)
+        .returning(Future.successful(accessGroups))
 
     def mockAccessGroupsRepositoryUpsert(
       maybeUpsertType: Option[UpsertType]
@@ -91,7 +121,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
             accessGroupsService
               .create(accessGroup)
-              .futureValue shouldBe AccessGroupCreated(insertedId)
+              .futureValue shouldBe AccessGroupCreated("KARN1234567%7Esome+group")
           }
         }
 
@@ -105,6 +135,30 @@ class AccessGroupsServiceSpec extends BaseSpec {
               .futureValue shouldBe AccessGroupNotCreated
           }
         }
+      }
+    }
+  }
+
+  "Calling group summaries" when {
+
+    "access groups exist" should {
+      "return corresponding summaries" in new TestScope {
+        mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+
+        accessGroupsService.groupSummaries(arn).futureValue shouldBe
+          Seq(AccessGroupSummary("KARN1234567%7Esome+group", "some group", 3, 3))
+      }
+    }
+  }
+
+  "Fetching group" when {
+
+    "group exists" should {
+      "return corresponding summaries" in new TestScope {
+        mockAccessGroupsRepositoryGet(Some(accessGroup))
+
+        accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+          Some(accessGroup)
       }
     }
   }
