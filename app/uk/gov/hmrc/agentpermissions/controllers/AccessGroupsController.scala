@@ -20,12 +20,13 @@ import play.api.Logging
 import play.api.libs.json._
 import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment}
-import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupExists, AccessGroupNotCreated, AccessGroupsService}
+import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 @Singleton()
 class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService)(implicit
@@ -54,6 +55,42 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     }
   }
 
+  def groupsInformation(arn: Arn): Action[AnyContent] = Action.async {
+    if (!Arn.isValid(arn.value)) {
+      badRequestInvalidArn(arn)
+    } else {
+      accessGroupsService.groupSummaries(arn) transformWith {
+        case Success(groupSummaries) =>
+          if (groupSummaries.isEmpty) {
+            Future.successful(NotFound)
+          } else {
+            Future.successful(Ok(Json.toJson(groupSummaries)))
+          }
+        case Failure(ex) =>
+          logger.error(s"Error fetching group summaries of ARN: ${ex.getMessage}")
+          Future.successful(InternalServerError)
+      }
+    }
+  }
+
+  def getGroup(gid: String): Action[AnyContent] = Action.async {
+    GroupId.decode(gid) match {
+      case None =>
+        Future.successful(BadRequest("Check provided group id"))
+      case Some(groupId) =>
+        accessGroupsService.get(groupId) transformWith {
+          case Success(None) =>
+            Future.successful(NotFound)
+          case Success(Some(accessGroup)) =>
+            Future.successful(Ok(Json.toJson(accessGroup)))
+          case Failure(ex) =>
+            logger.error(s"Error fetching group: ${ex.getMessage}")
+            Future.successful(InternalServerError)
+        }
+    }
+
+  }
+
   private def processAccessGroupCreation(arn: Arn, createAccessGroupRequest: CreateAccessGroupRequest): Future[Result] =
     accessGroupsService
       .create(buildAccessGroup(arn, createAccessGroupRequest))
@@ -61,8 +98,9 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
         case AccessGroupExists =>
           logger.info("Cannot create a group with a name that already exists")
           Conflict
-        case AccessGroupCreated(creationId) =>
-          Created(JsString(creationId))
+        case AccessGroupCreated(groupId) =>
+          logger.info(s"Created group for '${arn.value}': '$groupId'")
+          Created(JsString(groupId))
         case AccessGroupNotCreated =>
           logger.warn("Unable to create access group")
           InternalServerError
