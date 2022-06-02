@@ -17,17 +17,20 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
+import com.mongodb.client.model.Updates.set
 import com.mongodb.client.model.{Collation, IndexOptions, ReplaceOptions}
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
-import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
+import org.mongodb.scala.model.{IndexModel, UpdateOptions}
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, Arn}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -36,6 +39,12 @@ trait AccessGroupsRepository {
   def get(arn: Arn): Future[Seq[AccessGroup]]
   def get(arn: Arn, groupName: String): Future[Option[AccessGroup]]
   def upsert(accessGroup: AccessGroup): Future[Option[UpsertType]]
+  def renameGroup(
+    arn: Arn,
+    groupName: String,
+    renameGroupTo: String,
+    whoIsRenaming: AgentUser
+  ): Future[Option[UpsertType]]
 }
 
 @Singleton
@@ -71,39 +80,54 @@ class AccessGroupsRepositoryImpl @Inject() (
       .collation(caseInsensitiveCollation)
       .headOption()
 
-  override def upsert(accessGroup: AccessGroup): Future[Option[UpsertType]] = {
-
-    def dbUpsert(mergedAccessGroup: AccessGroup): Future[Option[UpsertType]] =
-      collection
-        .replaceOne(
-          and(equal(FIELD_ARN, mergedAccessGroup.arn.value), equal(FIELD_GROUPNAME, mergedAccessGroup.groupName)),
-          mergedAccessGroup,
-          upsertOptions
+  override def upsert(accessGroup: AccessGroup): Future[Option[UpsertType]] =
+    collection
+      .replaceOne(
+        and(equal(FIELD_ARN, accessGroup.arn.value), equal(FIELD_GROUPNAME, accessGroup.groupName)),
+        accessGroup,
+        upsertOptions
+      )
+      .headOption()
+      .map(
+        _.map(result =>
+          result.getModifiedCount match {
+            case 0L => RecordInserted(result.getUpsertedId.asObjectId().getValue.toString)
+            case 1L => RecordUpdated
+            case x  => throw new RuntimeException(s"Update modified count should not have been $x")
+          }
         )
-        .headOption()
-        .map(
-          _.map(result =>
-            result.getModifiedCount match {
-              case 0L => RecordInserted(result.getUpsertedId.asObjectId().getValue.toString)
-              case 1L => RecordUpdated
-              case x  => throw new RuntimeException(s"Update modified count should not have been $x")
-            }
-          )
+      )
+
+  override def renameGroup(
+    arn: Arn,
+    groupName: String,
+    renameGroupTo: String,
+    whoIsRenaming: AgentUser
+  ): Future[Option[UpsertType]] =
+    collection
+      .updateOne(
+        and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),
+        Seq(
+          set("groupName", renameGroupTo),
+          set("lastUpdated", LocalDateTime.now().format(dateTimeFormatter)),
+          set("lastUpdatedBy.id", whoIsRenaming.id),
+          set("lastUpdatedBy.name", whoIsRenaming.name)
+        ),
+        new UpdateOptions().upsert(true).collation(caseInsensitiveCollation)
+      )
+      .headOption()
+      .map(
+        _.map(result =>
+          result.getModifiedCount match {
+            case 1L => RecordUpdated
+            case x  => throw new RuntimeException(s"Update modified count should not have been $x")
+          }
         )
+      )
 
-    for {
-      maybeExistingAccessGroup <- get(accessGroup.arn, accessGroup.groupName)
-      mergedAccessGroup <- maybeExistingAccessGroup match {
-                             case None =>
-                               Future.successful(accessGroup)
-                             case Some(existingAccessGroup) =>
-                               Future.successful(accessGroup.copy(groupName = existingAccessGroup.groupName))
-                           }
-      maybeUpsertType <- dbUpsert(mergedAccessGroup)
-    } yield maybeUpsertType
-  }
+  private lazy val upsertOptions: ReplaceOptions = new ReplaceOptions().upsert(true).collation(caseInsensitiveCollation)
 
-  private def upsertOptions = new ReplaceOptions().upsert(true)
+  private lazy val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
 }
 
 object AccessGroupsRepositoryImpl {

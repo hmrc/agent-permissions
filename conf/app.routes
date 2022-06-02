@@ -5,5 +5,6 @@ POST    /arn/:arn/optout                    uk.gov.hmrc.agentpermissions.control
 GET     /arn/:arn/optin-status              uk.gov.hmrc.agentpermissions.controllers.OptinController.optinStatus(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 
 POST    /arn/:arn/group/create              uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/groups-information        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupsInformation(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/groups-information        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupsSummaries(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /gid/:gid/group                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
+PUT     /gid/:gid/group-name                uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.renameGroup(gid: String)

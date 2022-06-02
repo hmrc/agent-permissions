@@ -40,7 +40,7 @@ class AuthAction @Inject() (val authConnector: AuthConnector, val env: Environme
   def getAuthorisedAgent()(implicit
     ec: ExecutionContext,
     request: Request[_]
-  ): Future[Option[(Arn, AgentUser)]] = {
+  ): Future[Option[AuthorisedAgent]] = {
 
     implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
 
@@ -50,7 +50,7 @@ class AuthAction @Inject() (val authConnector: AuthConnector, val env: Environme
           getArnAndAgentUser(enrols, name, credentials) match {
             case Some((arn, user)) =>
               credRole match {
-                case Some(User) | Some(Admin) => Future.successful(Option((arn, user)))
+                case Some(User) | Some(Admin) => Future.successful(Option(AuthorisedAgent(arn, user)))
                 case _ =>
                   logger.warn("Invalid credential role")
                   Future.successful(None)
@@ -78,3 +78,5 @@ class AuthAction @Inject() (val authConnector: AuthConnector, val env: Environme
     )
 
 }
+
+case class AuthorisedAgent(arn: Arn, agentUser: AgentUser)

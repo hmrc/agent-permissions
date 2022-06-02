@@ -44,6 +44,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
     val enrolment3: Enrolment =
       Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CgtRef", "XMCGTP123456789")))
 
+    val groupId: GroupId = GroupId(arn, groupName)
+    val renamedGroupName = "renamedGroupName"
+
     val accessGroup: AccessGroup = AccessGroup(
       arn,
       groupName,
@@ -85,6 +88,12 @@ class AccessGroupsServiceSpec extends BaseSpec {
       .upsert(_: AccessGroup))
       .expects(accessGroup)
       .returning(Future.successful(maybeUpsertType))
+
+    def mockAccessGroupsRepositoryRenameGroup(maybeUpsertType: Option[UpsertType]) =
+      (mockAccessGroupsRepository
+        .renameGroup(_: Arn, _: String, _: String, _: AgentUser))
+        .expects(arn, groupName, renamedGroupName, user)
+        .returning(Future.successful(maybeUpsertType))
   }
 
   "Calling create" when {
@@ -160,6 +169,52 @@ class AccessGroupsServiceSpec extends BaseSpec {
         accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
           Some(accessGroup)
       }
+    }
+  }
+
+  "Renaming group" when {
+
+    "group of that Arn and name does not exist" should {
+      s"return $AccessGroupNotExists" in new TestScope {
+        mockAccessGroupsRepositoryGet(None)
+
+        accessGroupsService.rename(groupId, renamedGroupName, user).futureValue shouldBe AccessGroupNotExists
+      }
+    }
+
+    "group of that Arn and name exists" when {
+
+      "DB call to rename group returns nothing" should {
+        s"return $AccessGroupNotRenamed" in new TestScope {
+          mockAccessGroupsRepositoryGet(Some(accessGroup))
+          mockAccessGroupsRepositoryRenameGroup(None)
+
+          accessGroupsService.rename(groupId, renamedGroupName, user).futureValue shouldBe AccessGroupNotRenamed
+        }
+      }
+
+      "DB call to rename group returns a value" when {
+
+        s"DB call to rename group returns $RecordInserted" should {
+          s"return $AccessGroupNotRenamed" in new TestScope {
+            mockAccessGroupsRepositoryGet(Some(accessGroup))
+            mockAccessGroupsRepositoryRenameGroup(Some(RecordInserted(insertedId)))
+
+            accessGroupsService.rename(groupId, renamedGroupName, user).futureValue shouldBe AccessGroupNotRenamed
+          }
+        }
+
+        s"DB call to rename group returns $RecordUpdated" should {
+          s"return $AccessGroupRenamed" in new TestScope {
+            mockAccessGroupsRepositoryGet(Some(accessGroup))
+            mockAccessGroupsRepositoryRenameGroup(Some(RecordUpdated))
+
+            accessGroupsService.rename(groupId, renamedGroupName, user).futureValue shouldBe AccessGroupRenamed
+          }
+        }
+
+      }
+
     }
   }
 

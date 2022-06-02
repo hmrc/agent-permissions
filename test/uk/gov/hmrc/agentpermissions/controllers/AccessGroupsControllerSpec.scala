@@ -17,14 +17,14 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import akka.actor.ActorSystem
-import org.scalamock.handlers.CallHandler2
-import play.api.libs.json.{JsString, JsValue, Json}
-import play.api.mvc.{AnyContentAsEmpty, ControllerComponents}
+import org.scalamock.handlers.{CallHandler2, CallHandler4}
+import play.api.libs.json.{JsArray, JsString, JsValue, Json}
+import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier}
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupCreationStatus, AccessGroupExists, AccessGroupNotCreated, AccessGroupSummary, AccessGroupsService, GroupId}
+import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupCreationStatus, AccessGroupExists, AccessGroupNotCreated, AccessGroupNotExists, AccessGroupNotRenamed, AccessGroupRenamed, AccessGroupRenamingStatus, AccessGroupSummary, AccessGroupsService, GroupId}
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
@@ -37,6 +37,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
   val invalidArn: Arn = Arn("KARN0101010")
   val user: AgentUser = AgentUser("userId", "userName")
   val groupName = "some group"
+  val renamedGroupName = "renamedGroupName"
   val createdId = "createdId"
   lazy val now: LocalDateTime = LocalDateTime.now()
   val user1: AgentUser = AgentUser("user1", "User 1")
@@ -51,15 +52,16 @@ class AccessGroupsControllerSpec extends BaseSpec {
     Seq(Identifier("EtmpRegistrationNumber", "XAPPT0000012345"))
   )
 
-  def jsonPayload(groupName: String): JsValue =
+  def jsonPayloadForCreateGroup(groupName: String): JsValue =
     Json.parse(s"""{
                   |    "groupName": "$groupName",
                   |    "clients": ${Json.toJson(Seq(enrolment1, enrolment2))},
-                  |    "teamMembers": ${Json.toJson(Seq(user1, user2))},
-                  |    "createdBy": {
-                  |        "id": "${user.id}",
-                  |        "name": "${user.name}"
-                  |    }
+                  |    "teamMembers": ${Json.toJson(Seq(user1, user2))}
+                  |}""".stripMargin)
+
+  def jsonPayloadForRenameGroup(groupName: String): JsValue =
+    Json.parse(s"""{
+                  |    "group-name": "$groupName"
                   |}""".stripMargin)
 
   def baseRequest: FakeRequest[AnyContentAsEmpty.type] = FakeRequest().withHeaders(CONTENTTYPE_APPLICATIONJSON)
@@ -68,11 +70,20 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     val accessGroup: AccessGroup = AccessGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
     val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
+    val mockAuthAction: AuthAction = mock[AuthAction]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val actorSystem: ActorSystem = ActorSystem()
 
-    val controller = new AccessGroupsController(mockAccessGroupsService)
+    val controller = new AccessGroupsController(mockAccessGroupsService, mockAuthAction)
+
+    def mockAuthActionGetAuthorisedAgent(
+      maybeAuthorisedAgent: Option[AuthorisedAgent]
+    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+      (mockAuthAction
+        .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+        .expects(*, *)
+        .returning(Future.successful(maybeAuthorisedAgent))
 
     def mockAccessGroupsServiceCreate(
       accessGroupCreationStatus: AccessGroupCreationStatus
@@ -122,34 +133,59 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .expects(GroupId(arn, groupName), *)
         .returning(Future.failed(ex))
 
+    def mockAccessGroupsServiceRename(
+      accessGroupRenamingStatus: AccessGroupRenamingStatus
+    ): CallHandler4[GroupId, String, AgentUser, ExecutionContext, Future[AccessGroupRenamingStatus]] =
+      (mockAccessGroupsService
+        .rename(_: GroupId, _: String, _: AgentUser)(_: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.successful(accessGroupRenamingStatus))
+
+    def mockAccessGroupsServiceRenameWithException(
+      ex: Exception
+    ): CallHandler4[GroupId, String, AgentUser, ExecutionContext, Future[AccessGroupRenamingStatus]] =
+      (mockAccessGroupsService
+        .rename(_: GroupId, _: String, _: AgentUser)(_: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.failed(ex))
+
   }
 
   "Call to create access group" when {
 
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.createGroup(arn)(baseRequest.withBody(jsonPayloadForCreateGroup(groupName)))
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
     "request does not contain json payload" should {
       s"return $BAD_REQUEST" in new TestScope {
-        implicit val request = baseRequest
-
-        val result = controller.createGroup(arn)(request)
+        val result = controller.createGroup(arn)(baseRequest)
         status(result) shouldBe BAD_REQUEST
       }
     }
 
     "request contains incorrect json payload" should {
       s"return $BAD_REQUEST" in new TestScope {
-        implicit val request = baseRequest.withBody(JsString(""))
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
 
-        val result = controller.createGroup(arn)(request)
+        val result = controller.createGroup(arn)(baseRequest.withBody(JsString("")))
         status(result) shouldBe BAD_REQUEST
       }
     }
 
     "request contains correct json payload" when {
 
-      implicit val request = baseRequest.withBody(jsonPayload(groupName))
+      implicit val request = baseRequest.withBody(jsonPayloadForCreateGroup(groupName))
 
       "provided arn is not valid" should {
         s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
           val invalidArn: Arn = Arn("hello")
 
           val result = controller.createGroup(invalidArn)(request)
@@ -160,11 +196,25 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
       "provided arn is valid" when {
 
+        "provided arn does not match that identified by auth" should {
+          s"return $BAD_REQUEST" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+            val nonMatchingArn: Arn = Arn("FARN3782960")
+
+            val result = controller.createGroup(nonMatchingArn)(request)
+
+            status(result) shouldBe BAD_REQUEST
+          }
+        }
+
         "provided group name length is more than the maximum allowed" should {
           s"return $BAD_REQUEST" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
             val result = controller.createGroup(arn)(
               baseRequest
-                .withBody(jsonPayload("0123456789012345678901234567890123"))
+                .withBody(jsonPayloadForCreateGroup("0123456789012345678901234567890123"))
             )
 
             status(result) shouldBe BAD_REQUEST
@@ -175,6 +225,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
           s"access groups service returns $AccessGroupExists" should {
             s"return $CONFLICT" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
               mockAccessGroupsServiceCreate(AccessGroupExists)
 
               val result = controller.createGroup(arn)(request)
@@ -185,6 +236,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
           s"access groups service returns $AccessGroupExists" should {
             s"return $CREATED" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
               mockAccessGroupsServiceCreate(AccessGroupCreated(createdId))
 
               val result = controller.createGroup(arn)(request)
@@ -195,6 +247,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
           s"access groups service returns $AccessGroupExists" should {
             s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
               mockAccessGroupsServiceCreate(AccessGroupNotCreated)
 
               val result = controller.createGroup(arn)(request)
@@ -205,6 +258,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
           s"access groups service throws an exception" should {
             s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
               mockAccessGroupsServiceCreateWithException(new RuntimeException("boo boo"))
 
               val result = controller.createGroup(arn)(request)
@@ -221,9 +275,20 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
   "Call to fetch group summaries" when {
 
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.groupsSummaries(arn)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
     "provided arn is not valid" should {
       s"return $BAD_REQUEST" in new TestScope {
-        val result = controller.groupsInformation(invalidArn)(baseRequest)
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.groupsSummaries(invalidArn)(baseRequest)
 
         status(result) shouldBe BAD_REQUEST
       }
@@ -231,11 +296,24 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "provided arn is valid" when {
 
+      "provided arn does not match that identified by auth" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          val result = controller.groupsSummaries(nonMatchingArn)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
       "call to fetch access groups returns empty collection" should {
         s"return $NOT_FOUND" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetGroupSummaries(Seq.empty)
 
-          val result = controller.groupsInformation(arn)(baseRequest)
+          val result = controller.groupsSummaries(arn)(baseRequest)
 
           status(result) shouldBe NOT_FOUND
         }
@@ -243,12 +321,12 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
       "call to fetch access groups returns non-empty collection" should {
         s"return $OK" in new TestScope {
-
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetGroupSummaries(
             Seq(AccessGroupSummary(gid, "some group", 3, 3))
           )
 
-          val result = controller.groupsInformation(arn)(baseRequest)
+          val result = controller.groupsSummaries(arn)(baseRequest)
 
           status(result) shouldBe OK
           contentAsJson(result) shouldBe Json.parse(
@@ -259,9 +337,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
       "call to fetch access groups throws exception" should {
         s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetGroupSummariesWithException(new RuntimeException("boo boo"))
 
-          val result = controller.groupsInformation(arn)(baseRequest)
+          val result = controller.groupsSummaries(arn)(baseRequest)
 
           status(result) shouldBe INTERNAL_SERVER_ERROR
         }
@@ -272,8 +351,19 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
   "Call to fetch group" when {
 
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.getGroup(gid)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
     "group id is not in the expected format" should {
       s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
         val result = controller.getGroup("bad")(baseRequest)
 
         status(result) shouldBe BAD_REQUEST
@@ -282,8 +372,21 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "group id is in the expected format" when {
 
+      "auth identifies a different arn than that obtained from provided group id" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
+
+          val result = controller.getGroup(gid)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
       "call to fetch group details returns nothing" should {
         s"return $NOT_FOUND" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetGroup(None)
 
           val result = controller.getGroup(gid)(baseRequest)
@@ -294,19 +397,27 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
       "call to fetch group details returns an access group" should {
         s"return $OK" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetGroup(Some(accessGroup))
 
           val result = controller.getGroup(gid)(baseRequest)
 
           status(result) shouldBe OK
-          contentAsJson(result) shouldBe Json.parse(
-            s"""{"arn":"${arn.value}","groupName":"$groupName","created":"$now","lastUpdated":"$now","createdBy":{"id":"userId","name":"userName"},"lastUpdatedBy":{"id":"userId","name":"userName"},"teamMembers":[],"clients":[]}"""
-          )
+
+          val generatedJson: JsValue = contentAsJson(result)
+
+          (generatedJson \ "arn").get shouldBe JsString(arn.value)
+          (generatedJson \ "groupName").get shouldBe JsString(groupName)
+          (generatedJson \ "createdBy" \ "id").get shouldBe JsString(user.id)
+          (generatedJson \ "createdBy" \ "name").get shouldBe JsString(user.name)
+          (generatedJson \ "teamMembers").get shouldBe JsArray(Seq.empty)
+          (generatedJson \ "clients").get shouldBe JsArray(Seq.empty)
         }
       }
 
       "call to fetch group details throws exception" should {
         s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetGroupWithException(new RuntimeException("boo boo"))
 
           val result = controller.getGroup(gid)(baseRequest)
@@ -317,5 +428,124 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     }
 
+  }
+
+  "Call to rename group" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.renameGroup(gid)(baseRequest.withBody(jsonPayloadForRenameGroup(renamedGroupName)))
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "request does not contain json payload" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        val result = controller.renameGroup(gid)(baseRequest)
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "request contains incorrect json payload" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.renameGroup(gid)(baseRequest.withBody(JsString("")))
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "request contains correct json payload" when {
+
+      implicit val request = baseRequest.withBody(jsonPayloadForRenameGroup(renamedGroupName))
+
+      "group id is not in the expected format" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          val result = controller.renameGroup("bad")(request)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "group id is in the expected format" when {
+
+        "auth identifies a different arn than that obtained from provided group id" should {
+          s"return $BAD_REQUEST" in new TestScope {
+            val nonMatchingArn: Arn = Arn("FARN3782960")
+
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
+
+            val result = controller.renameGroup(gid)(request)
+
+            status(result) shouldBe BAD_REQUEST
+          }
+        }
+
+        "provided group name length is more than the maximum allowed" should {
+          s"return $BAD_REQUEST" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+            val result = controller.renameGroup(gid)(
+              baseRequest
+                .withBody(jsonPayloadForRenameGroup("0123456789012345678901234567890123"))
+            )
+
+            status(result) shouldBe BAD_REQUEST
+          }
+        }
+
+        "provided group name length is less than the maximum allowed" when {
+
+          s"access groups service returns $AccessGroupNotExists" should {
+            s"return $NOT_FOUND" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceRename(AccessGroupNotExists)
+
+              val result = controller.renameGroup(gid)(request)
+
+              status(result) shouldBe NOT_FOUND
+            }
+          }
+
+          s"access groups service returns $AccessGroupNotRenamed" should {
+            s"return $NOT_MODIFIED" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceRename(AccessGroupNotRenamed)
+
+              val result = controller.renameGroup(gid)(request)
+
+              status(result) shouldBe NOT_MODIFIED
+            }
+          }
+
+          s"access groups service returns $AccessGroupRenamed" should {
+            s"return $OK" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceRename(AccessGroupRenamed)
+
+              val result = controller.renameGroup(gid)(request)
+
+              status(result) shouldBe OK
+            }
+          }
+
+          s"access groups service throws an exception" should {
+            s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceRenameWithException(new RuntimeException("boo boo"))
+
+              val result = controller.renameGroup(gid)(request)
+
+              status(result) shouldBe INTERNAL_SERVER_ERROR
+            }
+          }
+        }
+      }
+
+    }
   }
 }

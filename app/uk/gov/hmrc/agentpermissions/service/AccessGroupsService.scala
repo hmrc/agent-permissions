@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.service
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import play.api.libs.json.{Json, OFormat}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, Arn}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn}
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated}
 
 import javax.inject.{Inject, Singleton}
@@ -30,6 +30,9 @@ trait AccessGroupsService {
   def create(accessGroup: AccessGroup)(implicit ec: ExecutionContext): Future[AccessGroupCreationStatus]
   def groupSummaries(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroupSummary]]
   def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]]
+  def rename(groupId: GroupId, renameGroupTo: String, agentUser: AgentUser)(implicit
+    ec: ExecutionContext
+  ): Future[AccessGroupRenamingStatus]
 }
 
 @Singleton
@@ -71,6 +74,28 @@ class AccessGroupsServiceImpl @Inject() (accessGroupsRepository: AccessGroupsRep
 
   override def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]] =
     accessGroupsRepository.get(groupId.arn, groupId.groupName)
+
+  override def rename(groupId: GroupId, renameGroupTo: String, whoIsRenaming: AgentUser)(implicit
+    ec: ExecutionContext
+  ): Future[AccessGroupRenamingStatus] =
+    accessGroupsRepository.get(groupId.arn, groupId.groupName) flatMap {
+      case None =>
+        Future.successful(AccessGroupNotExists)
+      case Some(_) =>
+        accessGroupsRepository.renameGroup(groupId.arn, groupId.groupName, renameGroupTo, whoIsRenaming) flatMap {
+          case None =>
+            Future.successful(AccessGroupNotRenamed)
+          case Some(upsertType) =>
+            upsertType match {
+              case RecordInserted(_) =>
+                logger.warn("Should not have inserted when the request was for an update")
+                Future.successful(AccessGroupNotRenamed)
+              case RecordUpdated =>
+                logger.info(s"Renamed access group")
+                Future.successful(AccessGroupRenamed)
+            }
+        }
+    }
 }
 
 case class AccessGroupSummary(groupId: String, groupName: String, clientCount: Int, teamMemberCount: Int)
@@ -83,3 +108,8 @@ sealed trait AccessGroupCreationStatus
 case class AccessGroupCreated(creationId: String) extends AccessGroupCreationStatus
 case object AccessGroupExists extends AccessGroupCreationStatus
 case object AccessGroupNotCreated extends AccessGroupCreationStatus
+
+sealed trait AccessGroupRenamingStatus
+case object AccessGroupNotExists extends AccessGroupRenamingStatus
+case object AccessGroupNotRenamed extends AccessGroupRenamingStatus
+case object AccessGroupRenamed extends AccessGroupRenamingStatus
