@@ -38,197 +38,152 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   private val MAX_LENGTH_GROUP_NAME = 32
 
   def createGroup(arn: Arn): Action[JsValue] = Action.async(parse.json) { implicit request =>
-    authAction
-      .getAuthorisedAgent()
-      .flatMap {
-        case None =>
-          logger.info("Could not identify authorised agent")
-          Future.successful(Forbidden)
-        case Some(AuthorisedAgent(arnIdentified, agentUser)) =>
-          if (!Arn.isValid(arn.value)) {
-            logger.info("Provided ARN is not valid")
-            badRequestInvalidArn(arn)
-          } else if (arn != arnIdentified) {
-            logger.info("Provided ARN did not match with that identified by auth")
-            Future.successful(BadRequest)
-          } else {
-            processAccessGroupCreation(arn, agentUser)
-          }
-      } transformWith handleFailure
-  }
-
-  def groupsSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    authAction
-      .getAuthorisedAgent()
-      .flatMap {
-        case None =>
-          logger.info("Could not identify authorised agent")
-          Future.successful(Forbidden)
-        case Some(AuthorisedAgent(arnIdentified, _)) =>
-          if (!Arn.isValid(arn.value)) {
-            badRequestInvalidArn(arn)
-          } else if (arn != arnIdentified) {
-            logger.info("Provided ARN did not match with that identified by auth")
-            Future.successful(BadRequest)
-          } else {
-            accessGroupsService.groupSummaries(arn) flatMap { groupSummaries =>
-              if (groupSummaries.isEmpty) {
-                Future.successful(NotFound)
-              } else {
-                Future.successful(Ok(Json.toJson(groupSummaries)))
-              }
-            }
-          }
-      } transformWith handleFailure
-  }
-
-  def getGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
-    authAction
-      .getAuthorisedAgent()
-      .flatMap {
-        case None =>
-          logger.info("Could not identify authorised agent")
-          Future.successful(Forbidden)
-        case Some(AuthorisedAgent(arnIdentified, _)) =>
-          GroupId.decode(gid) match {
-            case None =>
-              Future.successful(BadRequest("Check provided group id"))
-            case Some(groupId) =>
-              if (groupId.arn != arnIdentified) {
-                logger.info("ARN obtained from provided group id did not match with that identified by auth")
-                Future.successful(BadRequest)
-              } else {
-                accessGroupsService.get(groupId) flatMap {
-                  case None =>
-                    Future.successful(NotFound)
-                  case Some(accessGroup) =>
-                    Future.successful(Ok(Json.toJson(accessGroup)))
-                }
-              }
-          }
-      } transformWith handleFailure
-  }
-
-  def renameGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
-    authAction
-      .getAuthorisedAgent()
-      .flatMap {
-        case None =>
-          logger.info("Could not identify authorised agent")
-          Future.successful(Forbidden)
-        case Some(AuthorisedAgent(arnIdentified, agentUser)) =>
-          GroupId.decode(gid) match {
-            case None =>
-              Future.successful(BadRequest("Check provided group id"))
-            case Some(groupId) =>
-              if (groupId.arn != arnIdentified) {
-                logger.info("ARN obtained from provided group id did not match with that identified by auth")
-                Future.successful(BadRequest)
-              } else {
-                processAccessGroupRename(groupId, agentUser)
-              }
-          }
-      } transformWith handleFailure
-  }
-
-  def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
-    authAction
-      .getAuthorisedAgent()
-      .flatMap {
-        case None =>
-          logger.info("Could not identify authorised agent")
-          Future.successful(Forbidden)
-        case Some(AuthorisedAgent(arnIdentified, agentUser)) =>
-          GroupId.decode(gid) match {
-            case None =>
-              Future.successful(BadRequest("Check provided group id"))
-            case Some(groupId) =>
-              if (groupId.arn != arnIdentified) {
-                logger.info("ARN obtained from provided group id did not match with that identified by auth")
-                Future.successful(BadRequest)
-              } else {
-                accessGroupsService.delete(groupId) flatMap {
-                  case AccessGroupNotDeleted =>
-                    logger.info("Access group was not deleted")
-                    Future.successful(NotModified)
-                  case AccessGroupDeleted =>
-                    Future.successful(Ok)
-                }
-              }
-          }
-      } transformWith handleFailure
-  }
-
-  private def processAccessGroupCreation(arn: Arn, agentUser: AgentUser)(implicit
-    request: Request[JsValue]
-  ): Future[Result] =
-    request.body
-      .validate[CreateAccessGroupRequest]
-      .fold(
-        errors => badRequestJsonParsing(errors),
-        createAccessGroupRequest =>
+    withAuthorisedAgent { authorisedAgent =>
+      if (!Arn.isValid(arn.value)) {
+        logger.info("Provided ARN is not valid")
+        badRequestInvalidArn(arn)
+      } else if (arn != authorisedAgent.arn) {
+        logger.info("Provided ARN did not match with that identified by auth")
+        Future.successful(BadRequest)
+      } else {
+        withJsonParsed[CreateAccessGroupRequest] { createAccessGroupRequest =>
           if (createAccessGroupRequest.groupName.length > MAX_LENGTH_GROUP_NAME) {
             badRequestGroupNameMaxLength
           } else {
-            accessGroupsService.create(buildAccessGroup(arn, createAccessGroupRequest, agentUser)) flatMap {
+            for {
+              groupCreationStatus <-
+                accessGroupsService
+                  .create(createAccessGroupRequest.buildAccessGroup(arn, authorisedAgent.agentUser))
+            } yield groupCreationStatus match {
               case AccessGroupExistsForCreation =>
                 logger.info("Cannot create a group with a name that already exists")
-                Future.successful(Conflict)
+                Conflict
               case AccessGroupCreated(groupId) =>
                 logger.info(s"Created group for '${arn.value}': '$groupId'")
-                Future.successful(Created(JsString(groupId)))
+                Created(JsString(groupId))
               case AccessGroupNotCreated =>
                 logger.warn("Unable to create access group")
-                Future.successful(InternalServerError)
+                InternalServerError
             }
           }
-      )
-
-  private def buildAccessGroup(
-    arn: Arn,
-    createAccessGroupRequest: CreateAccessGroupRequest,
-    agentUser: AgentUser
-  ): AccessGroup = {
-    val now = LocalDateTime.now()
-
-    AccessGroup(
-      arn,
-      createAccessGroupRequest.groupName,
-      now,
-      now,
-      agentUser,
-      agentUser,
-      createAccessGroupRequest.teamMembers,
-      createAccessGroupRequest.clients
-    )
+        }
+      }
+    }
   }
 
-  private def processAccessGroupRename(
-    groupId: GroupId,
-    agentUser: AgentUser
-  )(implicit
-    request: Request[JsValue]
-  ): Future[Result] =
-    request.body
-      .validate[RenameAccessGroupRequest]
-      .fold(
-        errors => badRequestJsonParsing(errors),
-        renameAccessGroupRequest =>
+  def groupsSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent { authorisedAgent =>
+      if (!Arn.isValid(arn.value)) {
+        logger.info("Provided ARN is not valid")
+        badRequestInvalidArn(arn)
+      } else if (arn != authorisedAgent.arn) {
+        logger.info("Provided ARN did not match with that identified by auth")
+        Future.successful(BadRequest)
+      } else {
+        for {
+          groupSummaries <- accessGroupsService.groupSummaries(arn)
+        } yield
+          if (groupSummaries.isEmpty) {
+            NotFound
+          } else {
+            Ok(Json.toJson(groupSummaries))
+          }
+      }
+    }
+  }
+
+  def getGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent { authorisedAgent =>
+      withGroupId(gid, authorisedAgent.arn) { groupId =>
+        for {
+          maybeAccessGroup <- accessGroupsService.get(groupId)
+        } yield maybeAccessGroup match {
+          case None =>
+            NotFound
+          case Some(accessGroup) =>
+            Ok(Json.toJson(accessGroup))
+        }
+      }
+    }
+  }
+
+  def renameGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+    withAuthorisedAgent { authorisedAgent =>
+      withGroupId(gid, authorisedAgent.arn) { groupId =>
+        withJsonParsed[RenameAccessGroupRequest] { renameAccessGroupRequest =>
           if (renameAccessGroupRequest.groupName.length > MAX_LENGTH_GROUP_NAME) {
             badRequestGroupNameMaxLength
           } else {
-            accessGroupsService.rename(groupId, renameAccessGroupRequest.groupName, agentUser) flatMap {
+            for {
+              groupRenamingStatus <-
+                accessGroupsService.rename(groupId, renameAccessGroupRequest.groupName, authorisedAgent.agentUser)
+            } yield groupRenamingStatus match {
               case AccessGroupNotExistsForRenaming =>
                 logger.info("Cannot rename a group that does not already exist")
-                Future.successful(NotFound)
+                NotFound
               case AccessGroupNotRenamed =>
                 logger.warn("Unable to rename access group")
-                Future.successful(NotModified)
+                NotModified
               case AccessGroupRenamed =>
                 logger.warn("Renamed access group")
-                Future.successful(Ok)
+                Ok
             }
           }
+        }
+      }
+    }
+  }
+
+  def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent { authorisedAgent =>
+      withGroupId(gid, authorisedAgent.arn) { groupId =>
+        accessGroupsService.delete(groupId) flatMap {
+          case AccessGroupNotDeleted =>
+            logger.info("Access group was not deleted")
+            Future.successful(NotModified)
+          case AccessGroupDeleted =>
+            Future.successful(Ok)
+        }
+      }
+    }
+  }
+
+  private def withAuthorisedAgent[T](
+    body: AuthorisedAgent => Future[Result]
+  )(implicit request: Request[T], ec: ExecutionContext): Future[Result] =
+    authAction
+      .getAuthorisedAgent()
+      .flatMap {
+        case None =>
+          logger.info("Could not identify authorised agent")
+          Future.successful(Forbidden)
+        case Some(authorisedAgent: AuthorisedAgent) =>
+          body(authorisedAgent)
+      } transformWith handleFailure
+
+  private def withGroupId(gid: String, authorisedArn: Arn)(
+    body: GroupId => Future[Result]
+  ): Future[Result] =
+    GroupId.decode(gid) match {
+      case None =>
+        Future.successful(BadRequest("Check provided group id"))
+      case Some(groupId) =>
+        if (groupId.arn != authorisedArn) {
+          logger.info("ARN obtained from provided group id did not match with that identified by auth")
+          Future.successful(BadRequest)
+        } else {
+          body(groupId)
+        }
+    }
+
+  def withJsonParsed[T](
+    body: T => Future[Result]
+  )(implicit request: Request[JsValue], reads: Reads[T]): Future[Result] =
+    request.body
+      .validate[T]
+      .fold(
+        errors => badRequestJsonParsing(errors),
+        deserialized => body(deserialized)
       )
 
   private def badRequestInvalidArn(arn: Arn): Future[Result] =
@@ -254,17 +209,37 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 }
 
+sealed trait AccessGroupRequest
+
 case class CreateAccessGroupRequest(
   groupName: String,
   teamMembers: Option[Set[AgentUser]],
   clients: Option[Set[Enrolment]]
-)
+) extends AccessGroupRequest {
+  def buildAccessGroup(
+    arn: Arn,
+    agentUser: AgentUser
+  ): AccessGroup = {
+    val now = LocalDateTime.now()
+
+    AccessGroup(
+      arn,
+      groupName,
+      now,
+      now,
+      agentUser,
+      agentUser,
+      teamMembers,
+      clients
+    )
+  }
+}
 
 object CreateAccessGroupRequest {
   implicit val formatCreateAccessGroupRequest: OFormat[CreateAccessGroupRequest] = Json.format[CreateAccessGroupRequest]
 }
 
-case class RenameAccessGroupRequest(groupName: String)
+case class RenameAccessGroupRequest(groupName: String) extends AccessGroupRequest
 
 object RenameAccessGroupRequest {
 
