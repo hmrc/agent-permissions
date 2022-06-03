@@ -94,17 +94,23 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .renameGroup(_: Arn, _: String, _: String, _: AgentUser))
         .expects(arn, groupName, renamedGroupName, user)
         .returning(Future.successful(maybeUpsertType))
+
+    def mockAccessGroupsRepositoryDelete(maybeDeletedCount: Option[Long]) =
+      (mockAccessGroupsRepository
+        .delete(_: Arn, _: String))
+        .expects(arn, groupName)
+        .returning(Future.successful(maybeDeletedCount))
   }
 
   "Calling create" when {
 
     "group of that name already exists" should {
-      s"return $AccessGroupExists" in new TestScope {
+      s"return $AccessGroupExistsForCreation" in new TestScope {
         mockAccessGroupsRepositoryGet(Some(accessGroup))
 
         accessGroupsService
           .create(accessGroup)
-          .futureValue shouldBe AccessGroupExists
+          .futureValue shouldBe AccessGroupExistsForCreation
       }
     }
 
@@ -175,10 +181,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
   "Renaming group" when {
 
     "group of that Arn and name does not exist" should {
-      s"return $AccessGroupNotExists" in new TestScope {
+      s"return $AccessGroupNotExistsForRenaming" in new TestScope {
         mockAccessGroupsRepositoryGet(None)
 
-        accessGroupsService.rename(groupId, renamedGroupName, user).futureValue shouldBe AccessGroupNotExists
+        accessGroupsService.rename(groupId, renamedGroupName, user).futureValue shouldBe AccessGroupNotExistsForRenaming
       }
     }
 
@@ -213,6 +219,37 @@ class AccessGroupsServiceSpec extends BaseSpec {
           }
         }
 
+      }
+
+    }
+  }
+
+  "Deleting group" when {
+
+    "DB call to delete group returns nothing" should {
+      s"return $AccessGroupNotDeleted" in new TestScope {
+        mockAccessGroupsRepositoryDelete(None)
+
+        accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupNotDeleted
+      }
+    }
+
+    "DB call to delete group returns some value" when {
+
+      "DB call to delete group indicates one record was deleted" should {
+        s"return $AccessGroupDeleted" in new TestScope {
+          mockAccessGroupsRepositoryDelete(Some(1L))
+
+          accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupDeleted
+        }
+      }
+
+      "DB call to delete group indicates no record was deleted" should {
+        s"return $AccessGroupNotDeleted" in new TestScope {
+          mockAccessGroupsRepositoryDelete(Some(0L))
+
+          accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupNotDeleted
+        }
       }
 
     }

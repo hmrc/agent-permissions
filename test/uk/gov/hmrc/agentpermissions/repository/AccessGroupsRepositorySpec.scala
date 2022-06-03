@@ -138,12 +138,29 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
     "renaming group" when {
 
       "group name provided is different than that existing in DB" should {
-        s"return RecordUpdated" in new TestScope {
+        s"return $RecordUpdated" in new TestScope {
           accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
 
           accessGroupsRepository.renameGroup(arn, groupName, renamedGroupName, agent).futureValue shouldBe Some(
             RecordUpdated
           )
+        }
+      }
+    }
+
+    "deleting group" when {
+
+      "access group corresponding to group name provided does not exist in DB" should {
+        s"indicate the correct deletion count" in new TestScope {
+          accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(0L)
+        }
+      }
+
+      "group name provided is different than that existing in DB only case-sensitively" should {
+        s"indicate the correct deletion count" in new TestScope {
+          accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
+
+          accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(1L)
         }
       }
     }

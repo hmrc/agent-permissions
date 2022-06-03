@@ -33,6 +33,7 @@ trait AccessGroupsService {
   def rename(groupId: GroupId, renameGroupTo: String, agentUser: AgentUser)(implicit
     ec: ExecutionContext
   ): Future[AccessGroupRenamingStatus]
+  def delete(groupId: GroupId)(implicit ec: ExecutionContext): Future[AccessGroupDeletionStatus]
 }
 
 @Singleton
@@ -42,7 +43,7 @@ class AccessGroupsServiceImpl @Inject() (accessGroupsRepository: AccessGroupsRep
   override def create(accessGroup: AccessGroup)(implicit ec: ExecutionContext): Future[AccessGroupCreationStatus] =
     accessGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
       case Some(_) =>
-        Future.successful(AccessGroupExists)
+        Future.successful(AccessGroupExistsForCreation)
       case _ =>
         accessGroupsRepository.upsert(accessGroup) flatMap {
           case None =>
@@ -80,7 +81,7 @@ class AccessGroupsServiceImpl @Inject() (accessGroupsRepository: AccessGroupsRep
   ): Future[AccessGroupRenamingStatus] =
     accessGroupsRepository.get(groupId.arn, groupId.groupName) flatMap {
       case None =>
-        Future.successful(AccessGroupNotExists)
+        Future.successful(AccessGroupNotExistsForRenaming)
       case Some(_) =>
         accessGroupsRepository.renameGroup(groupId.arn, groupId.groupName, renameGroupTo, whoIsRenaming) flatMap {
           case None =>
@@ -96,6 +97,19 @@ class AccessGroupsServiceImpl @Inject() (accessGroupsRepository: AccessGroupsRep
             }
         }
     }
+
+  override def delete(groupId: GroupId)(implicit ec: ExecutionContext): Future[AccessGroupDeletionStatus] =
+    for {
+      maybeDeletedCount <- accessGroupsRepository.delete(groupId.arn, groupId.groupName)
+    } yield maybeDeletedCount match {
+      case None =>
+        AccessGroupNotDeleted
+      case Some(deletedCount) =>
+        if (deletedCount == 1L)
+          AccessGroupDeleted
+        else
+          AccessGroupNotDeleted
+    }
 }
 
 case class AccessGroupSummary(groupId: String, groupName: String, clientCount: Int, teamMemberCount: Int)
@@ -106,10 +120,14 @@ object AccessGroupSummary {
 
 sealed trait AccessGroupCreationStatus
 case class AccessGroupCreated(creationId: String) extends AccessGroupCreationStatus
-case object AccessGroupExists extends AccessGroupCreationStatus
+case object AccessGroupExistsForCreation extends AccessGroupCreationStatus
 case object AccessGroupNotCreated extends AccessGroupCreationStatus
 
 sealed trait AccessGroupRenamingStatus
-case object AccessGroupNotExists extends AccessGroupRenamingStatus
+case object AccessGroupNotExistsForRenaming extends AccessGroupRenamingStatus
 case object AccessGroupNotRenamed extends AccessGroupRenamingStatus
 case object AccessGroupRenamed extends AccessGroupRenamingStatus
+
+sealed trait AccessGroupDeletionStatus
+case object AccessGroupDeleted extends AccessGroupDeletionStatus
+case object AccessGroupNotDeleted extends AccessGroupDeletionStatus

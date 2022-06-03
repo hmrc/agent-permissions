@@ -24,7 +24,8 @@ import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier}
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupCreationStatus, AccessGroupExists, AccessGroupNotCreated, AccessGroupNotExists, AccessGroupNotRenamed, AccessGroupRenamed, AccessGroupRenamingStatus, AccessGroupSummary, AccessGroupsService, GroupId}
+import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupCreationStatus, AccessGroupDeleted, AccessGroupDeletionStatus, AccessGroupExistsForCreation, AccessGroupNotCreated, AccessGroupNotDeleted, AccessGroupNotExistsForRenaming, AccessGroupNotRenamed, AccessGroupRenamed, AccessGroupRenamingStatus, AccessGroupSummary, AccessGroupsService, GroupId}
+import uk.gov.hmrc.auth.core.InvalidBearerToken
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
@@ -84,6 +85,14 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
         .expects(*, *)
         .returning(Future.successful(maybeAuthorisedAgent))
+
+    def mockAuthActionGetAuthorisedAgentWithExceptiom(
+      ex: Exception
+    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+      (mockAuthAction
+        .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+        .expects(*, *)
+        .returning(Future.failed(ex))
 
     def mockAccessGroupsServiceCreate(
       accessGroupCreationStatus: AccessGroupCreationStatus
@@ -149,6 +158,22 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .expects(*, *, *, *)
         .returning(Future.failed(ex))
 
+    def mockAccessGroupsServiceDelete(
+      accessGroupDeletionStatus: AccessGroupDeletionStatus
+    ): CallHandler2[GroupId, ExecutionContext, Future[AccessGroupDeletionStatus]] =
+      (mockAccessGroupsService
+        .delete(_: GroupId)(_: ExecutionContext))
+        .expects(*, *)
+        .returning(Future.successful(accessGroupDeletionStatus))
+
+    def mockAccessGroupsServiceDeleteWithException(
+      ex: Exception
+    ): CallHandler2[GroupId, ExecutionContext, Future[AccessGroupDeletionStatus]] =
+      (mockAccessGroupsService
+        .delete(_: GroupId)(_: ExecutionContext))
+        .expects(*, *)
+        .returning(Future.failed(ex))
+
   }
 
   "Call to create access group" when {
@@ -156,6 +181,15 @@ class AccessGroupsControllerSpec extends BaseSpec {
     "authorised agent is not identified by auth" should {
       s"return $FORBIDDEN" in new TestScope {
         mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.createGroup(arn)(baseRequest.withBody(jsonPayloadForCreateGroup(groupName)))
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "auth throws exception" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgentWithExceptiom(new InvalidBearerToken("auth failed"))
 
         val result = controller.createGroup(arn)(baseRequest.withBody(jsonPayloadForCreateGroup(groupName)))
         status(result) shouldBe FORBIDDEN
@@ -223,10 +257,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
         "provided group name length is less than the maximum allowed" when {
 
-          s"access groups service returns $AccessGroupExists" should {
+          s"access groups service returns $AccessGroupExistsForCreation" should {
             s"return $CONFLICT" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockAccessGroupsServiceCreate(AccessGroupExists)
+              mockAccessGroupsServiceCreate(AccessGroupExistsForCreation)
 
               val result = controller.createGroup(arn)(request)
 
@@ -234,7 +268,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
             }
           }
 
-          s"access groups service returns $AccessGroupExists" should {
+          s"access groups service returns $AccessGroupExistsForCreation" should {
             s"return $CREATED" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
               mockAccessGroupsServiceCreate(AccessGroupCreated(createdId))
@@ -245,7 +279,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
             }
           }
 
-          s"access groups service returns $AccessGroupExists" should {
+          s"access groups service returns $AccessGroupExistsForCreation" should {
             s"return $INTERNAL_SERVER_ERROR" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
               mockAccessGroupsServiceCreate(AccessGroupNotCreated)
@@ -500,10 +534,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
         "provided group name length is less than the maximum allowed" when {
 
-          s"access groups service returns $AccessGroupNotExists" should {
+          s"access groups service returns $AccessGroupNotExistsForRenaming" should {
             s"return $NOT_FOUND" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockAccessGroupsServiceRename(AccessGroupNotExists)
+              mockAccessGroupsServiceRename(AccessGroupNotExistsForRenaming)
 
               val result = controller.renameGroup(gid)(request)
 
@@ -547,5 +581,77 @@ class AccessGroupsControllerSpec extends BaseSpec {
       }
 
     }
+  }
+
+  "Call to delete group" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.deleteGroup(gid)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "group id is not in the expected format" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.deleteGroup("bad")(baseRequest)
+
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "group id is in the expected format" when {
+
+      "auth identifies a different arn than that obtained from provided group id" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
+
+          val result = controller.deleteGroup(gid)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      s"access groups service returns $AccessGroupNotDeleted" should {
+        s"return $NOT_MODIFIED" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceDelete(AccessGroupNotDeleted)
+
+          val result = controller.deleteGroup(gid)(baseRequest)
+
+          status(result) shouldBe NOT_MODIFIED
+        }
+      }
+
+      s"access groups service returns $AccessGroupDeleted" should {
+        s"return $OK" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceDelete(AccessGroupDeleted)
+
+          val result = controller.deleteGroup(gid)(baseRequest)
+
+          status(result) shouldBe OK
+        }
+      }
+
+      s"access groups service throws an exception" should {
+        s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceDeleteWithException(new RuntimeException("boo boo"))
+
+          val result = controller.deleteGroup(gid)(baseRequest)
+
+          status(result) shouldBe INTERNAL_SERVER_ERROR
+        }
+      }
+
+    }
+
   }
 }

@@ -8,3 +8,4 @@ POST    /arn/:arn/group/create              uk.gov.hmrc.agentpermissions.control
 GET     /arn/:arn/groups-information        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupsSummaries(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /gid/:gid/group                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
 PUT     /gid/:gid/group-name                uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.renameGroup(gid: String)
+DELETE  /group/gid/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)

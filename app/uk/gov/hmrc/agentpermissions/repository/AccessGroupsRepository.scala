@@ -22,7 +22,7 @@ import com.mongodb.client.model.{Collation, IndexOptions, ReplaceOptions}
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
-import org.mongodb.scala.model.{IndexModel, UpdateOptions}
+import org.mongodb.scala.model.{DeleteOptions, IndexModel, UpdateOptions}
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
@@ -45,6 +45,7 @@ trait AccessGroupsRepository {
     renameGroupTo: String,
     whoIsRenaming: AgentUser
   ): Future[Option[UpsertType]]
+  def delete(arn: Arn, groupName: String): Future[Option[Long]]
 }
 
 @Singleton
@@ -125,7 +126,18 @@ class AccessGroupsRepositoryImpl @Inject() (
         )
       )
 
+  override def delete(arn: Arn, groupName: String): Future[Option[Long]] =
+    collection
+      .deleteOne(
+        and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),
+        deleteOptions
+      )
+      .headOption()
+      .map(_.map(result => result.getDeletedCount))
+
   private lazy val upsertOptions: ReplaceOptions = new ReplaceOptions().upsert(true).collation(caseInsensitiveCollation)
+
+  private lazy val deleteOptions: DeleteOptions = new DeleteOptions().collation(caseInsensitiveCollation)
 
   private lazy val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
 }

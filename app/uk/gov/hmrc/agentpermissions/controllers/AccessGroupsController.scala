@@ -21,6 +21,7 @@ import play.api.libs.json._
 import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment}
 import uk.gov.hmrc.agentpermissions.service._
+import uk.gov.hmrc.auth.core.AuthorisationException
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import java.time.LocalDateTime
@@ -130,6 +131,34 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
       } transformWith handleFailure
   }
 
+  def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
+    authAction
+      .getAuthorisedAgent()
+      .flatMap {
+        case None =>
+          logger.info("Could not identify authorised agent")
+          Future.successful(Forbidden)
+        case Some(AuthorisedAgent(arnIdentified, agentUser)) =>
+          GroupId.decode(gid) match {
+            case None =>
+              Future.successful(BadRequest("Check provided group id"))
+            case Some(groupId) =>
+              if (groupId.arn != arnIdentified) {
+                logger.info("ARN obtained from provided group id did not match with that identified by auth")
+                Future.successful(BadRequest)
+              } else {
+                accessGroupsService.delete(groupId) flatMap {
+                  case AccessGroupNotDeleted =>
+                    logger.info("Access group was not deleted")
+                    Future.successful(NotModified)
+                  case AccessGroupDeleted =>
+                    Future.successful(Ok)
+                }
+              }
+          }
+      } transformWith handleFailure
+  }
+
   private def processAccessGroupCreation(arn: Arn, agentUser: AgentUser)(implicit
     request: Request[JsValue]
   ): Future[Result] =
@@ -142,7 +171,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
             badRequestGroupNameMaxLength
           } else {
             accessGroupsService.create(buildAccessGroup(arn, createAccessGroupRequest, agentUser)) flatMap {
-              case AccessGroupExists =>
+              case AccessGroupExistsForCreation =>
                 logger.info("Cannot create a group with a name that already exists")
                 Future.successful(Conflict)
               case AccessGroupCreated(groupId) =>
@@ -189,7 +218,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
             badRequestGroupNameMaxLength
           } else {
             accessGroupsService.rename(groupId, renameAccessGroupRequest.groupName, agentUser) flatMap {
-              case AccessGroupNotExists =>
+              case AccessGroupNotExistsForRenaming =>
                 logger.info("Cannot rename a group that does not already exist")
                 Future.successful(NotFound)
               case AccessGroupNotRenamed =>
@@ -216,6 +245,9 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   private def handleFailure(t: Try[Result]): Future[Result] = t match {
     case Success(result) =>
       Future.successful(result)
+    case Failure(ex: AuthorisationException) =>
+      logger.error(s"Auth error: ${ex.getMessage}")
+      Future.successful(Forbidden)
     case Failure(ex) =>
       logger.error(s"Error processing request: ${ex.getMessage}")
       Future.successful(InternalServerError)
