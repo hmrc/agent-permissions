@@ -106,31 +106,29 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
       }
     }
 
-    "upserting" when {
+    "inserting" when {
 
-      "upserting a non-existing access group" should {
-        s"return $RecordInserted" in new TestScope {
-          accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
+      "inserting a non-existing access group" should {
+        s"return an id" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
         }
       }
 
-      "upserting an existing access group" should {
-        s"return $RecordUpdated" in new TestScope {
-          accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
-          accessGroupsRepository.upsert(accessGroup).futureValue shouldBe Some(RecordUpdated)
+      "inserting an existing access group" should {
+        s"return None" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+          accessGroupsRepository.insert(accessGroup).futureValue shouldBe None
         }
       }
 
-      "upserting an access group with a group name differing only in case-sensitiveness" should {
-        s"return $RecordUpdated" in new TestScope {
-          accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
+      "inserting an access group with a group name differing only in case-sensitiveness" should {
+        s"return None" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
           val accessGroupHavingGroupNameOfDifferentCase: AccessGroup =
             accessGroup.copy(groupName = accessGroup.groupName.toUpperCase)
 
-          accessGroupsRepository.upsert(accessGroupHavingGroupNameOfDifferentCase).futureValue shouldBe Some(
-            RecordUpdated
-          )
+          accessGroupsRepository.insert(accessGroupHavingGroupNameOfDifferentCase).futureValue shouldBe None
         }
       }
     }
@@ -139,7 +137,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "group name provided is different than that existing in DB" should {
         s"return $RecordUpdated" in new TestScope {
-          accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
           accessGroupsRepository.renameGroup(arn, groupName, renamedGroupName, agent).futureValue shouldBe Some(
             RecordUpdated
@@ -158,9 +156,26 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "group name provided is different than that existing in DB only case-sensitively" should {
         s"indicate the correct deletion count" in new TestScope {
-          accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
           accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(1L)
+        }
+      }
+    }
+
+    "updating group" when {
+
+      "access group corresponding to group name provided does not exist in DB" should {
+        "indicate the correct updation count" in new TestScope {
+          accessGroupsRepository.update(arn, groupName, accessGroup).futureValue shouldBe Some(0)
+        }
+      }
+
+      "roup name provided is different than that existing in DB only case-sensitively" should {
+        "indicate the correct updation count" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+
+          accessGroupsRepository.update(arn, groupName.toUpperCase, accessGroup).futureValue shouldBe Some(1)
         }
       }
     }

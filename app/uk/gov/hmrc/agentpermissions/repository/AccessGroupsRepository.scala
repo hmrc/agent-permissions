@@ -17,12 +17,13 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
+import com.mongodb.MongoWriteException
 import com.mongodb.client.model.Updates.set
-import com.mongodb.client.model.{Collation, IndexOptions, ReplaceOptions}
+import com.mongodb.client.model.{Collation, IndexOptions}
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
-import org.mongodb.scala.model.{DeleteOptions, IndexModel, UpdateOptions}
+import org.mongodb.scala.model.{DeleteOptions, IndexModel, ReplaceOptions, UpdateOptions}
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
@@ -38,7 +39,7 @@ import scala.concurrent.{ExecutionContext, Future}
 trait AccessGroupsRepository {
   def get(arn: Arn): Future[Seq[AccessGroup]]
   def get(arn: Arn, groupName: String): Future[Option[AccessGroup]]
-  def upsert(accessGroup: AccessGroup): Future[Option[UpsertType]]
+  def insert(accessGroup: AccessGroup): Future[Option[String]]
   def renameGroup(
     arn: Arn,
     groupName: String,
@@ -46,6 +47,7 @@ trait AccessGroupsRepository {
     whoIsRenaming: AgentUser
   ): Future[Option[UpsertType]]
   def delete(arn: Arn, groupName: String): Future[Option[Long]]
+  def update(arn: Arn, groupName: String, accessGroup: AccessGroup): Future[Option[Long]]
 }
 
 @Singleton
@@ -81,23 +83,14 @@ class AccessGroupsRepositoryImpl @Inject() (
       .collation(caseInsensitiveCollation)
       .headOption()
 
-  override def upsert(accessGroup: AccessGroup): Future[Option[UpsertType]] =
+  override def insert(accessGroup: AccessGroup): Future[Option[String]] =
     collection
-      .replaceOne(
-        and(equal(FIELD_ARN, accessGroup.arn.value), equal(FIELD_GROUPNAME, accessGroup.groupName)),
-        accessGroup,
-        upsertOptions
-      )
+      .insertOne(accessGroup)
       .headOption()
-      .map(
-        _.map(result =>
-          result.getModifiedCount match {
-            case 0L => RecordInserted(result.getUpsertedId.asObjectId().getValue.toString)
-            case 1L => RecordUpdated
-            case x  => throw new RuntimeException(s"Update modified count should not have been $x")
-          }
-        )
-      )
+      .map(_.map(result => result.getInsertedId.asObjectId().getValue.toString))
+      .recoverWith { case e: MongoWriteException =>
+        Future.successful(None)
+      }
 
   override def renameGroup(
     arn: Arn,
@@ -135,9 +128,20 @@ class AccessGroupsRepositoryImpl @Inject() (
       .headOption()
       .map(_.map(result => result.getDeletedCount))
 
-  private lazy val upsertOptions: ReplaceOptions = new ReplaceOptions().upsert(true).collation(caseInsensitiveCollation)
+  override def update(arn: Arn, groupName: String, accessGroup: AccessGroup): Future[Option[Long]] =
+    collection
+      .replaceOne(
+        and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),
+        accessGroup,
+        replaceOptions
+      )
+      .headOption()
+      .map(_.map(result => result.getModifiedCount))
 
   private lazy val deleteOptions: DeleteOptions = new DeleteOptions().collation(caseInsensitiveCollation)
+
+  private lazy val replaceOptions: ReplaceOptions =
+    new ReplaceOptions().upsert(true).collation(caseInsensitiveCollation)
 
   private lazy val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
 }

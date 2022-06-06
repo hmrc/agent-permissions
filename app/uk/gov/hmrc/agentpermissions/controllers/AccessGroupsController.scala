@@ -68,7 +68,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
           }
         }
       }
-    }
+    } transformWith failureHandler
   }
 
   def groupsSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
@@ -89,7 +89,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
             Ok(Json.toJson(groupSummaries))
           }
       }
-    }
+    } transformWith failureHandler
   }
 
   def getGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
@@ -104,7 +104,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
             Ok(Json.toJson(accessGroup))
         }
       }
-    }
+    } transformWith failureHandler
   }
 
   def renameGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
@@ -131,21 +131,45 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
           }
         }
       }
-    }
+    } transformWith failureHandler
   }
 
   def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
       withGroupId(gid, authorisedAgent.arn) { groupId =>
-        accessGroupsService.delete(groupId) flatMap {
+        for {
+          groupDeletionStatus <- accessGroupsService.delete(groupId)
+        } yield groupDeletionStatus match {
           case AccessGroupNotDeleted =>
             logger.info("Access group was not deleted")
-            Future.successful(NotModified)
+            NotModified
           case AccessGroupDeleted =>
-            Future.successful(Ok)
+            Ok
         }
       }
-    }
+    } transformWith failureHandler
+  }
+
+  def updateGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+    withAuthorisedAgent { authorisedAgent =>
+      withGroupId(gid, authorisedAgent.arn) { groupId =>
+        withJsonParsed[AccessGroup] { accessGroup =>
+          if (accessGroup.groupName.length > MAX_LENGTH_GROUP_NAME) {
+            badRequestGroupNameMaxLength
+          } else {
+            for {
+              groupUpdationStatus <- accessGroupsService.update(groupId, accessGroup, authorisedAgent.agentUser)
+            } yield groupUpdationStatus match {
+              case AccessGroupNotUpdated =>
+                logger.info("Access group was not updated")
+                NotFound
+              case AccessGroupUpdated =>
+                Ok
+            }
+          }
+        }
+      }
+    } transformWith failureHandler
   }
 
   private def withAuthorisedAgent[T](
@@ -159,7 +183,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
           Future.successful(Forbidden)
         case Some(authorisedAgent: AuthorisedAgent) =>
           body(authorisedAgent)
-      } transformWith handleFailure
+      }
 
   private def withGroupId(gid: String, authorisedArn: Arn)(
     body: GroupId => Future[Result]
@@ -170,7 +194,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
       case Some(groupId) =>
         if (groupId.arn != authorisedArn) {
           logger.info("ARN obtained from provided group id did not match with that identified by auth")
-          Future.successful(BadRequest)
+          Future.successful(Forbidden)
         } else {
           body(groupId)
         }
@@ -197,7 +221,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
       BadRequest(Json.obj("message" -> JsString(s"Group name length exceeds maximum allowed $MAX_LENGTH_GROUP_NAME")))
     )
 
-  private def handleFailure(t: Try[Result]): Future[Result] = t match {
+  private def failureHandler(triedResult: Try[Result]): Future[Result] = triedResult match {
     case Success(result) =>
       Future.successful(result)
     case Failure(ex: AuthorisationException) =>
