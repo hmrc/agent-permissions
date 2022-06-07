@@ -29,6 +29,7 @@ import uk.gov.hmrc.play.http.HeaderCarrierConverter
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 @Singleton
 class AuthAction @Inject() (val authConnector: AuthConnector, val env: Environment, val config: Configuration)
@@ -48,9 +49,9 @@ class AuthAction @Inject() (val authConnector: AuthConnector, val env: Environme
       .retrieve(allEnrolments and credentialRole and name and credentials) {
         case enrols ~ credRole ~ name ~ credentials =>
           getArnAndAgentUser(enrols, name, credentials) match {
-            case Some((arn, user)) =>
+            case Some(authorisedAgent) =>
               credRole match {
-                case Some(User) | Some(Admin) => Future.successful(Option(AuthorisedAgent(arn, user)))
+                case Some(User) | Some(Admin) => Future.successful(Option(authorisedAgent))
                 case _ =>
                   logger.warn("Invalid credential role")
                   Future.successful(None)
@@ -59,23 +60,34 @@ class AuthAction @Inject() (val authConnector: AuthConnector, val env: Environme
               logger.warn("No " + agentReferenceNumberIdentifier + " in enrolment")
               Future.successful(None)
           }
-      }
+      } transformWith failureHandler
   }
 
   private def getArnAndAgentUser(
     enrolments: Enrolments,
     maybeName: Option[Name],
     maybeCredentials: Option[Credentials]
-  ): Option[(Arn, AgentUser)] =
+  ): Option[AuthorisedAgent] =
     for {
       enrolment   <- enrolments.getEnrolment(agentEnrolment)
       identifier  <- enrolment.getIdentifier(agentReferenceNumberIdentifier)
       credentials <- maybeCredentials
       name        <- maybeName
     } yield (
-      Arn(identifier.value),
-      AgentUser(credentials.providerId, name.name.getOrElse("") + " " + name.lastName.getOrElse(""))
+      AuthorisedAgent(
+        Arn(identifier.value),
+        AgentUser(credentials.providerId, name.name.getOrElse("") + " " + name.lastName.getOrElse(""))
+      )
     )
+
+  private def failureHandler(triedResult: Try[Option[AuthorisedAgent]]): Future[Option[AuthorisedAgent]] =
+    triedResult match {
+      case Success(maybeAuthorisedAgent) =>
+        Future.successful(maybeAuthorisedAgent)
+      case Failure(ex) =>
+        logger.warn(s"Error authorising: ${ex.getMessage}")
+        Future.successful(None)
+    }
 
 }
 

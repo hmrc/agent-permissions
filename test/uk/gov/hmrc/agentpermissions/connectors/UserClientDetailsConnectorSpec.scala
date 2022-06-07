@@ -16,37 +16,48 @@
 
 package uk.gov.hmrc.agentpermissions.connectors
 
-import com.google.inject.AbstractModule
-import play.api.http.Status.{FORBIDDEN, INTERNAL_SERVER_ERROR, NOT_FOUND, NO_CONTENT, OK, UNAUTHORIZED}
+import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
+import com.kenshoo.play.metrics.Metrics
+import org.scalamock.handlers.CallHandler0
+import play.api.http.Status._
 import play.api.libs.json.Json
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseIntegrationSpec
+import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpReads, HttpResponse}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class UserClientDetailsConnectorIntegrationSpec extends BaseIntegrationSpec {
+class UserClientDetailsConnectorSpec extends BaseSpec {
 
-  val arn = Arn("TARN0000001")
+  val arn: Arn = Arn("TARN0000001")
 
-  val httpClient: HttpClient = mock[HttpClient]
+  val mockHttpClient: HttpClient = mock[HttpClient]
+  val mockMetrics: Metrics = mock[Metrics]
+  val noopMetricRegistry = new NoopMetricRegistry
+
+  implicit val mockAppConfig: AppConfig = mock[AppConfig]
 
   implicit val hc: HeaderCarrier = HeaderCarrier()
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
-  override def moduleOverrides: AbstractModule = new AbstractModule {
-    override def configure(): Unit =
-      bind(classOf[HttpClient]).toInstance(httpClient)
-  }
-
   trait TestScope {
-    lazy val appConfig: AppConfig = app.injector.instanceOf[AppConfig]
     lazy val userClientDetailsConnector: UserClientDetailsConnector =
-      app.injector.instanceOf[UserClientDetailsConnector]
+      new UserClientDetailsConnectorImpl(mockHttpClient, mockMetrics)
+
+    def mockAppConfigAgentUserClientDetailsBaseUrl: CallHandler0[String] =
+      (mockAppConfig.agentUserClientDetailsBaseUrl _)
+        .expects()
+        .returning("http://someBaseUrl")
+        .noMoreThanTwice
+
+    def mockMetricsDefaultRegistry: CallHandler0[MetricRegistry] =
+      (mockMetrics.defaultRegistry _)
+        .expects()
+        .returning(noopMetricRegistry)
 
     def mockHttpGet[A](url: String, response: A): Unit =
-      (httpClient
+      (mockHttpClient
         .GET[A](_: String, _: Seq[(String, String)], _: Seq[(String, String)])(
           _: HttpReads[A],
           _: HeaderCarrier,
@@ -61,8 +72,10 @@ class UserClientDetailsConnectorIntegrationSpec extends BaseIntegrationSpec {
     s"http response has $OK status code" should {
       "return the client count" in new TestScope {
         val clientCount = 10
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
         mockHttpGet(
-          s"${appConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/agent-size",
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/agent-size",
           HttpResponse(OK, Json.obj("client-count" -> clientCount).toString)
         )
 
@@ -71,10 +84,12 @@ class UserClientDetailsConnectorIntegrationSpec extends BaseIntegrationSpec {
     }
 
     "http response has non-200 status codes" should {
-      "return nothing" in new TestScope {
-        Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+      Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+        s"return nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
           mockHttpGet(
-            s"${appConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/agent-size",
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/agent-size",
             HttpResponse(statusCode, "")
           )
 
@@ -88,8 +103,10 @@ class UserClientDetailsConnectorIntegrationSpec extends BaseIntegrationSpec {
 
     s"http response has $NO_CONTENT status code" should {
       "return false" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
         mockHttpGet(
-          s"${appConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user-check",
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user-check",
           HttpResponse(NO_CONTENT, "")
         )
 
@@ -99,8 +116,10 @@ class UserClientDetailsConnectorIntegrationSpec extends BaseIntegrationSpec {
 
     s"http response has $FORBIDDEN status code" should {
       "return true" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
         mockHttpGet(
-          s"${appConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user-check",
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user-check",
           HttpResponse(FORBIDDEN, "")
         )
 
@@ -109,10 +128,12 @@ class UserClientDetailsConnectorIntegrationSpec extends BaseIntegrationSpec {
     }
 
     "http response has non-200 status codes" should {
-      "return nothing" in new TestScope {
-        Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+      Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+        s"return nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
           mockHttpGet(
-            s"${appConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user-check",
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user-check",
             HttpResponse(statusCode, "")
           )
 
@@ -126,8 +147,10 @@ class UserClientDetailsConnectorIntegrationSpec extends BaseIntegrationSpec {
 
     s"http response has $OK status code" should {
       "return true" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
         mockHttpGet(
-          s"${appConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/work-items-exist",
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/work-items-exist",
           HttpResponse(OK, "")
         )
 
@@ -137,8 +160,10 @@ class UserClientDetailsConnectorIntegrationSpec extends BaseIntegrationSpec {
 
     s"http response has $NO_CONTENT status code" should {
       "return false" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
         mockHttpGet(
-          s"${appConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/work-items-exist",
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/work-items-exist",
           HttpResponse(NO_CONTENT, "")
         )
 
@@ -147,10 +172,12 @@ class UserClientDetailsConnectorIntegrationSpec extends BaseIntegrationSpec {
     }
 
     "http response has non-200 status codes" should {
-      "return nothing" in new TestScope {
-        Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+      Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+        s"return nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
           mockHttpGet(
-            s"${appConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/work-items-exist",
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/work-items-exist",
             HttpResponse(statusCode, "")
           )
 
