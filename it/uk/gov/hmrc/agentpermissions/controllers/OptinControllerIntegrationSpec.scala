@@ -60,6 +60,15 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
     lazy val wsClient: WSClient = app.injector.instanceOf[WSClient]
     lazy val baseUrl = s"http://localhost:$port"
 
+    def optinPostRequest: Future[WSResponse] =
+      wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin").post("")
+
+    def optoutPostRequest: Future[WSResponse] =
+      wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optout").post("")
+
+    def optinStatusGetRequest: Future[WSResponse] =
+      wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin-status").get()
+
     def mockUserClientDetailsConnectorAgentSize(
       maybeSize: Option[Int]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Int]]] =
@@ -87,31 +96,23 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
 
   "Call to optin" when {
 
-    "optin record does not already exist" should {
-      s"return $CREATED" in new TestScope {
-        stubAuthResponseWithoutException(buildAuthorisedResponse)
-
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin").post("").futureValue.status shouldBe CREATED
-      }
-    }
-
     s"optin record already exists having $OptedOut type" should {
       s"return $CREATED" in new TestScope {
         stubAuthResponseWithoutException(buildAuthorisedResponse)
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optout").post("").futureValue.status shouldBe CREATED
+        optoutPostRequest.futureValue.status shouldBe CREATED
 
         stubAuthResponseWithoutException(buildAuthorisedResponse)
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin").post("").futureValue.status shouldBe CREATED
+        optinPostRequest.futureValue.status shouldBe CREATED
       }
     }
 
     s"optin record already exists having $OptedIn type" should {
       s"return $CONFLICT" in new TestScope {
         stubAuthResponseWithoutException(buildAuthorisedResponse)
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin").post("").futureValue.status shouldBe CREATED
+        optinPostRequest.futureValue.status shouldBe CREATED
 
         stubAuthResponseWithoutException(buildAuthorisedResponse)
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin").post("").futureValue.status shouldBe CONFLICT
+        optinPostRequest.futureValue.status shouldBe CONFLICT
       }
     }
 
@@ -128,38 +129,6 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
       }
     }
 
-    s"request is not authorised due to empty enrolments" should {
-      s"return $FORBIDDEN" in new TestScope {
-        stubAuthResponseWithoutException(buildUnauthorisedResponseHavingEmptyEnrolments)
-
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin").post("").futureValue.status shouldBe FORBIDDEN
-      }
-    }
-
-    s"request is not authorised due to incorrect credential role" should {
-      s"return $FORBIDDEN" in new TestScope {
-        stubAuthResponseWithoutException(buildUnauthorisedResponseHavingIncorrectCredentialRole)
-
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin").post("").futureValue.status shouldBe FORBIDDEN
-      }
-    }
-
-    s"request is not authorised due to incorrect username" should {
-      s"return $FORBIDDEN" in new TestScope {
-        stubAuthResponseWithoutException(buildUnauthorisedResponseHavingIncorrectUsername)
-
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin").post("").futureValue.status shouldBe FORBIDDEN
-      }
-    }
-
-    s"request is not authorised due to incorrect credentials" should {
-      s"return $FORBIDDEN" in new TestScope {
-        stubAuthResponseWithoutException(buildUnauthorisedResponseHavingIncorrectCredentials)
-
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin").post("").futureValue.status shouldBe FORBIDDEN
-      }
-    }
-
     s"an appropriate bearer token is not found in the request" should {
       s"return $FORBIDDEN" in new TestScope {
         stubAuthResponseWithException(new MissingBearerToken)
@@ -175,45 +144,34 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
     }
 
     s"a runtime exception is thrown" should {
-      s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+      s"return $FORBIDDEN" in new TestScope {
         stubAuthResponseWithException(new InsufficientEnrolments)
 
-        val response: WSResponse = wsClient
-          .url(s"$baseUrl/agent-permissions/arn/$arn/optin")
-          .post("")
-          .futureValue
-        response.status shouldBe INTERNAL_SERVER_ERROR
+        val response: WSResponse = optinPostRequest.futureValue
+        response.status shouldBe FORBIDDEN
       }
     }
   }
 
   "Call to optout" when {
 
-    "optin record does not already exist" should {
-      s"return $CREATED" in new TestScope {
-        stubAuthResponseWithoutException(buildAuthorisedResponse)
-
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optout").post("").futureValue.status shouldBe CREATED
-      }
-    }
-
     s"optin record already exists having $OptedIn type" should {
       s"return $CREATED" in new TestScope {
         stubAuthResponseWithoutException(buildAuthorisedResponse)
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optin").post("").futureValue.status shouldBe CREATED
+        optinPostRequest.futureValue.status shouldBe CREATED
 
         stubAuthResponseWithoutException(buildAuthorisedResponse)
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optout").post("").futureValue.status shouldBe CREATED
+        optoutPostRequest.futureValue.status shouldBe CREATED
       }
     }
 
     s"optin record already exists having $OptedOut type" should {
       s"return $CONFLICT" in new TestScope {
         stubAuthResponseWithoutException(buildAuthorisedResponse)
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optout").post("").futureValue.status shouldBe CREATED
+        optoutPostRequest.futureValue.status shouldBe CREATED
 
         stubAuthResponseWithoutException(buildAuthorisedResponse)
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optout").post("").futureValue.status shouldBe CONFLICT
+        optoutPostRequest.futureValue.status shouldBe CONFLICT
       }
     }
 
@@ -230,38 +188,6 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
       }
     }
 
-    s"request is not authorised due to empty enrolments" should {
-      s"return $FORBIDDEN" in new TestScope {
-        stubAuthResponseWithoutException(buildUnauthorisedResponseHavingEmptyEnrolments)
-
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optout").post("").futureValue.status shouldBe FORBIDDEN
-      }
-    }
-
-    s"request is not authorised due to incorrect credential role" should {
-      s"return $FORBIDDEN" in new TestScope {
-        stubAuthResponseWithoutException(buildUnauthorisedResponseHavingIncorrectCredentialRole)
-
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optout").post("").futureValue.status shouldBe FORBIDDEN
-      }
-    }
-
-    s"request is not authorised due to incorrect username" should {
-      s"return $FORBIDDEN" in new TestScope {
-        stubAuthResponseWithoutException(buildUnauthorisedResponseHavingIncorrectUsername)
-
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optout").post("").futureValue.status shouldBe FORBIDDEN
-      }
-    }
-
-    s"request is not authorised due to incorrect credentials" should {
-      s"return $FORBIDDEN" in new TestScope {
-        stubAuthResponseWithoutException(buildUnauthorisedResponseHavingIncorrectCredentials)
-
-        wsClient.url(s"$baseUrl/agent-permissions/arn/$arn/optout").post("").futureValue.status shouldBe FORBIDDEN
-      }
-    }
-
     s"an appropriate bearer token is not found in the request" should {
       s"return $FORBIDDEN" in new TestScope {
         stubAuthResponseWithException(new MissingBearerToken)
@@ -277,14 +203,11 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
     }
 
     s"a runtime exception is thrown" should {
-      s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+      s"return $FORBIDDEN" in new TestScope {
         stubAuthResponseWithException(new InsufficientEnrolments)
 
-        val response: WSResponse = wsClient
-          .url(s"$baseUrl/agent-permissions/arn/$arn/optout")
-          .post("")
-          .futureValue
-        response.status shouldBe INTERNAL_SERVER_ERROR
+        val response: WSResponse = optoutPostRequest.futureValue
+        response.status shouldBe FORBIDDEN
       }
     }
   }
@@ -296,10 +219,7 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
         mockUserClientDetailsConnectorAgentSize(Some(10))
         mockUserClientDetailsConnectorCheckGroupAssignments(Some(false))
 
-        val response: WSResponse = wsClient
-          .url(s"$baseUrl/agent-permissions/arn/$arn/optin-status")
-          .get()
-          .futureValue
+        val response: WSResponse = optinStatusGetRequest.futureValue
         response.status shouldBe OK
         response.body shouldBe """"Opted-Out_ELIGIBLE""""
       }
@@ -309,10 +229,7 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
       s"return $NOT_FOUND" in new TestScope {
         mockUserClientDetailsConnectorAgentSize(None)
 
-        val response: WSResponse = wsClient
-          .url(s"$baseUrl/agent-permissions/arn/$arn/optin-status")
-          .get()
-          .futureValue
+        val response: WSResponse = optinStatusGetRequest.futureValue
         response.status shouldBe NOT_FOUND
       }
     }
@@ -321,10 +238,7 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
       s"return $INTERNAL_SERVER_ERROR" in new TestScope {
         mockUserClientDetailsConnectorAgentSizeWithException(new RuntimeException("boo boo"))
 
-        val response: WSResponse = wsClient
-          .url(s"$baseUrl/agent-permissions/arn/$arn/optin-status")
-          .get()
-          .futureValue
+        val response: WSResponse = optinStatusGetRequest.futureValue
         response.status shouldBe INTERNAL_SERVER_ERROR
       }
     }
@@ -335,30 +249,6 @@ class OptinControllerIntegrationSpec extends BaseIntegrationSpec with DefaultPla
       Some(User) and
       Some(Name(Some("Jane"), Some("Doe"))) and
       Some(Credentials("user1", "GovernmentGateway"))
-
-  private def buildUnauthorisedResponseHavingEmptyEnrolments: GrantAccess =
-    Enrolments(Set.empty) and
-      Some(User) and
-      Some(Name(Some("Jane"), Some("Doe"))) and
-      Some(Credentials("user1", "GovernmentGateway"))
-
-  private def buildUnauthorisedResponseHavingIncorrectCredentialRole: GrantAccess =
-    Enrolments(Set(Enrolment(agentEnrolment, agentEnrolmentIdentifiers, "Activated"))) and
-      None and
-      Some(Name(Some("Jane"), Some("Doe"))) and
-      Some(Credentials("user1", "GovernmentGateway"))
-
-  private def buildUnauthorisedResponseHavingIncorrectUsername: GrantAccess =
-    Enrolments(Set(Enrolment(agentEnrolment, agentEnrolmentIdentifiers, "Activated"))) and
-      Some(User) and
-      None and
-      Some(Credentials("user1", "GovernmentGateway"))
-
-  private def buildUnauthorisedResponseHavingIncorrectCredentials: GrantAccess =
-    Enrolments(Set(Enrolment(agentEnrolment, agentEnrolmentIdentifiers, "Activated"))) and
-      Some(User) and
-      Some(Name(Some("Jane"), Some("Doe"))) and
-      None
 
   override protected def repository: PlayMongoRepository[OptinRecord] = new OptinRepositoryImpl(mongoComponent)
 }

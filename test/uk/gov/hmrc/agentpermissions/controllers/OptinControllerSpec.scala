@@ -50,19 +50,35 @@ class OptinControllerSpec extends BaseSpec {
       .expects(*, *)
       .returning(Future.successful(maybeAuthorisedAgent))
 
-    def mockOptinServiceOptin(
+    def mockOptinServiceOptinWithoutException(
       maybeOptinRequestStatus: Option[OptinRequestStatus]
     ): CallHandler3[Arn, AgentUser, ExecutionContext, Future[Option[OptinRequestStatus]]] = (optinService
       .optin(_: Arn, _: AgentUser)(_: ExecutionContext))
       .expects(arn, user, *)
       .returning(Future.successful(maybeOptinRequestStatus))
 
-    def mockOptinServiceOptout(
+    def mockOptinServiceOptinWithException(
+      ex: Exception
+    ): CallHandler3[Arn, AgentUser, ExecutionContext, Future[Option[OptinRequestStatus]]] =
+      (optinService
+        .optin(_: Arn, _: AgentUser)(_: ExecutionContext))
+        .expects(arn, user, *)
+        .returning(Future failed ex)
+
+    def mockOptinServiceOptoutWithoutException(
       maybeOptoutRequestStatus: Option[OptoutRequestStatus]
     ): CallHandler3[Arn, AgentUser, ExecutionContext, Future[Option[OptoutRequestStatus]]] = (optinService
       .optout(_: Arn, _: AgentUser)(_: ExecutionContext))
       .expects(arn, user, *)
       .returning(Future.successful(maybeOptoutRequestStatus))
+
+    def mockOptinServiceOptoutWithException(
+      ex: Exception
+    ): CallHandler3[Arn, AgentUser, ExecutionContext, Future[Option[OptoutRequestStatus]]] =
+      (optinService
+        .optout(_: Arn, _: AgentUser)(_: ExecutionContext))
+        .expects(arn, user, *)
+        .returning(Future failed ex)
 
   }
 
@@ -82,7 +98,7 @@ class OptinControllerSpec extends BaseSpec {
 
       s"return $CREATED" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        mockOptinServiceOptin(Some(OptinCreated))
+        mockOptinServiceOptinWithoutException(Some(OptinCreated))
 
         val result = controller.optin(arn)(request)
         status(result) shouldBe CREATED
@@ -93,10 +109,21 @@ class OptinControllerSpec extends BaseSpec {
 
       s"return $CONFLICT" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        mockOptinServiceOptin(None)
+        mockOptinServiceOptinWithoutException(None)
 
         val result = controller.optin(arn)(request)
         status(result) shouldBe CONFLICT
+      }
+    }
+
+    s"optin service throws an exception" should {
+
+      s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        mockOptinServiceOptinWithException(new RuntimeException("boo boo"))
+
+        val result = controller.optin(arn)(request)
+        status(result) shouldBe INTERNAL_SERVER_ERROR
       }
     }
 
@@ -127,7 +154,7 @@ class OptinControllerSpec extends BaseSpec {
 
       s"return $CREATED" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        mockOptinServiceOptout(Some(OptoutCreated))
+        mockOptinServiceOptoutWithoutException(Some(OptoutCreated))
 
         val result = controller.optout(arn)(request)
         status(result) shouldBe CREATED
@@ -138,10 +165,21 @@ class OptinControllerSpec extends BaseSpec {
 
       s"return $CONFLICT" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        mockOptinServiceOptout(None)
+        mockOptinServiceOptoutWithoutException(None)
 
         val result = controller.optout(arn)(request)
         status(result) shouldBe CONFLICT
+      }
+    }
+
+    s"optin service throws an exception" should {
+
+      s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        mockOptinServiceOptoutWithException(new RuntimeException("boo boo"))
+
+        val result = controller.optout(arn)(request)
+        status(result) shouldBe INTERNAL_SERVER_ERROR
       }
     }
 

@@ -22,11 +22,11 @@ import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptedIn, OptedOut}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.service.OptinService
-import uk.gov.hmrc.auth.core.NoActiveSession
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 @Singleton()
 class OptinController @Inject() (optinService: OptinService, authAction: AuthAction)(implicit
@@ -35,54 +35,40 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
   val ec: ExecutionContext
 ) extends BackendController(cc) with Logging {
 
-  def optin(arnProvided: Arn): Action[AnyContent] = Action.async { implicit request =>
-    authAction
-      .getAuthorisedAgent()
-      .flatMap {
-        case None =>
-          logger.info("Could not identify authorised agent")
-          Future.successful(Forbidden)
-        case Some(AuthorisedAgent(arnIdentified, user)) =>
-          if (arnProvided == arnIdentified) {
-            optinService.optin(arnIdentified, user) flatMap {
-              case None =>
-                logger.info(s"Already has $OptedIn")
-                Future.successful(Conflict)
-              case Some(_) =>
-                logger.info(s"Optin record created")
-                Future.successful(Created)
-            }
-          } else {
-            logger.info("Provided ARN did not match with that identified by auth")
-            Future.successful(BadRequest)
-          }
+  def optin(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent { authorisedAgent =>
+      if (arn == authorisedAgent.arn) {
+        optinService.optin(authorisedAgent.arn, authorisedAgent.agentUser) flatMap {
+          case None =>
+            logger.info(s"Already has $OptedIn")
+            Future.successful(Conflict)
+          case Some(_) =>
+            logger.info(s"Optin record created")
+            Future.successful(Created)
+        }
+      } else {
+        logger.info("Provided ARN did not match with that identified by auth")
+        Future.successful(BadRequest)
       }
-      .recover(handleFailure)
+    } transformWith failureHandler
   }
 
-  def optout(arnProvided: Arn): Action[AnyContent] = Action.async { implicit request =>
-    authAction
-      .getAuthorisedAgent()
-      .flatMap {
-        case None =>
-          logger.info("Could not identify authorised agent")
-          Future.successful(Forbidden)
-        case Some(AuthorisedAgent(arnIdentified, user)) =>
-          if (arnProvided == arnIdentified) {
-            optinService.optout(arnIdentified, user) flatMap {
-              case None =>
-                logger.info(s"Already has $OptedOut")
-                Future.successful(Conflict)
-              case Some(_) =>
-                logger.info(s"Optin record created")
-                Future.successful(Created)
-            }
-          } else {
-            logger.info("Provided ARN did not match with that identified by auth")
-            Future.successful(BadRequest)
-          }
+  def optout(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent { authorisedAgent =>
+      if (arn == authorisedAgent.arn) {
+        optinService.optout(authorisedAgent.arn, authorisedAgent.agentUser) flatMap {
+          case None =>
+            logger.info(s"Already has $OptedOut")
+            Future.successful(Conflict)
+          case Some(_) =>
+            logger.info(s"Optin record created")
+            Future.successful(Created)
+        }
+      } else {
+        logger.info("Provided ARN did not match with that identified by auth")
+        Future.successful(BadRequest)
       }
-      .recover(handleFailure)
+    } transformWith failureHandler
   }
 
   def optinStatus(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
@@ -99,12 +85,25 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
       }
   }
 
-  private def handleFailure: PartialFunction[Throwable, Result] = {
-    case ex: NoActiveSession =>
-      logger.info(s"Returning $Forbidden: ${ex.getMessage}")
-      Forbidden
-    case ex =>
+  private def withAuthorisedAgent[T](
+    body: AuthorisedAgent => Future[Result]
+  )(implicit request: Request[T], ec: ExecutionContext): Future[Result] =
+    authAction
+      .getAuthorisedAgent()
+      .flatMap {
+        case None =>
+          logger.info("Could not identify authorised agent")
+          Future.successful(Forbidden)
+        case Some(authorisedAgent: AuthorisedAgent) =>
+          body(authorisedAgent)
+      }
+
+  private def failureHandler(triedResult: Try[Result]): Future[Result] = triedResult match {
+    case Success(result) =>
+      Future.successful(result)
+    case Failure(ex) =>
       logger.info(s"Returning $InternalServerError: ${ex.getMessage}")
-      InternalServerError
+      Future.successful(InternalServerError)
   }
+
 }
