@@ -19,17 +19,30 @@ package uk.gov.hmrc.agentpermissions.service
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import play.api.libs.json.{Json, OFormat}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, Arn}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn}
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated}
 
+import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[AccessGroupsServiceImpl])
 trait AccessGroupsService {
   def create(accessGroup: AccessGroup)(implicit ec: ExecutionContext): Future[AccessGroupCreationStatus]
+
   def groupSummaries(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroupSummary]]
+
   def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]]
+
+  def rename(groupId: GroupId, renameGroupTo: String, agentUser: AgentUser)(implicit
+    ec: ExecutionContext
+  ): Future[AccessGroupRenamingStatus]
+
+  def delete(groupId: GroupId)(implicit ec: ExecutionContext): Future[AccessGroupDeletionStatus]
+
+  def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
+    ec: ExecutionContext
+  ): Future[AccessGroupUpdationStatus]
 }
 
 @Singleton
@@ -39,21 +52,16 @@ class AccessGroupsServiceImpl @Inject() (accessGroupsRepository: AccessGroupsRep
   override def create(accessGroup: AccessGroup)(implicit ec: ExecutionContext): Future[AccessGroupCreationStatus] =
     accessGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
       case Some(_) =>
-        Future.successful(AccessGroupExists)
+        Future.successful(AccessGroupExistsForCreation)
       case _ =>
-        accessGroupsRepository.upsert(accessGroup) flatMap {
+        accessGroupsRepository.insert(accessGroup) flatMap {
           case None =>
             Future.successful(AccessGroupNotCreated)
-          case Some(upsertType) =>
-            upsertType match {
-              case RecordInserted(creationId) =>
-                val groupId = GroupId(accessGroup.arn, accessGroup.groupName).encode
-                logger.info(s"Created access group. DB id: '$creationId', gid: '$groupId'")
-                Future.successful(AccessGroupCreated(groupId))
-              case RecordUpdated =>
-                logger.warn("Should not have updated when the request was for a creation")
-                Future.successful(AccessGroupNotCreated)
-            }
+          case Some(creationId) =>
+            val groupId = GroupId(accessGroup.arn, accessGroup.groupName).encode
+            logger.info(s"Created access group. DB id: '$creationId', gid: '$groupId'")
+            Future.successful(AccessGroupCreated(groupId))
+
         }
     }
 
@@ -71,6 +79,60 @@ class AccessGroupsServiceImpl @Inject() (accessGroupsRepository: AccessGroupsRep
 
   override def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]] =
     accessGroupsRepository.get(groupId.arn, groupId.groupName)
+
+  override def rename(groupId: GroupId, renameGroupTo: String, whoIsRenaming: AgentUser)(implicit
+    ec: ExecutionContext
+  ): Future[AccessGroupRenamingStatus] =
+    accessGroupsRepository.get(groupId.arn, groupId.groupName) flatMap {
+      case None =>
+        Future.successful(AccessGroupNotExistsForRenaming)
+      case Some(_) =>
+        accessGroupsRepository.renameGroup(groupId.arn, groupId.groupName, renameGroupTo, whoIsRenaming) flatMap {
+          case None =>
+            Future.successful(AccessGroupNotRenamed)
+          case Some(upsertType) =>
+            upsertType match {
+              case RecordInserted(_) =>
+                logger.warn("Should not have inserted when the request was for an update")
+                Future.successful(AccessGroupNotRenamed)
+              case RecordUpdated =>
+                logger.info(s"Renamed access group")
+                Future.successful(AccessGroupRenamed)
+            }
+        }
+    }
+
+  override def delete(groupId: GroupId)(implicit ec: ExecutionContext): Future[AccessGroupDeletionStatus] =
+    for {
+      maybeDeletedCount <- accessGroupsRepository.delete(groupId.arn, groupId.groupName)
+    } yield maybeDeletedCount match {
+      case None =>
+        AccessGroupNotDeleted
+      case Some(deletedCount) =>
+        if (deletedCount == 1L)
+          AccessGroupDeleted
+        else
+          AccessGroupNotDeleted
+    }
+
+  override def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
+    ec: ExecutionContext
+  ): Future[AccessGroupUpdationStatus] =
+    for {
+      accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
+      maybeUpdatedCount <- accessGroupsRepository.update(groupId.arn, groupId.groupName, accessGroupWithWhoIsUpdating)
+    } yield maybeUpdatedCount match {
+      case None =>
+        AccessGroupNotUpdated
+      case Some(updatedCount) =>
+        if (updatedCount == 1L)
+          AccessGroupUpdated
+        else
+          AccessGroupNotUpdated
+    }
+
+  private def mergeWhoIsUpdating(accessGroup: AccessGroup, whoIsUpdating: AgentUser): Future[AccessGroup] =
+    Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
 }
 
 case class AccessGroupSummary(groupId: String, groupName: String, clientCount: Int, teamMemberCount: Int)
@@ -81,5 +143,18 @@ object AccessGroupSummary {
 
 sealed trait AccessGroupCreationStatus
 case class AccessGroupCreated(creationId: String) extends AccessGroupCreationStatus
-case object AccessGroupExists extends AccessGroupCreationStatus
+case object AccessGroupExistsForCreation extends AccessGroupCreationStatus
 case object AccessGroupNotCreated extends AccessGroupCreationStatus
+
+sealed trait AccessGroupRenamingStatus
+case object AccessGroupNotExistsForRenaming extends AccessGroupRenamingStatus
+case object AccessGroupNotRenamed extends AccessGroupRenamingStatus
+case object AccessGroupRenamed extends AccessGroupRenamingStatus
+
+sealed trait AccessGroupDeletionStatus
+case object AccessGroupDeleted extends AccessGroupDeletionStatus
+case object AccessGroupNotDeleted extends AccessGroupDeletionStatus
+
+sealed trait AccessGroupUpdationStatus
+case object AccessGroupNotUpdated extends AccessGroupUpdationStatus
+case object AccessGroupUpdated extends AccessGroupUpdationStatus

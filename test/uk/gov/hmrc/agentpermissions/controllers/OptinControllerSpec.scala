@@ -44,11 +44,11 @@ class OptinControllerSpec extends BaseSpec {
     def fakeRequest: FakeRequest[AnyContentAsEmpty.type] = FakeRequest()
 
     def mockAuthActionGetAuthorisedAgent(
-      maybeTuple: Option[(Arn, AgentUser)]
-    ): CallHandler2[ExecutionContext, Request[_], Future[Option[(Arn, AgentUser)]]] = (authAction
+      maybeAuthorisedAgent: Option[AuthorisedAgent]
+    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] = (authAction
       .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
       .expects(*, *)
-      .returning(Future.successful(maybeTuple))
+      .returning(Future.successful(maybeAuthorisedAgent))
 
     def mockOptinServiceOptin(
       maybeOptinRequestStatus: Option[OptinRequestStatus]
@@ -81,7 +81,7 @@ class OptinControllerSpec extends BaseSpec {
     s"optin service returns an optin record" should {
 
       s"return $CREATED" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some((arn, user)))
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         mockOptinServiceOptin(Some(OptinCreated))
 
         val result = controller.optin(arn)(request)
@@ -92,7 +92,7 @@ class OptinControllerSpec extends BaseSpec {
     s"optin service does not return an optin record" should {
 
       s"return $CONFLICT" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some((arn, user)))
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         mockOptinServiceOptin(None)
 
         val result = controller.optin(arn)(request)
@@ -103,7 +103,7 @@ class OptinControllerSpec extends BaseSpec {
     s"auth returns a different arn than the provided one" should {
 
       s"return $BAD_REQUEST" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some((Arn("NARN0101010"), user)))
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(Arn("NARN0101010"), user)))
 
         val result = controller.optin(arn)(request)
         status(result) shouldBe BAD_REQUEST
@@ -126,7 +126,7 @@ class OptinControllerSpec extends BaseSpec {
     s"optin service returns an optin record" should {
 
       s"return $CREATED" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some((arn, user)))
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         mockOptinServiceOptout(Some(OptoutCreated))
 
         val result = controller.optout(arn)(request)
@@ -137,7 +137,7 @@ class OptinControllerSpec extends BaseSpec {
     s"optin service does not return an optin record" should {
 
       s"return $CONFLICT" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some((arn, user)))
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         mockOptinServiceOptout(None)
 
         val result = controller.optout(arn)(request)
@@ -148,7 +148,7 @@ class OptinControllerSpec extends BaseSpec {
     s"auth returns a different arn than the provided one" should {
 
       s"return $BAD_REQUEST" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some((Arn("NARN0101010"), user)))
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(Arn("NARN0101010"), user)))
 
         val result = controller.optout(arn)(request)
         status(result) shouldBe BAD_REQUEST

@@ -42,7 +42,7 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
         case None =>
           logger.info("Could not identify authorised agent")
           Future.successful(Forbidden)
-        case Some((arnIdentified, user)) =>
+        case Some(AuthorisedAgent(arnIdentified, user)) =>
           if (arnProvided == arnIdentified) {
             optinService.optin(arnIdentified, user) flatMap {
               case None =>
@@ -67,7 +67,7 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
         case None =>
           logger.info("Could not identify authorised agent")
           Future.successful(Forbidden)
-        case Some((arnIdentified, user)) =>
+        case Some(AuthorisedAgent(arnIdentified, user)) =>
           if (arnProvided == arnIdentified) {
             optinService.optout(arnIdentified, user) flatMap {
               case None =>

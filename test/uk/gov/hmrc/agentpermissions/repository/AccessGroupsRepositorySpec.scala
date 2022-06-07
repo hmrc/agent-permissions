@@ -35,6 +35,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
     val agent: AgentUser = AgentUser("userId", "userName")
     val user1: AgentUser = AgentUser("user1", "User 1")
     val user2: AgentUser = AgentUser("user2", "User 2")
+    val renamedGroupName = "renamedGroupName"
 
     val enrolment1: Enrolment =
       Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
@@ -87,35 +88,95 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
       }
     }
 
-    "fetching a non-existing record" should {
-      "return nothing" in new TestScope {
-        accessGroupsRepository.get(arn).futureValue shouldBe empty
+    "getting all groups of Arn" when {
+
+      "no groups exist for Arn" should {
+        "return nothing" in new TestScope {
+          accessGroupsRepository.get(arn).futureValue shouldBe empty
+        }
       }
     }
 
-    "upserting a non-existing access group" should {
-      s"return $RecordInserted" in new TestScope {
-        accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
+    "getting one group of Arn" when {
+
+      "group of that name does not exist" should {
+        "return nothing" in new TestScope {
+          accessGroupsRepository.get(arn, groupName).futureValue shouldBe None
+        }
       }
     }
 
-    "upserting an existing access group" should {
-      s"return $RecordUpdated" in new TestScope {
-        accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
-        accessGroupsRepository.upsert(accessGroup).futureValue shouldBe Some(RecordUpdated)
+    "inserting" when {
+
+      "inserting a non-existing access group" should {
+        s"return an id" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+        }
+      }
+
+      "inserting an existing access group" should {
+        s"return None" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+          accessGroupsRepository.insert(accessGroup).futureValue shouldBe None
+        }
+      }
+
+      "inserting an access group with a group name differing only in case-sensitiveness" should {
+        s"return None" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+
+          val accessGroupHavingGroupNameOfDifferentCase: AccessGroup =
+            accessGroup.copy(groupName = accessGroup.groupName.toUpperCase)
+
+          accessGroupsRepository.insert(accessGroupHavingGroupNameOfDifferentCase).futureValue shouldBe None
+        }
       }
     }
 
-    "upserting an access group with a group name differing only in case-sensitiveness" should {
-      s"return $RecordUpdated" in new TestScope {
-        accessGroupsRepository.upsert(accessGroup).futureValue.get shouldBe a[RecordInserted]
+    "renaming group" when {
 
-        val accessGroupHavingGroupNameOfDifferentCase: AccessGroup =
-          accessGroup.copy(groupName = accessGroup.groupName.toUpperCase)
+      "group name provided is different than that existing in DB" should {
+        s"return $RecordUpdated" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
-        accessGroupsRepository.upsert(accessGroupHavingGroupNameOfDifferentCase).futureValue shouldBe Some(
-          RecordUpdated
-        )
+          accessGroupsRepository.renameGroup(arn, groupName, renamedGroupName, agent).futureValue shouldBe Some(
+            RecordUpdated
+          )
+        }
+      }
+    }
+
+    "deleting group" when {
+
+      "access group corresponding to group name provided does not exist in DB" should {
+        s"indicate the correct deletion count" in new TestScope {
+          accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(0L)
+        }
+      }
+
+      "group name provided is different than that existing in DB only case-sensitively" should {
+        s"indicate the correct deletion count" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+
+          accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(1L)
+        }
+      }
+    }
+
+    "updating group" when {
+
+      "access group corresponding to group name provided does not exist in DB" should {
+        "indicate the correct updation count" in new TestScope {
+          accessGroupsRepository.update(arn, groupName, accessGroup).futureValue shouldBe Some(0)
+        }
+      }
+
+      "roup name provided is different than that existing in DB only case-sensitively" should {
+        "indicate the correct updation count" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+
+          accessGroupsRepository.update(arn, groupName.toUpperCase, accessGroup).futureValue shouldBe Some(1)
+        }
       }
     }
   }
