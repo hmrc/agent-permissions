@@ -166,13 +166,13 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
     "updating group" when {
 
       "access group corresponding to group name provided does not exist in DB" should {
-        "indicate the correct updation count" in new TestScope {
+        "indicate the correct update count" in new TestScope {
           accessGroupsRepository.update(arn, groupName, accessGroup).futureValue shouldBe Some(0)
         }
       }
 
       "roup name provided is different than that existing in DB only case-sensitively" should {
-        "indicate the correct updation count" in new TestScope {
+        "indicate the correct update count" in new TestScope {
           accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
           accessGroupsRepository.update(arn, groupName.toUpperCase, accessGroup).futureValue shouldBe Some(1)

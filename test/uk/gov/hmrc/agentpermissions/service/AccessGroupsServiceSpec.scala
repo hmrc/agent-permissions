@@ -16,10 +16,11 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler4}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated, UpsertType}
+import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
@@ -61,8 +62,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
     val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
+    val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
 
-    val accessGroupsService: AccessGroupsService = new AccessGroupsServiceImpl(mockAccessGroupsRepository)
+    val accessGroupsService: AccessGroupsService =
+      new AccessGroupsServiceImpl(mockAccessGroupsRepository, mockUserEnrolmentAssignmentService)
 
     lazy val now: LocalDateTime = LocalDateTime.now()
 
@@ -97,6 +100,38 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .expects(arn, groupName, renamedGroupName, user)
         .returning(Future.successful(maybeUpsertType))
 
+    def mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler2[AccessGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+      (mockUserEnrolmentAssignmentService
+        .calculateForGroupCreation(_: AccessGroup)(_: ExecutionContext))
+        .expects(accessGroup, *)
+        .returning(Future successful maybeUserEnrolmentAssignments)
+
+    def mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler2[GroupId, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+      (mockUserEnrolmentAssignmentService
+        .calculateForGroupDeletion(_: GroupId)(_: ExecutionContext))
+        .expects(groupId, *)
+        .returning(Future successful maybeUserEnrolmentAssignments)
+
+    def mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler2[GroupId, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+      (mockUserEnrolmentAssignmentService
+        .calculateForGroupUpdate(_: GroupId)(_: ExecutionContext))
+        .expects(groupId, *)
+        .returning(Future successful maybeUserEnrolmentAssignments)
+
+    def mockUserEnrolmentAssignmentServiceApplyUserEnrolmentsInEacd(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler1[Option[UserEnrolmentAssignments], Future[Option[UserEnrolmentAssignments]]] =
+      (mockUserEnrolmentAssignmentService
+        .applyAssignmentsInEacd(_: Option[UserEnrolmentAssignments]))
+        .expects(maybeUserEnrolmentAssignments)
+        .returning(Future successful maybeUserEnrolmentAssignments)
+
     def mockAccessGroupsRepositoryDelete(
       maybeDeletedCount: Option[Long]
     ): CallHandler2[Arn, String, Future[Option[Long]]] =
@@ -107,7 +142,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     def mockAccessGroupsRepositoryUpdate(
       maybeModifiedCount: Option[Long]
-    ) =
+    ): CallHandler3[Arn, String, AccessGroup, Future[Option[Long]]] =
       (mockAccessGroupsRepository
         .update(_: Arn, _: String, _: AccessGroup))
         .expects(arn, groupName, *)
@@ -130,6 +165,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       "insert calls returns nothing" should {
         s"return $AccessGroupNotCreated" in new TestScope {
+          mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(None)
           mockAccessGroupsRepositoryGet(None)
           mockAccessGroupsRepositoryInsert(None)
 
@@ -141,8 +177,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       s"insert calls returns an id" should {
         s"return $AccessGroupCreated" in new TestScope {
+          mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(None)
           mockAccessGroupsRepositoryGet(None)
           mockAccessGroupsRepositoryInsert(Some(insertedId))
+          mockUserEnrolmentAssignmentServiceApplyUserEnrolmentsInEacd(None)
 
           accessGroupsService
             .create(accessGroup)
@@ -152,14 +190,14 @@ class AccessGroupsServiceSpec extends BaseSpec {
     }
   }
 
-  "Calling group summaries" when {
+  "Fetching all groups" when {
 
     "access groups exist" should {
-      "return corresponding summaries" in new TestScope {
+      "return corresponding groups" in new TestScope {
         mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
 
-        accessGroupsService.groupSummaries(arn).futureValue shouldBe
-          Seq(AccessGroupSummary("KARN1234567%7Esome+group", "some group", 3, 3))
+        accessGroupsService.getAll(arn).futureValue shouldBe
+          Seq(accessGroup)
       }
     }
   }
@@ -226,6 +264,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     "DB call to delete group returns nothing" should {
       s"return $AccessGroupNotDeleted" in new TestScope {
+        mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(None)
         mockAccessGroupsRepositoryDelete(None)
 
         accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupNotDeleted
@@ -236,7 +275,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       "DB call to delete group indicates one record was deleted" should {
         s"return $AccessGroupDeleted" in new TestScope {
+          mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(None)
           mockAccessGroupsRepositoryDelete(Some(1L))
+          mockUserEnrolmentAssignmentServiceApplyUserEnrolmentsInEacd(None)
 
           accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupDeleted
         }
@@ -244,6 +285,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       "DB call to delete group indicates no record was deleted" should {
         s"return $AccessGroupNotDeleted" in new TestScope {
+          mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(None)
           mockAccessGroupsRepositoryDelete(Some(0L))
 
           accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupNotDeleted
@@ -256,6 +298,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       "DB call to update group returns nothing" should {
         s"return $AccessGroupNotUpdated" in new TestScope {
+          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(None)
           mockAccessGroupsRepositoryUpdate(None)
 
           accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
@@ -264,7 +307,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       "DB call to update group indicates one record was updated" should {
         s"return $AccessGroupUpdated" in new TestScope {
+          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(None)
           mockAccessGroupsRepositoryUpdate(Some(1))
+          mockUserEnrolmentAssignmentServiceApplyUserEnrolmentsInEacd(None)
 
           accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupUpdated
         }
@@ -272,6 +317,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       "DB call to update group indicates no record was updated" should {
         s"return $AccessGroupNotUpdated" in new TestScope {
+          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(None)
           mockAccessGroupsRepositoryUpdate(Some(0))
 
           accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated

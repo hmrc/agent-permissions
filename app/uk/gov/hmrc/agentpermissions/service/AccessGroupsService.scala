@@ -18,9 +18,9 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import play.api.libs.json.{Json, OFormat}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn}
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated}
+import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 
 import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
 trait AccessGroupsService {
   def create(accessGroup: AccessGroup)(implicit ec: ExecutionContext): Future[AccessGroupCreationStatus]
 
-  def groupSummaries(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroupSummary]]
+  def getAll(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]]
 
   def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]]
 
@@ -42,40 +42,37 @@ trait AccessGroupsService {
 
   def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
     ec: ExecutionContext
-  ): Future[AccessGroupUpdationStatus]
+  ): Future[AccessGroupUpdateStatus]
 }
 
 @Singleton
-class AccessGroupsServiceImpl @Inject() (accessGroupsRepository: AccessGroupsRepository)
-    extends AccessGroupsService with Logging {
+class AccessGroupsServiceImpl @Inject() (
+  accessGroupsRepository: AccessGroupsRepository,
+  userEnrolmentAssignmentService: UserEnrolmentAssignmentService
+) extends AccessGroupsService with Logging {
 
   override def create(accessGroup: AccessGroup)(implicit ec: ExecutionContext): Future[AccessGroupCreationStatus] =
     accessGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
       case Some(_) =>
         Future.successful(AccessGroupExistsForCreation)
       case _ =>
-        accessGroupsRepository.insert(accessGroup) flatMap {
+        for {
+          maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupCreation(accessGroup)
+          maybeCreationId            <- accessGroupsRepository.insert(accessGroup)
+        } yield maybeCreationId match {
           case None =>
-            Future.successful(AccessGroupNotCreated)
+            AccessGroupNotCreated
           case Some(creationId) =>
+            userEnrolmentAssignmentService.applyAssignmentsInEacd(maybeCalculatedAssignments)
+
             val groupId = GroupId(accessGroup.arn, accessGroup.groupName).encode
             logger.info(s"Created access group. DB id: '$creationId', gid: '$groupId'")
-            Future.successful(AccessGroupCreated(groupId))
-
+            AccessGroupCreated(groupId)
         }
     }
 
-  override def groupSummaries(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroupSummary]] =
-    accessGroupsRepository.get(arn).map {
-      _.map(accessGroup =>
-        AccessGroupSummary(
-          GroupId(arn, accessGroup.groupName).encode,
-          accessGroup.groupName,
-          accessGroup.clients.fold(0)(_.size),
-          accessGroup.teamMembers.fold(0)(_.size)
-        )
-      )
-    }
+  override def getAll(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]] =
+    accessGroupsRepository.get(arn)
 
   override def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]] =
     accessGroupsRepository.get(groupId.arn, groupId.groupName)
@@ -104,41 +101,42 @@ class AccessGroupsServiceImpl @Inject() (accessGroupsRepository: AccessGroupsRep
 
   override def delete(groupId: GroupId)(implicit ec: ExecutionContext): Future[AccessGroupDeletionStatus] =
     for {
-      maybeDeletedCount <- accessGroupsRepository.delete(groupId.arn, groupId.groupName)
+      maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupDeletion(groupId)
+      maybeDeletedCount          <- accessGroupsRepository.delete(groupId.arn, groupId.groupName)
     } yield maybeDeletedCount match {
       case None =>
         AccessGroupNotDeleted
       case Some(deletedCount) =>
-        if (deletedCount == 1L)
+        if (deletedCount == 1L) {
+          userEnrolmentAssignmentService.applyAssignmentsInEacd(maybeCalculatedAssignments)
           AccessGroupDeleted
-        else
+        } else {
           AccessGroupNotDeleted
+        }
     }
 
   override def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
     ec: ExecutionContext
-  ): Future[AccessGroupUpdationStatus] =
+  ): Future[AccessGroupUpdateStatus] =
     for {
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
+      maybeCalculatedAssignments   <- userEnrolmentAssignmentService.calculateForGroupUpdate(groupId)
       maybeUpdatedCount <- accessGroupsRepository.update(groupId.arn, groupId.groupName, accessGroupWithWhoIsUpdating)
     } yield maybeUpdatedCount match {
       case None =>
         AccessGroupNotUpdated
       case Some(updatedCount) =>
-        if (updatedCount == 1L)
+        if (updatedCount == 1L) {
+          userEnrolmentAssignmentService.applyAssignmentsInEacd(maybeCalculatedAssignments)
           AccessGroupUpdated
-        else
+        } else {
           AccessGroupNotUpdated
+        }
     }
 
   private def mergeWhoIsUpdating(accessGroup: AccessGroup, whoIsUpdating: AgentUser): Future[AccessGroup] =
     Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
-}
 
-case class AccessGroupSummary(groupId: String, groupName: String, clientCount: Int, teamMemberCount: Int)
-
-object AccessGroupSummary {
-  implicit val formatAccessGroupSummary: OFormat[AccessGroupSummary] = Json.format[AccessGroupSummary]
 }
 
 sealed trait AccessGroupCreationStatus
@@ -155,6 +153,6 @@ sealed trait AccessGroupDeletionStatus
 case object AccessGroupDeleted extends AccessGroupDeletionStatus
 case object AccessGroupNotDeleted extends AccessGroupDeletionStatus
 
-sealed trait AccessGroupUpdationStatus
-case object AccessGroupNotUpdated extends AccessGroupUpdationStatus
-case object AccessGroupUpdated extends AccessGroupUpdationStatus
+sealed trait AccessGroupUpdateStatus
+case object AccessGroupNotUpdated extends AccessGroupUpdateStatus
+case object AccessGroupUpdated extends AccessGroupUpdateStatus

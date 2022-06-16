@@ -69,7 +69,8 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     withAuthorisedAgent { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
-          groupSummaries <- accessGroupsService.groupSummaries(matchedArn)
+          groups         <- accessGroupsService.getAll(matchedArn)
+          groupSummaries <- Future.successful(groups.map(AccessGroupSummary.convert))
         } yield
           if (groupSummaries.isEmpty) {
             NotFound
@@ -146,8 +147,8 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
             badRequestGroupNameMaxLength
           } else {
             for {
-              groupUpdationStatus <- accessGroupsService.update(groupId, accessGroup, authorisedAgent.agentUser)
-            } yield groupUpdationStatus match {
+              groupUpdateStatus <- accessGroupsService.update(groupId, accessGroup, authorisedAgent.agentUser)
+            } yield groupUpdateStatus match {
               case AccessGroupNotUpdated =>
                 logger.info("Access group was not updated")
                 NotFound
@@ -275,4 +276,19 @@ object RenameAccessGroupRequest {
   implicit val writes: Writes[RenameAccessGroupRequest] = Json.writes[RenameAccessGroupRequest]
 
   implicit val formatRenameAccessGroupRequest: Format[RenameAccessGroupRequest] = Format(reads, writes)
+}
+
+case class AccessGroupSummary(groupId: String, groupName: String, clientCount: Int, teamMemberCount: Int)
+
+object AccessGroupSummary {
+
+  def convert(accessGroup: AccessGroup): AccessGroupSummary =
+    AccessGroupSummary(
+      GroupId(accessGroup.arn, accessGroup.groupName).encode,
+      accessGroup.groupName,
+      accessGroup.clients.fold(0)(_.size),
+      accessGroup.teamMembers.fold(0)(_.size)
+    )
+
+  implicit val formatAccessGroupSummary: OFormat[AccessGroupSummary] = Json.format[AccessGroupSummary]
 }

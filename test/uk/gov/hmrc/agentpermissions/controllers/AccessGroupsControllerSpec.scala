@@ -24,7 +24,7 @@ import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier}
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupCreationStatus, AccessGroupDeleted, AccessGroupDeletionStatus, AccessGroupExistsForCreation, AccessGroupNotCreated, AccessGroupNotDeleted, AccessGroupNotExistsForRenaming, AccessGroupNotRenamed, AccessGroupNotUpdated, AccessGroupRenamed, AccessGroupRenamingStatus, AccessGroupSummary, AccessGroupUpdated, AccessGroupUpdationStatus, AccessGroupsService, GroupId}
+import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupCreationStatus, AccessGroupDeleted, AccessGroupDeletionStatus, AccessGroupExistsForCreation, AccessGroupNotCreated, AccessGroupNotDeleted, AccessGroupNotExistsForRenaming, AccessGroupNotRenamed, AccessGroupNotUpdated, AccessGroupRenamed, AccessGroupRenamingStatus, AccessGroupUpdateStatus, AccessGroupUpdated, AccessGroupsService, GroupId}
 import uk.gov.hmrc.auth.core.InvalidBearerToken
 
 import java.time.LocalDateTime
@@ -149,19 +149,19 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .expects(*, *)
         .returning(Future.failed(ex))
 
-    def mockAccessGroupsServiceGetGroupSummaries(
-      groupSummaries: Seq[AccessGroupSummary]
-    ): CallHandler2[Arn, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+    def mockAccessGroupsServiceGetGroups(
+      groups: Seq[AccessGroup]
+    ): CallHandler2[Arn, ExecutionContext, Future[Seq[AccessGroup]]] =
       (mockAccessGroupsService
-        .groupSummaries(_: Arn)(_: ExecutionContext))
+        .getAll(_: Arn)(_: ExecutionContext))
         .expects(arn, *)
-        .returning(Future.successful(groupSummaries))
+        .returning(Future.successful(groups))
 
-    def mockAccessGroupsServiceGetGroupSummariesWithException(
+    def mockAccessGroupsServiceGetGroupsWithException(
       ex: Exception
-    ): CallHandler2[Arn, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+    ): CallHandler2[Arn, ExecutionContext, Future[Seq[AccessGroup]]] =
       (mockAccessGroupsService
-        .groupSummaries(_: Arn)(_: ExecutionContext))
+        .getAll(_: Arn)(_: ExecutionContext))
         .expects(arn, *)
         .returning(Future.failed(ex))
 
@@ -190,12 +190,12 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .returning(Future.successful(accessGroupRenamingStatus))
 
     def mockAccessGroupsServiceUpdate(
-      accessGroupUpdationStatus: AccessGroupUpdationStatus
-    ): CallHandler4[GroupId, AccessGroup, AgentUser, ExecutionContext, Future[AccessGroupUpdationStatus]] =
+      accessGroupUpdateStatus: AccessGroupUpdateStatus
+    ): CallHandler4[GroupId, AccessGroup, AgentUser, ExecutionContext, Future[AccessGroupUpdateStatus]] =
       (mockAccessGroupsService
         .update(_: GroupId, _: AccessGroup, _: AgentUser)(_: ExecutionContext))
         .expects(*, *, *, *)
-        .returning(Future.successful(accessGroupUpdationStatus))
+        .returning(Future.successful(accessGroupUpdateStatus))
 
     def mockAccessGroupsServiceRenameWithException(
       ex: Exception
@@ -392,7 +392,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       "call to fetch access groups returns empty collection" should {
         s"return $NOT_FOUND" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroupSummaries(Seq.empty)
+          mockAccessGroupsServiceGetGroups(Seq.empty)
 
           val result = controller.groupsSummaries(arn)(baseRequest)
 
@@ -400,26 +400,44 @@ class AccessGroupsControllerSpec extends BaseSpec {
         }
       }
 
-      "call to fetch access groups returns non-empty collection" should {
-        s"return $OK" in new TestScope {
-          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroupSummaries(
-            Seq(AccessGroupSummary(gid, "some group", 3, 3))
-          )
+      "call to fetch access groups returns non-empty collection" when {
 
-          val result = controller.groupsSummaries(arn)(baseRequest)
+        "access group clients and users are empty" should {
+          s"return $OK" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
 
-          status(result) shouldBe OK
-          contentAsJson(result) shouldBe Json.parse(
-            s"""[{"groupId":"$gid","groupName":"$groupName","clientCount":3,"teamMemberCount":3}]"""
-          )
+            val groupWithEmptyClientsAndUsers: AccessGroup = accessGroup.copy(clients = None, teamMembers = None)
+            mockAccessGroupsServiceGetGroups(Seq(groupWithEmptyClientsAndUsers))
+
+            val result = controller.groupsSummaries(arn)(baseRequest)
+
+            status(result) shouldBe OK
+            contentAsJson(result) shouldBe Json.parse(
+              s"""[{"groupId":"$gid","groupName":"$groupName","clientCount":0,"teamMemberCount":0}]"""
+            )
+          }
         }
+
+        "access group clients and users are not empty" should {
+          s"return $OK" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+
+            val result = controller.groupsSummaries(arn)(baseRequest)
+
+            status(result) shouldBe OK
+            contentAsJson(result) shouldBe Json.parse(
+              s"""[{"groupId":"$gid","groupName":"$groupName","clientCount":0,"teamMemberCount":0}]"""
+            )
+          }
+        }
+
       }
 
       "call to fetch access groups throws exception" should {
         s"return $INTERNAL_SERVER_ERROR" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroupSummariesWithException(new RuntimeException("boo boo"))
+          mockAccessGroupsServiceGetGroupsWithException(new RuntimeException("boo boo"))
 
           val result = controller.groupsSummaries(arn)(baseRequest)
 
