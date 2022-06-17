@@ -39,13 +39,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
 
   def createGroup(arn: Arn): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
-      if (!Arn.isValid(arn.value)) {
-        logger.info("Provided ARN is not valid")
-        badRequestInvalidArn(arn)
-      } else if (arn != authorisedAgent.arn) {
-        logger.info("Provided ARN did not match with that identified by auth")
-        Future.successful(BadRequest)
-      } else {
+      withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         withJsonParsed[CreateAccessGroupRequest] { createAccessGroupRequest =>
           if (createAccessGroupRequest.groupName.length > MAX_LENGTH_GROUP_NAME) {
             badRequestGroupNameMaxLength
@@ -53,13 +47,13 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
             for {
               groupCreationStatus <-
                 accessGroupsService
-                  .create(createAccessGroupRequest.buildAccessGroup(arn, authorisedAgent.agentUser))
+                  .create(createAccessGroupRequest.buildAccessGroup(matchedArn, authorisedAgent.agentUser))
             } yield groupCreationStatus match {
               case AccessGroupExistsForCreation =>
                 logger.info("Cannot create a group with a name that already exists")
                 Conflict
               case AccessGroupCreated(groupId) =>
-                logger.info(s"Created group for '${arn.value}': '$groupId'")
+                logger.info(s"Created group for '${matchedArn.value}': '$groupId'")
                 Created(JsString(groupId))
               case AccessGroupNotCreated =>
                 logger.warn("Unable to create access group")
@@ -73,15 +67,10 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
 
   def groupsSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
-      if (!Arn.isValid(arn.value)) {
-        logger.info("Provided ARN is not valid")
-        badRequestInvalidArn(arn)
-      } else if (arn != authorisedAgent.arn) {
-        logger.info("Provided ARN did not match with that identified by auth")
-        Future.successful(BadRequest)
-      } else {
+      withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
-          groupSummaries <- accessGroupsService.groupSummaries(arn)
+          groups         <- accessGroupsService.getAll(matchedArn)
+          groupSummaries <- Future.successful(groups.map(AccessGroupSummary.convert))
         } yield
           if (groupSummaries.isEmpty) {
             NotFound
@@ -158,8 +147,8 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
             badRequestGroupNameMaxLength
           } else {
             for {
-              groupUpdationStatus <- accessGroupsService.update(groupId, accessGroup, authorisedAgent.agentUser)
-            } yield groupUpdationStatus match {
+              groupUpdateStatus <- accessGroupsService.update(groupId, accessGroup, authorisedAgent.agentUser)
+            } yield groupUpdateStatus match {
               case AccessGroupNotUpdated =>
                 logger.info("Access group was not updated")
                 NotFound
@@ -198,6 +187,19 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
         } else {
           body(groupId)
         }
+    }
+
+  private def withValidAndMatchingArn(providedArn: Arn, authorisedAgent: AuthorisedAgent)(
+    body: Arn => Future[Result]
+  ): Future[Result] =
+    if (!Arn.isValid(providedArn.value)) {
+      logger.info("Provided ARN is not valid")
+      badRequestInvalidArn(providedArn)
+    } else if (providedArn != authorisedAgent.arn) {
+      logger.info("Provided ARN did not match with that identified by auth")
+      Future.successful(BadRequest)
+    } else {
+      body(providedArn)
     }
 
   def withJsonParsed[T](
@@ -274,4 +276,19 @@ object RenameAccessGroupRequest {
   implicit val writes: Writes[RenameAccessGroupRequest] = Json.writes[RenameAccessGroupRequest]
 
   implicit val formatRenameAccessGroupRequest: Format[RenameAccessGroupRequest] = Format(reads, writes)
+}
+
+case class AccessGroupSummary(groupId: String, groupName: String, clientCount: Int, teamMemberCount: Int)
+
+object AccessGroupSummary {
+
+  def convert(accessGroup: AccessGroup): AccessGroupSummary =
+    AccessGroupSummary(
+      GroupId(accessGroup.arn, accessGroup.groupName).encode,
+      accessGroup.groupName,
+      accessGroup.clients.fold(0)(_.size),
+      accessGroup.teamMembers.fold(0)(_.size)
+    )
+
+  implicit val formatAccessGroupSummary: OFormat[AccessGroupSummary] = Json.format[AccessGroupSummary]
 }
