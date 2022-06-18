@@ -24,6 +24,7 @@ import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.service._
+import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -80,6 +81,21 @@ class OptinControllerSpec extends BaseSpec {
         .expects(arn, user, *)
         .returning(Future failed ex)
 
+    def mockOptinServiceOptinStatusWithoutException(
+      maybeOptinStatis: Option[OptinStatus]
+    ): CallHandler3[Arn, ExecutionContext, HeaderCarrier, Future[Option[OptinStatus]]] =
+      (optinService
+        .optinStatus(_: Arn)(_: ExecutionContext, _: HeaderCarrier))
+        .expects(arn, *, *)
+        .returning(Future successful maybeOptinStatis)
+
+    def mockOptinServiceOptinStatusWithException(
+      ex: Exception
+    ): CallHandler3[Arn, ExecutionContext, HeaderCarrier, Future[Option[OptinStatus]]] =
+      (optinService
+        .optinStatus(_: Arn)(_: ExecutionContext, _: HeaderCarrier))
+        .expects(arn, *, *)
+        .returning(Future failed ex)
   }
 
   "Call to opt-in" when {
@@ -94,14 +110,13 @@ class OptinControllerSpec extends BaseSpec {
       }
     }
 
-    s"optin service returns an optin record" should {
+    s"auth returns a different arn than the provided one" should {
 
-      s"return $CREATED" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        mockOptinServiceOptinWithoutException(Some(OptinCreated))
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(Arn("NARN0101010"), user)))
 
         val result = controller.optin(arn)(request)
-        status(result) shouldBe CREATED
+        status(result) shouldBe BAD_REQUEST
       }
     }
 
@@ -116,6 +131,17 @@ class OptinControllerSpec extends BaseSpec {
       }
     }
 
+    s"optin service returns an optin record" should {
+
+      s"return $CREATED" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        mockOptinServiceOptinWithoutException(Some(OptinCreated))
+
+        val result = controller.optin(arn)(request)
+        status(result) shouldBe CREATED
+      }
+    }
+
     s"optin service throws an exception" should {
 
       s"return $INTERNAL_SERVER_ERROR" in new TestScope {
@@ -127,15 +153,6 @@ class OptinControllerSpec extends BaseSpec {
       }
     }
 
-    s"auth returns a different arn than the provided one" should {
-
-      s"return $BAD_REQUEST" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(Arn("NARN0101010"), user)))
-
-        val result = controller.optin(arn)(request)
-        status(result) shouldBe BAD_REQUEST
-      }
-    }
   }
 
   "Call to opt-out" when {
@@ -150,14 +167,13 @@ class OptinControllerSpec extends BaseSpec {
       }
     }
 
-    s"optin service returns an optin record" should {
+    s"auth returns a different arn than the provided one" should {
 
-      s"return $CREATED" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        mockOptinServiceOptoutWithoutException(Some(OptoutCreated))
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(Arn("NARN0101010"), user)))
 
         val result = controller.optout(arn)(request)
-        status(result) shouldBe CREATED
+        status(result) shouldBe BAD_REQUEST
       }
     }
 
@@ -172,6 +188,17 @@ class OptinControllerSpec extends BaseSpec {
       }
     }
 
+    s"optin service returns an optin record" should {
+
+      s"return $CREATED" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        mockOptinServiceOptoutWithoutException(Some(OptoutCreated))
+
+        val result = controller.optout(arn)(request)
+        status(result) shouldBe CREATED
+      }
+    }
+
     s"optin service throws an exception" should {
 
       s"return $INTERNAL_SERVER_ERROR" in new TestScope {
@@ -183,14 +210,37 @@ class OptinControllerSpec extends BaseSpec {
       }
     }
 
-    s"auth returns a different arn than the provided one" should {
+  }
 
-      s"return $BAD_REQUEST" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(Arn("NARN0101010"), user)))
+  "Call to optin status" when {
 
-        val result = controller.optout(arn)(request)
-        status(result) shouldBe BAD_REQUEST
+    "optin service does not return an optin status record" should {
+      s"return $NOT_FOUND" in new TestScope {
+        mockOptinServiceOptinStatusWithoutException(None)
+
+        val result = controller.optinStatus(arn)(request)
+        status(result) shouldBe NOT_FOUND
       }
     }
+
+    "optin service does return an optin status record" should {
+      s"return $OK" in new TestScope {
+        mockOptinServiceOptinStatusWithoutException(Some(OptedOutEligible))
+
+        val result = controller.optinStatus(arn)(request)
+        status(result) shouldBe OK
+        contentAsString(result) shouldBe """"Opted-Out_ELIGIBLE""""
+      }
+    }
+
+    "optin service throws exception" should {
+      s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+        mockOptinServiceOptinStatusWithException(new RuntimeException("boo boo"))
+
+        val result = controller.optinStatus(arn)(request)
+        status(result) shouldBe INTERNAL_SERVER_ERROR
+      }
+    }
+
   }
 }
