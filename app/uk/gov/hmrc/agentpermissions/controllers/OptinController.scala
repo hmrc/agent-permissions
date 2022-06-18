@@ -37,7 +37,7 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
 
   def optin(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
-      if (arn == authorisedAgent.arn) {
+      withMatchedArn(arn, authorisedAgent) {
         optinService.optin(authorisedAgent.arn, authorisedAgent.agentUser) flatMap {
           case None =>
             logger.info(s"Already has $OptedIn")
@@ -46,16 +46,13 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
             logger.info(s"Optin record created")
             Future.successful(Created)
         }
-      } else {
-        logger.info("Provided ARN did not match with that identified by auth")
-        Future.successful(BadRequest)
       }
     } transformWith failureHandler
   }
 
   def optout(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
-      if (arn == authorisedAgent.arn) {
+      withMatchedArn(arn, authorisedAgent) {
         optinService.optout(authorisedAgent.arn, authorisedAgent.agentUser) flatMap {
           case None =>
             logger.info(s"Already has $OptedOut")
@@ -64,9 +61,6 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
             logger.info(s"Optin record created")
             Future.successful(Created)
         }
-      } else {
-        logger.info("Provided ARN did not match with that identified by auth")
-        Future.successful(BadRequest)
       }
     } transformWith failureHandler
   }
@@ -76,13 +70,9 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
       .optinStatus(arn)
       .map(_.map(_.value))
       .map {
-        case None             => NotFound
-        case Some(statusJson) => Ok(JsString(statusJson))
-      }
-      .recover { case ex =>
-        logger.info(s"Returning $InternalServerError: ${ex.getMessage}")
-        InternalServerError
-      }
+        case None              => NotFound
+        case Some(optinStatus) => Ok(JsString(optinStatus))
+      } transformWith failureHandler
   }
 
   private def withAuthorisedAgent[T](
@@ -97,6 +87,16 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
         case Some(authorisedAgent: AuthorisedAgent) =>
           body(authorisedAgent)
       }
+
+  private def withMatchedArn(providedArn: Arn, authorisedAgent: AuthorisedAgent)(
+    body: => Future[Result]
+  ): Future[Result] =
+    if (providedArn == authorisedAgent.arn) {
+      body
+    } else {
+      logger.info("Provided ARN did not match with that identified by auth")
+      Future.successful(BadRequest)
+    }
 
   private def failureHandler(triedResult: Try[Result]): Future[Result] = triedResult match {
     case Success(result) =>
