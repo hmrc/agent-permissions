@@ -97,6 +97,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
         buildAccessGroup(Set(userA, userB, userC), Set(enrolment1, enrolment2, enrolment3))
 
       val accessGroupToUpdatePreviousVersion: AccessGroup = accessGroupToUpdate.copy(
+        groupName = accessGroupToUpdate.groupName.toUpperCase,
         teamMembers = Some(Set(userA, userB, userD)),
         clients = Some(Set(enrolment1, enrolment2, enrolment4))
       )
