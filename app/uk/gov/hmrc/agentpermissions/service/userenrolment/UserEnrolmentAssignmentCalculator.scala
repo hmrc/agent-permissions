@@ -59,7 +59,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     accessGroupToProcess: AccessGroup,
     existingAccessGroups: Seq[AccessGroup]
   ): Option[UserEnrolmentAssignments] =
-    existingAccessGroups.find(_.groupName == accessGroupToProcess.groupName) map {
+    existingAccessGroups.find(_.groupName.equalsIgnoreCase(accessGroupToProcess.groupName)) map {
       accessGroupToProcessPreviousVersion =>
         val seedAssigns =
           explodeUserEnrolments(accessGroupToProcess) -- explodeUserEnrolments(accessGroupToProcessPreviousVersion)
@@ -94,7 +94,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     seedUnassigns: Set[UserEnrolment]
   ) =
     existingAccessGroups
-      .filterNot(_.groupName == accessGroupToProcess.groupName)
+      .filterNot(_.groupName.equalsIgnoreCase(accessGroupToProcess.groupName))
       .foldLeft(UserEnrolmentAssignments(seedAssigns, seedUnassigns)) {
         (userEnrolmentAssignments, existingAccessGroup) =>
           val userEnrolments = explodeUserEnrolments(existingAccessGroup)
