@@ -118,10 +118,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     def mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[GroupId, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+    ): CallHandler3[GroupId, AccessGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForGroupUpdate(_: GroupId)(_: ExecutionContext))
-        .expects(groupId, *)
+        .calculateForGroupUpdate(_: GroupId, _: AccessGroup)(_: ExecutionContext))
+        .expects(groupId, accessGroup, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
     def mockUserEnrolmentAssignmentServiceApplyUserEnrolmentsInEacd(

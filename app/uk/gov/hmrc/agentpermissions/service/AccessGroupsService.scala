@@ -120,7 +120,7 @@ class AccessGroupsServiceImpl @Inject() (
   ): Future[AccessGroupUpdateStatus] =
     for {
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
-      maybeCalculatedAssignments   <- userEnrolmentAssignmentService.calculateForGroupUpdate(groupId)
+      maybeCalculatedAssignments   <- userEnrolmentAssignmentService.calculateForGroupUpdate(groupId, accessGroup)
       maybeUpdatedCount <- accessGroupsRepository.update(groupId.arn, groupId.groupName, accessGroupWithWhoIsUpdating)
     } yield maybeUpdatedCount match {
       case None =>
