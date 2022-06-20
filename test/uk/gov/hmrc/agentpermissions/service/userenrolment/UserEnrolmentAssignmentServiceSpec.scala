@@ -102,11 +102,10 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
   "Calculating assignments during group update" should {
     "return calculated assignments" in new TestScope {
       mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
-      mockAccessGroupsRepositoryGet(Some(accessGroup))
       mockUserEnrolmentAssignmentCalculatorForGroupUpdate(maybeUserEnrolmentAssignments)
 
       userEnrolmentAssignmentService
-        .calculateForGroupUpdate(groupId)
+        .calculateForGroupUpdate(groupId, accessGroup)
         .futureValue shouldBe maybeUserEnrolmentAssignments
     }
   }

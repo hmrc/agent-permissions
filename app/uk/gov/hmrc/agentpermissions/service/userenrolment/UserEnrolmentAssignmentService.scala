@@ -38,7 +38,8 @@ trait UserEnrolmentAssignmentService {
   ): Future[Option[UserEnrolmentAssignments]]
 
   def calculateForGroupUpdate(
-    groupId: GroupId
+    groupId: GroupId,
+    accessGroupToUpdate: AccessGroup
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
 
   def applyAssignmentsInEacd(
@@ -74,15 +75,13 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     } yield maybeUserEnrolmentAssignments
 
   override def calculateForGroupUpdate(
-    groupId: GroupId
+    groupId: GroupId,
+    accessGroupToUpdate: AccessGroup
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
-      existingAccessGroups     <- accessGroupsRepository.get(groupId.arn)
-      maybeExistingAccessGroup <- accessGroupsRepository.get(groupId.arn, groupId.groupName)
+      existingAccessGroups <- accessGroupsRepository.get(groupId.arn)
       maybeUserEnrolmentAssignments <-
-        Future.successful(
-          maybeExistingAccessGroup.flatMap(userEnrolmentAssignmentCalculator.forGroupUpdate(_, existingAccessGroups))
-        )
+        Future.successful(userEnrolmentAssignmentCalculator.forGroupUpdate(accessGroupToUpdate, existingAccessGroups))
     } yield maybeUserEnrolmentAssignments
 
   override def applyAssignmentsInEacd(
