@@ -17,10 +17,9 @@
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import org.scalamock.handlers.{CallHandler1, CallHandler2}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, GroupId, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
-import uk.gov.hmrc.agentpermissions.service.GroupId
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}

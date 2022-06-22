@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.controllers
 import play.api.Logging
 import play.api.libs.json._
 import play.api.mvc._
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment}
+import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.auth.core.AuthorisationException
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -69,10 +69,11 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     withAuthorisedAgent { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
-          groups         <- accessGroupsService.getAll(matchedArn)
-          groupSummaries <- Future.successful(groups.map(AccessGroupSummary.convert))
+          groups            <- accessGroupsService.getAllGroups(matchedArn)
+          unassignedClients <- accessGroupsService.getUnassignedClients(arn)
+          groupSummaries = AccessGroupSummaries(groups.map(AccessGroupSummary.convert), unassignedClients)
         } yield
-          if (groupSummaries.isEmpty) {
+          if (groupSummaries.groups.isEmpty && groupSummaries.unassignedClients.isEmpty) {
             NotFound
           } else {
             Ok(Json.toJson(groupSummaries))
@@ -276,19 +277,4 @@ object RenameAccessGroupRequest {
   implicit val writes: Writes[RenameAccessGroupRequest] = Json.writes[RenameAccessGroupRequest]
 
   implicit val formatRenameAccessGroupRequest: Format[RenameAccessGroupRequest] = Format(reads, writes)
-}
-
-case class AccessGroupSummary(groupId: String, groupName: String, clientCount: Int, teamMemberCount: Int)
-
-object AccessGroupSummary {
-
-  def convert(accessGroup: AccessGroup): AccessGroupSummary =
-    AccessGroupSummary(
-      GroupId(accessGroup.arn, accessGroup.groupName).encode,
-      accessGroup.groupName,
-      accessGroup.clients.fold(0)(_.size),
-      accessGroup.teamMembers.fold(0)(_.size)
-    )
-
-  implicit val formatAccessGroupSummary: OFormat[AccessGroupSummary] = Json.format[AccessGroupSummary]
 }
