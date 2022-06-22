@@ -17,15 +17,16 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import akka.actor.ActorSystem
-import org.scalamock.handlers.{CallHandler2, CallHandler4}
+import org.scalamock.handlers.{CallHandler2, CallHandler3, CallHandler4}
 import play.api.libs.json.{JsArray, JsString, JsValue, Json}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client, Enrolment, GroupId, Identifier}
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupCreationStatus, AccessGroupDeleted, AccessGroupDeletionStatus, AccessGroupExistsForCreation, AccessGroupNotCreated, AccessGroupNotDeleted, AccessGroupNotExistsForRenaming, AccessGroupNotRenamed, AccessGroupNotUpdated, AccessGroupRenamed, AccessGroupRenamingStatus, AccessGroupUpdateStatus, AccessGroupUpdated, AccessGroupsService, GroupId}
+import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupCreationStatus, AccessGroupDeleted, AccessGroupDeletionStatus, AccessGroupExistsForCreation, AccessGroupNotCreated, AccessGroupNotDeleted, AccessGroupNotExistsForRenaming, AccessGroupNotRenamed, AccessGroupNotUpdated, AccessGroupRenamed, AccessGroupRenamingStatus, AccessGroupUpdateStatus, AccessGroupUpdated, AccessGroupsService}
 import uk.gov.hmrc.auth.core.InvalidBearerToken
+import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
@@ -153,7 +154,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       groups: Seq[AccessGroup]
     ): CallHandler2[Arn, ExecutionContext, Future[Seq[AccessGroup]]] =
       (mockAccessGroupsService
-        .getAll(_: Arn)(_: ExecutionContext))
+        .getAllGroups(_: Arn)(_: ExecutionContext))
         .expects(arn, *)
         .returning(Future.successful(groups))
 
@@ -161,7 +162,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       ex: Exception
     ): CallHandler2[Arn, ExecutionContext, Future[Seq[AccessGroup]]] =
       (mockAccessGroupsService
-        .getAll(_: Arn)(_: ExecutionContext))
+        .getAllGroups(_: Arn)(_: ExecutionContext))
         .expects(arn, *)
         .returning(Future.failed(ex))
 
@@ -220,6 +221,14 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .delete(_: GroupId)(_: ExecutionContext))
         .expects(*, *)
         .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceGetUnassignedClients(
+      unassignedClients: Set[Client]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Set[Client]]] =
+      (mockAccessGroupsService
+        .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future successful unassignedClients)
 
   }
 
@@ -389,10 +398,11 @@ class AccessGroupsControllerSpec extends BaseSpec {
         }
       }
 
-      "call to fetch access groups returns empty collection" should {
+      "calls to fetch both access groups and unassigned clients return empty collections" should {
         s"return $NOT_FOUND" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetGroups(Seq.empty)
+          mockAccessGroupsServiceGetUnassignedClients(Set.empty)
 
           val result = controller.groupsSummaries(arn)(baseRequest)
 
@@ -400,38 +410,63 @@ class AccessGroupsControllerSpec extends BaseSpec {
         }
       }
 
-      "call to fetch access groups returns non-empty collection" when {
+      "not both calls to fetch access groups and unassigned clients return empty collections" when {
 
-        "access group clients and users are empty" should {
-          s"return $OK" in new TestScope {
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        "call to fetch unassigned clients returns empty collection" when {
 
-            val groupWithEmptyClientsAndUsers: AccessGroup = accessGroup.copy(clients = None, teamMembers = None)
-            mockAccessGroupsServiceGetGroups(Seq(groupWithEmptyClientsAndUsers))
+          "access group clients and users are nothing" should {
+            s"return $OK" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
 
-            val result = controller.groupsSummaries(arn)(baseRequest)
+              val groupWithEmptyClientsAndUsers: AccessGroup = accessGroup.copy(clients = None, teamMembers = None)
+              mockAccessGroupsServiceGetGroups(Seq(groupWithEmptyClientsAndUsers))
+              mockAccessGroupsServiceGetUnassignedClients(Set.empty)
 
-            status(result) shouldBe OK
-            contentAsJson(result) shouldBe Json.parse(
-              s"""[{"groupId":"$gid","groupName":"$groupName","clientCount":0,"teamMemberCount":0}]"""
-            )
+              val result = controller.groupsSummaries(arn)(baseRequest)
+
+              status(result) shouldBe OK
+              contentAsJson(result) shouldBe Json.parse(
+                s"""{"groups":[{"groupId":"$gid","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[]}"""
+              )
+            }
+          }
+
+          "access group clients and users are not nothing" should {
+            s"return $OK" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+              mockAccessGroupsServiceGetUnassignedClients(Set.empty)
+
+              val result = controller.groupsSummaries(arn)(baseRequest)
+
+              status(result) shouldBe OK
+              contentAsJson(result) shouldBe Json.parse(
+                s"""{"groups":[{"groupId":"$gid","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[]}"""
+              )
+            }
           }
         }
 
-        "access group clients and users are not empty" should {
-          s"return $OK" in new TestScope {
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+        "call to fetch unassigned clients returns non-empty collection" when {
 
-            val result = controller.groupsSummaries(arn)(baseRequest)
+          "access group clients and users are not nothing" should {
+            s"return $OK" in new TestScope {
+              val enrolmentKey = "key"
+              val friendlyName = "friendly name"
 
-            status(result) shouldBe OK
-            contentAsJson(result) shouldBe Json.parse(
-              s"""[{"groupId":"$gid","groupName":"$groupName","clientCount":0,"teamMemberCount":0}]"""
-            )
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+              mockAccessGroupsServiceGetUnassignedClients(Set(Client(enrolmentKey, friendlyName)))
+
+              val result = controller.groupsSummaries(arn)(baseRequest)
+
+              status(result) shouldBe OK
+              contentAsJson(result) shouldBe Json.parse(
+                s"""{"groups":[{"groupId":"$gid","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[{"enrolmentKey":"$enrolmentKey","friendlyName":"$friendlyName"}]}"""
+              )
+            }
           }
         }
-
       }
 
       "call to fetch access groups throws exception" should {

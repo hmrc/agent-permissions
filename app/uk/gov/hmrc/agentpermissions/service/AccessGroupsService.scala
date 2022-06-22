@@ -18,9 +18,11 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client, ClientList, EnrolmentKey, GroupId}
+import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated}
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
+import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
@@ -30,7 +32,7 @@ import scala.concurrent.{ExecutionContext, Future}
 trait AccessGroupsService {
   def create(accessGroup: AccessGroup)(implicit ec: ExecutionContext): Future[AccessGroupCreationStatus]
 
-  def getAll(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]]
+  def getAllGroups(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]]
 
   def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]]
 
@@ -43,12 +45,19 @@ trait AccessGroupsService {
   def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
+
+  def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList]
+
+  def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
+
+  def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
 }
 
 @Singleton
 class AccessGroupsServiceImpl @Inject() (
   accessGroupsRepository: AccessGroupsRepository,
-  userEnrolmentAssignmentService: UserEnrolmentAssignmentService
+  userEnrolmentAssignmentService: UserEnrolmentAssignmentService,
+  userClientDetailsConnector: UserClientDetailsConnector
 ) extends AccessGroupsService with Logging {
 
   override def create(accessGroup: AccessGroup)(implicit ec: ExecutionContext): Future[AccessGroupCreationStatus] =
@@ -71,7 +80,7 @@ class AccessGroupsServiceImpl @Inject() (
         }
     }
 
-  override def getAll(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]] =
+  override def getAllGroups(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]] =
     accessGroupsRepository.get(arn)
 
   override def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]] =
@@ -133,6 +142,25 @@ class AccessGroupsServiceImpl @Inject() (
           AccessGroupNotUpdated
         }
     }
+
+  override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
+    for {
+      clients      <- userClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
+      accessGroups <- if (clients.nonEmpty) accessGroupsRepository.get(arn) else Future.successful(Seq.empty)
+      assignedEnrolmentKeys = accessGroups.flatMap(_.clients).flatten.toSet.flatMap(EnrolmentKey.enrolmentKeys)
+    } yield clients.foldLeft(ClientList(Set.empty, Set.empty)) { (clientList, client) =>
+      if (assignedEnrolmentKeys.contains(client.enrolmentKey)) {
+        clientList.copy(assigned = clientList.assigned + client)
+      } else {
+        clientList.copy(unassigned = clientList.unassigned + client)
+      }
+    }
+
+  override def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
+    getAllClients(arn).map(_.assigned)
+
+  override def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
+    getAllClients(arn).map(_.unassigned)
 
   private def mergeWhoIsUpdating(accessGroup: AccessGroup, whoIsUpdating: AgentUser): Future[AccessGroup] =
     Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))

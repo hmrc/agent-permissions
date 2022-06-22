@@ -22,10 +22,10 @@ import com.kenshoo.play.metrics.Metrics
 import play.api.Logging
 import play.api.http.Status._
 import uk.gov.hmrc.agent.kenshoo.monitoring.HttpAPIMonitor
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpReads, HttpResponse}
-import HttpReads.Implicits.readRaw
+import uk.gov.hmrc.http.HttpReads.Implicits.readRaw
+import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpResponse}
 
 import java.net.URL
 import javax.inject.{Inject, Singleton}
@@ -38,6 +38,8 @@ trait UserClientDetailsConnector {
   def isSingleUserAgency(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]]
 
   def outstandingWorkItemsExist(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]]
+
+  def getClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Seq[Client]]]
 }
 
 @Singleton
@@ -96,6 +98,24 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
             Option(true)
           case NO_CONTENT =>
             Option(false)
+          case other =>
+            logger.warn(s"Received $other status: ${response.body}")
+            None
+        }
+      }
+    }
+  }
+
+  override def getClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Seq[Client]]] = {
+    val url = new URL(aucdBaseUrl, s"/agent-user-client-details/arn/${arn.value}/client-list")
+
+    monitor("ConsumedAPI-getClientList-GET") {
+      http.GET[HttpResponse](url).map { response =>
+        response.status match {
+          case ACCEPTED =>
+            None
+          case OK =>
+            response.json.asOpt[Seq[Client]]
           case other =>
             logger.warn(s"Received $other status: ${response.body}")
             None

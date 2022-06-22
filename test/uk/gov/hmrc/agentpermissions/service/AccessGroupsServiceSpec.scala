@@ -17,10 +17,12 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client, ClientList, Enrolment, EnrolmentKey, GroupId, Identifier, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated, UpsertType}
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
+import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
@@ -60,12 +62,18 @@ class AccessGroupsServiceSpec extends BaseSpec {
     )
 
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
     val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
     val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
+    val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
 
     val accessGroupsService: AccessGroupsService =
-      new AccessGroupsServiceImpl(mockAccessGroupsRepository, mockUserEnrolmentAssignmentService)
+      new AccessGroupsServiceImpl(
+        mockAccessGroupsRepository,
+        mockUserEnrolmentAssignmentService,
+        mockUserClientDetailsConnector
+      )
 
     lazy val now: LocalDateTime = LocalDateTime.now()
 
@@ -147,6 +155,14 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .update(_: Arn, _: String, _: AccessGroup))
         .expects(arn, groupName, *)
         .returning(Future.successful(maybeModifiedCount))
+
+    def mockUserClientDetailsConnectorGetClients(
+      maybeClients: Option[Seq[Client]]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Seq[Client]]]] =
+      (mockUserClientDetailsConnector
+        .getClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *)
+        .returning(Future successful maybeClients)
   }
 
   "Calling create" when {
@@ -196,7 +212,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
       "return corresponding groups" in new TestScope {
         mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
 
-        accessGroupsService.getAll(arn).futureValue shouldBe
+        accessGroupsService.getAllGroups(arn).futureValue shouldBe
           Seq(accessGroup)
       }
     }
@@ -322,6 +338,98 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
           accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
         }
+      }
+    }
+  }
+
+  "Fetching all clients" when {
+
+    "AUCD connector returns nothing" should {
+      "return no unassigned clients" in new TestScope {
+        mockUserClientDetailsConnectorGetClients(None)
+
+        accessGroupsService.getAllClients(arn).futureValue shouldBe
+          ClientList(Set.empty, Set.empty)
+      }
+    }
+
+    "AUCD connector returns something" when {
+
+      "AUCD connector returns empty list of clients" should {
+        "return correct clients" in new TestScope {
+          mockUserClientDetailsConnectorGetClients(Some(Seq.empty))
+
+          accessGroupsService.getAllClients(arn).futureValue shouldBe
+            ClientList(Set.empty, Set.empty)
+        }
+      }
+
+      "AUCD connector returns non-empty list of clients" when {
+
+        "no access groups exist" should {
+          "return correct clients" in new TestScope {
+            val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client")
+
+            mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
+            mockAccessGroupsRepositoryGetAll(Seq.empty)
+
+            accessGroupsService.getAllClients(arn).futureValue shouldBe
+              ClientList(Set.empty, Set(client1))
+          }
+        }
+
+        "access groups exist" when {
+
+          "access group exists whose assigned clients match those returned by AUCD connector" should {
+            "return correct clients" in new TestScope {
+              val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client")
+              mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
+              mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+
+              accessGroupsService.getAllClients(arn).futureValue shouldBe
+                ClientList(Set(client1), Set.empty)
+            }
+          }
+
+          "access group exists whose assigned clients do not match those returned by AUCD connector" should {
+            "return correct clients" in new TestScope {
+              val client1: Client = Client("unmatchedEnrolmentKey", "existing client")
+              mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
+              mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+
+              accessGroupsService.getAllClients(arn).futureValue shouldBe
+                ClientList(Set.empty, Set(client1))
+            }
+          }
+        }
+      }
+    }
+  }
+
+  "Fetching assigned clients" when {
+    "access group exists whose assigned clients match some of those returned by AUCD connector" should {
+      "return correct assigned clients" in new TestScope {
+        val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client1")
+        val client2: Client = Client("unmatchedEnrolmentKey", "existing client2")
+        mockUserClientDetailsConnectorGetClients(Some(Seq(client1, client2)))
+        mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+
+        accessGroupsService.getAssignedClients(arn).futureValue shouldBe
+          Set(client1)
+      }
+    }
+  }
+
+  "Fetching unassigned clients" when {
+    "access group exists whose assigned clients match some of those returned by AUCD connector" should {
+      "return correct unassigned clients" in new TestScope {
+        val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client1")
+        val client2: Client = Client("unmatchedEnrolmentKey", "existing client2")
+        mockUserClientDetailsConnectorGetClients(Some(Seq(client1, client2)))
+        mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+
+        accessGroupsService.getUnassignedClients(arn).futureValue shouldBe
+          Set(client2)
       }
     }
   }

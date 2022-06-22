@@ -187,4 +187,48 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     }
   }
 
+  "getClients" when {
+
+    s"http response has $ACCEPTED status code" should {
+      "return nothing" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpGet(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list",
+          HttpResponse(ACCEPTED, "")
+        )
+
+        userClientDetailsConnector.getClients(arn).futureValue shouldBe None
+      }
+    }
+
+    s"http response has $OK status code" should {
+      "return clients" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpGet(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list",
+          HttpResponse(OK, "[]")
+        )
+
+        userClientDetailsConnector.getClients(arn).futureValue shouldBe Some(Seq.empty)
+      }
+    }
+
+    "http response has non-200 status codes" should {
+      Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+        s"return nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpGet(
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list",
+            HttpResponse(statusCode, "")
+          )
+
+          userClientDetailsConnector.getClients(arn).futureValue shouldBe None
+        }
+      }
+    }
+  }
+
 }
