@@ -1,7 +1,7 @@
 
 # agent-permissions
 
-Backend service to store the opt-in and any agent-permissions-specific structures, such as groups.
+Backend service to store opt-in status and any agent-permissions-specific structures, such as groups.
 
 ## Running the tests
 
