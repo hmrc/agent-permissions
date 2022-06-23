@@ -21,10 +21,10 @@ import com.kenshoo.play.metrics.Metrics
 import org.scalamock.handlers.CallHandler0
 import play.api.http.Status._
 import play.api.libs.json.Json
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpReads, HttpResponse}
+import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpReads, HttpResponse, UpstreamErrorResponse}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -215,8 +215,8 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       }
     }
 
-    "http response has non-200 status codes" should {
-      Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+    "http response has 4xx status codes" should {
+      Seq(NOT_FOUND, UNAUTHORIZED).foreach { statusCode =>
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
           mockMetricsDefaultRegistry
@@ -226,6 +226,24 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
           )
 
           userClientDetailsConnector.getClients(arn).futureValue shouldBe None
+        }
+      }
+    }
+
+    "http response has 5xx status codes" should {
+      Seq(INTERNAL_SERVER_ERROR, BAD_GATEWAY).foreach { statusCode =>
+        s"throw upstream exception nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpGet(
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list",
+            HttpResponse(statusCode, "")
+          )
+
+          val eventualMaybeClients: Future[Option[Seq[Client]]] = userClientDetailsConnector.getClients(arn)
+          whenReady(eventualMaybeClients.failed) { ex =>
+            ex shouldBe a[UpstreamErrorResponse]
+          }
         }
       }
     }
