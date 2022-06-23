@@ -22,7 +22,7 @@ import com.kenshoo.play.metrics.Metrics
 import play.api.Logging
 import play.api.http.Status._
 import uk.gov.hmrc.agent.kenshoo.monitoring.HttpAPIMonitor
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.http.HttpReads.Implicits.readRaw
 import uk.gov.hmrc.http.HttpReads.is5xx
@@ -41,6 +41,10 @@ trait UserClientDetailsConnector {
   def outstandingWorkItemsExist(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]]
 
   def getClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Seq[Client]]]
+
+  def pushAssignments(
+    assignments: UserEnrolmentAssignments
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus]
 }
 
 @Singleton
@@ -128,4 +132,25 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
     }
   }
 
+  override def pushAssignments(
+    userEnrolmentAssignments: UserEnrolmentAssignments
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] = {
+    val url = new URL(aucdBaseUrl, s"/agent-user-client-details/user-enrolment-assignments")
+
+    monitor("ConsumedAPI-AgentUserClientDetails-ClientList-GET") {
+      http.POST[UserEnrolmentAssignments, HttpResponse](url, userEnrolmentAssignments).map { response =>
+        response.status match {
+          case ACCEPTED =>
+            AssignmentsPushed
+          case other =>
+            logger.warn(s"EACD assignments not pushed. Received $other status: ${response.body}")
+            AssignmentsNotPushed
+        }
+      }
+    }
+  }
 }
+
+sealed trait EacdAssignmentsPushStatus
+case object AssignmentsPushed extends EacdAssignmentsPushStatus
+case object AssignmentsNotPushed extends EacdAssignmentsPushStatus
