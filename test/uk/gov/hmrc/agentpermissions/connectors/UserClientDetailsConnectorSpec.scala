@@ -20,8 +20,8 @@ import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
 import com.kenshoo.play.metrics.Metrics
 import org.scalamock.handlers.CallHandler0
 import play.api.http.Status._
-import play.api.libs.json.Json
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client}
+import play.api.libs.json.{Json, Writes}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpReads, HttpResponse, UpstreamErrorResponse}
@@ -64,6 +64,17 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
           _: ExecutionContext
         ))
         .expects(url, *, *, *, *, *)
+        .returning(Future.successful(response))
+
+    def mockHttpPost[I, A](url: String, response: A): Unit =
+      (mockHttpClient
+        .POST[I, A](_: String, _: I, _: Seq[(String, String)])(
+          _: Writes[I],
+          _: HttpReads[A],
+          _: HeaderCarrier,
+          _: ExecutionContext
+        ))
+        .expects(url, *, *, *, *, *, *)
         .returning(Future.successful(response))
   }
 
@@ -244,6 +255,41 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
           whenReady(eventualMaybeClients.failed) { ex =>
             ex shouldBe a[UpstreamErrorResponse]
           }
+        }
+      }
+    }
+  }
+
+  "push calculated assignments" when {
+
+    s"http response has $ACCEPTED status code" should {
+      s"return $AssignmentsPushed" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpPost(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/user-enrolment-assignments",
+          HttpResponse(ACCEPTED, "")
+        )
+
+        userClientDetailsConnector
+          .pushAssignments(UserEnrolmentAssignments(Set.empty, Set.empty))
+          .futureValue shouldBe AssignmentsPushed
+      }
+    }
+
+    "http response has non-200 status codes" should {
+      Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+        s"return nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpPost(
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/user-enrolment-assignments",
+            HttpResponse(statusCode, "")
+          )
+
+          userClientDetailsConnector
+            .pushAssignments(UserEnrolmentAssignments(Set.empty, Set.empty))
+            .futureValue shouldBe AssignmentsNotPushed
         }
       }
     }

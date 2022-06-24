@@ -18,8 +18,8 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client, ClientList, EnrolmentKey, GroupId}
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentpermissions.connectors.{EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated}
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 import uk.gov.hmrc.http.HeaderCarrier
@@ -30,7 +30,9 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[AccessGroupsServiceImpl])
 trait AccessGroupsService {
-  def create(accessGroup: AccessGroup)(implicit ec: ExecutionContext): Future[AccessGroupCreationStatus]
+  def create(
+    accessGroup: AccessGroup
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus]
 
   def getAllGroups(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]]
 
@@ -40,9 +42,10 @@ trait AccessGroupsService {
     ec: ExecutionContext
   ): Future[AccessGroupRenamingStatus]
 
-  def delete(groupId: GroupId)(implicit ec: ExecutionContext): Future[AccessGroupDeletionStatus]
+  def delete(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus]
 
   def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
 
@@ -60,7 +63,9 @@ class AccessGroupsServiceImpl @Inject() (
   userClientDetailsConnector: UserClientDetailsConnector
 ) extends AccessGroupsService with Logging {
 
-  override def create(accessGroup: AccessGroup)(implicit ec: ExecutionContext): Future[AccessGroupCreationStatus] =
+  override def create(
+    accessGroup: AccessGroup
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus] =
     accessGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
       case Some(_) =>
         Future.successful(AccessGroupExistsForCreation)
@@ -72,7 +77,7 @@ class AccessGroupsServiceImpl @Inject() (
           case None =>
             AccessGroupNotCreated
           case Some(creationId) =>
-            userEnrolmentAssignmentService.applyAssignmentsInEacd(maybeCalculatedAssignments)
+            maybeCalculatedAssignments.foreach(pushCalculatedAssignments)
 
             val groupId = GroupId(accessGroup.arn, accessGroup.groupName).encode
             logger.info(s"Created access group. DB id: '$creationId', gid: '$groupId'")
@@ -108,7 +113,9 @@ class AccessGroupsServiceImpl @Inject() (
         }
     }
 
-  override def delete(groupId: GroupId)(implicit ec: ExecutionContext): Future[AccessGroupDeletionStatus] =
+  override def delete(
+    groupId: GroupId
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus] =
     for {
       maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupDeletion(groupId)
       maybeDeletedCount          <- accessGroupsRepository.delete(groupId.arn, groupId.groupName)
@@ -117,7 +124,8 @@ class AccessGroupsServiceImpl @Inject() (
         AccessGroupNotDeleted
       case Some(deletedCount) =>
         if (deletedCount == 1L) {
-          userEnrolmentAssignmentService.applyAssignmentsInEacd(maybeCalculatedAssignments)
+          maybeCalculatedAssignments.foreach(pushCalculatedAssignments)
+
           AccessGroupDeleted
         } else {
           AccessGroupNotDeleted
@@ -125,6 +133,7 @@ class AccessGroupsServiceImpl @Inject() (
     }
 
   override def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
     for {
@@ -136,7 +145,8 @@ class AccessGroupsServiceImpl @Inject() (
         AccessGroupNotUpdated
       case Some(updatedCount) =>
         if (updatedCount == 1L) {
-          userEnrolmentAssignmentService.applyAssignmentsInEacd(maybeCalculatedAssignments)
+          maybeCalculatedAssignments.foreach(pushCalculatedAssignments)
+
           AccessGroupUpdated
         } else {
           AccessGroupNotUpdated
@@ -164,6 +174,16 @@ class AccessGroupsServiceImpl @Inject() (
 
   private def mergeWhoIsUpdating(accessGroup: AccessGroup, whoIsUpdating: AgentUser): Future[AccessGroup] =
     Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
+
+  private def pushCalculatedAssignments(
+    calculatedAssignments: UserEnrolmentAssignments
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] =
+    userEnrolmentAssignmentService
+      .applyAssignmentsInEacd(calculatedAssignments)
+      .map { pushStatus =>
+        logger.info(s"Push status: $pushStatus")
+        pushStatus
+      }
 
 }
 

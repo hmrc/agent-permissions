@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import akka.actor.ActorSystem
-import org.scalamock.handlers.{CallHandler2, CallHandler3, CallHandler4}
+import org.scalamock.handlers.{CallHandler2, CallHandler3, CallHandler4, CallHandler5}
 import play.api.libs.json.{JsArray, JsString, JsValue, Json}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
@@ -114,6 +114,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
     val mockAuthAction: AuthAction = mock[AuthAction]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
     implicit val actorSystem: ActorSystem = ActorSystem()
 
     val controller = new AccessGroupsController(mockAccessGroupsService, mockAuthAction)
@@ -136,18 +137,18 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAccessGroupsServiceCreate(
       accessGroupCreationStatus: AccessGroupCreationStatus
-    ): CallHandler2[AccessGroup, ExecutionContext, Future[AccessGroupCreationStatus]] =
+    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
       (mockAccessGroupsService
-        .create(_: AccessGroup)(_: ExecutionContext))
-        .expects(*, *)
+        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
         .returning(Future.successful(accessGroupCreationStatus))
 
     def mockAccessGroupsServiceCreateWithException(
       ex: Exception
-    ): CallHandler2[AccessGroup, ExecutionContext, Future[AccessGroupCreationStatus]] =
+    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
       (mockAccessGroupsService
-        .create(_: AccessGroup)(_: ExecutionContext))
-        .expects(*, *)
+        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
         .returning(Future.failed(ex))
 
     def mockAccessGroupsServiceGetGroups(
@@ -192,10 +193,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAccessGroupsServiceUpdate(
       accessGroupUpdateStatus: AccessGroupUpdateStatus
-    ): CallHandler4[GroupId, AccessGroup, AgentUser, ExecutionContext, Future[AccessGroupUpdateStatus]] =
+    ): CallHandler5[GroupId, AccessGroup, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
       (mockAccessGroupsService
-        .update(_: GroupId, _: AccessGroup, _: AgentUser)(_: ExecutionContext))
-        .expects(*, *, *, *)
+        .update(_: GroupId, _: AccessGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *, *)
         .returning(Future.successful(accessGroupUpdateStatus))
 
     def mockAccessGroupsServiceRenameWithException(
@@ -208,18 +209,18 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAccessGroupsServiceDelete(
       accessGroupDeletionStatus: AccessGroupDeletionStatus
-    ): CallHandler2[GroupId, ExecutionContext, Future[AccessGroupDeletionStatus]] =
+    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
       (mockAccessGroupsService
-        .delete(_: GroupId)(_: ExecutionContext))
-        .expects(*, *)
+        .delete(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
         .returning(Future.successful(accessGroupDeletionStatus))
 
     def mockAccessGroupsServiceDeleteWithException(
       ex: Exception
-    ): CallHandler2[GroupId, ExecutionContext, Future[AccessGroupDeletionStatus]] =
+    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
       (mockAccessGroupsService
-        .delete(_: GroupId)(_: ExecutionContext))
-        .expects(*, *)
+        .delete(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
         .returning(Future.failed(ex))
 
     def mockAccessGroupsServiceGetUnassignedClients(

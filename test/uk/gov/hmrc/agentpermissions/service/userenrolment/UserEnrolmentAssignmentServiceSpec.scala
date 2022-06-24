@@ -16,10 +16,12 @@
 
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
-import org.scalamock.handlers.{CallHandler1, CallHandler2}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, GroupId, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
+import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
@@ -29,10 +31,9 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
   val arn: Arn = Arn("KARN1234567")
   val user: AgentUser = AgentUser("userId", "userName")
   val groupName = "some group"
-  val groupId = GroupId(arn, groupName)
-  val maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments] = Some(
-    UserEnrolmentAssignments(Set.empty, Set.empty)
-  )
+  val groupId: GroupId = GroupId(arn, groupName)
+  val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty)
+  val maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments] = Some(userEnrolmentAssignments)
 
   val accessGroup: AccessGroup = AccessGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
 
@@ -42,11 +43,17 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
     val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
     val mockUserEnrolmentAssignmentCalculator: UserEnrolmentAssignmentCalculator =
       mock[UserEnrolmentAssignmentCalculator]
+    val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
 
     val userEnrolmentAssignmentService =
-      new UserEnrolmentAssignmentServiceImpl(mockAccessGroupsRepository, mockUserEnrolmentAssignmentCalculator)
+      new UserEnrolmentAssignmentServiceImpl(
+        mockAccessGroupsRepository,
+        mockUserEnrolmentAssignmentCalculator,
+        mockUserClientDetailsConnector
+      )
 
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
+    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
     def mockAccessGroupsRepositoryGetAll(accessGroups: Seq[AccessGroup]): CallHandler1[Arn, Future[Seq[AccessGroup]]] =
       (mockAccessGroupsRepository
@@ -85,6 +92,14 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
         .forGroupDeletion(_: AccessGroup, _: Seq[AccessGroup]))
         .expects(accessGroup, *)
         .returning(maybeUserEnrolmentAssignments)
+
+    def mockUserClientDetailsConnectorPushAssignments(
+      pushStatus: EacdAssignmentsPushStatus
+    ): CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Future[EacdAssignmentsPushStatus]] =
+      (mockUserClientDetailsConnector
+        .pushAssignments(_: UserEnrolmentAssignments)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(userEnrolmentAssignments, *, *)
+        .returning(Future successful pushStatus)
   }
 
   "Calculating assignments during group creation" should {
@@ -123,9 +138,11 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
 
   "Applying calculated assignments" should {
     "return applied assignments" in new TestScope {
+      mockUserClientDetailsConnectorPushAssignments(AssignmentsPushed)
+
       userEnrolmentAssignmentService
-        .applyAssignmentsInEacd(maybeUserEnrolmentAssignments)
-        .futureValue shouldBe maybeUserEnrolmentAssignments
+        .applyAssignmentsInEacd(userEnrolmentAssignments)
+        .futureValue shouldBe AssignmentsPushed
     }
   }
 }

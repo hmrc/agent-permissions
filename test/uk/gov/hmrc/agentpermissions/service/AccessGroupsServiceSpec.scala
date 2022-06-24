@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.service
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client, ClientList, Enrolment, EnrolmentKey, GroupId, Identifier, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated, UpsertType}
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 import uk.gov.hmrc.http.HeaderCarrier
@@ -74,6 +74,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockUserEnrolmentAssignmentService,
         mockUserClientDetailsConnector
       )
+
+    val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty)
+    val maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments] = Some(userEnrolmentAssignments)
 
     lazy val now: LocalDateTime = LocalDateTime.now()
 
@@ -132,14 +135,6 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .expects(groupId, accessGroup, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
-    def mockUserEnrolmentAssignmentServiceApplyUserEnrolmentsInEacd(
-      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler1[Option[UserEnrolmentAssignments], Future[Option[UserEnrolmentAssignments]]] =
-      (mockUserEnrolmentAssignmentService
-        .applyAssignmentsInEacd(_: Option[UserEnrolmentAssignments]))
-        .expects(maybeUserEnrolmentAssignments)
-        .returning(Future successful maybeUserEnrolmentAssignments)
-
     def mockAccessGroupsRepositoryDelete(
       maybeDeletedCount: Option[Long]
     ): CallHandler2[Arn, String, Future[Option[Long]]] =
@@ -163,6 +158,14 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .getClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future successful maybeClients)
+
+    def mockUserEnrolmentAssignmentServiceApplyAssignmentsInEacd(
+      eacdAssignmentsPushStatus: EacdAssignmentsPushStatus
+    ): CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Future[EacdAssignmentsPushStatus]] =
+      (mockUserEnrolmentAssignmentService
+        .applyAssignmentsInEacd(_: UserEnrolmentAssignments)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(userEnrolmentAssignments, *, *)
+        .returning(Future successful eacdAssignmentsPushStatus)
   }
 
   "Calling create" when {
@@ -193,10 +196,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       s"insert calls returns an id" should {
         s"return $AccessGroupCreated" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(None)
+          mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(maybeUserEnrolmentAssignments)
           mockAccessGroupsRepositoryGet(None)
           mockAccessGroupsRepositoryInsert(Some(insertedId))
-          mockUserEnrolmentAssignmentServiceApplyUserEnrolmentsInEacd(None)
+          mockUserEnrolmentAssignmentServiceApplyAssignmentsInEacd(AssignmentsPushed)
 
           accessGroupsService
             .create(accessGroup)
@@ -291,9 +294,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       "DB call to delete group indicates one record was deleted" should {
         s"return $AccessGroupDeleted" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(None)
+          mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
           mockAccessGroupsRepositoryDelete(Some(1L))
-          mockUserEnrolmentAssignmentServiceApplyUserEnrolmentsInEacd(None)
+          mockUserEnrolmentAssignmentServiceApplyAssignmentsInEacd(AssignmentsPushed)
 
           accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupDeleted
         }
@@ -301,7 +304,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       "DB call to delete group indicates no record was deleted" should {
         s"return $AccessGroupNotDeleted" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(None)
+          mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
           mockAccessGroupsRepositoryDelete(Some(0L))
 
           accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupNotDeleted
@@ -323,9 +326,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       "DB call to update group indicates one record was updated" should {
         s"return $AccessGroupUpdated" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(None)
+          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
           mockAccessGroupsRepositoryUpdate(Some(1))
-          mockUserEnrolmentAssignmentServiceApplyUserEnrolmentsInEacd(None)
+          mockUserEnrolmentAssignmentServiceApplyAssignmentsInEacd(AssignmentsPushed)
 
           accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupUpdated
         }
@@ -333,7 +336,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
       "DB call to update group indicates no record was updated" should {
         s"return $AccessGroupNotUpdated" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(None)
+          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
           mockAccessGroupsRepositoryUpdate(Some(0))
 
           accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated

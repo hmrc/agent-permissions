@@ -18,9 +18,10 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import play.api.libs.json.Json
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, GroupId, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.connectors.{EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
+import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
@@ -42,14 +43,15 @@ trait UserEnrolmentAssignmentService {
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
 
   def applyAssignmentsInEacd(
-    maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
-  ): Future[Option[UserEnrolmentAssignments]]
+    calculatedAssignments: UserEnrolmentAssignments
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus]
 }
 
 @Singleton
 class UserEnrolmentAssignmentServiceImpl @Inject() (
   accessGroupsRepository: AccessGroupsRepository,
-  userEnrolmentAssignmentCalculator: UserEnrolmentAssignmentCalculator
+  userEnrolmentAssignmentCalculator: UserEnrolmentAssignmentCalculator,
+  userClientDetailsConnector: UserClientDetailsConnector
 ) extends UserEnrolmentAssignmentService with Logging {
 
   override def calculateForGroupCreation(
@@ -84,12 +86,13 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     } yield maybeUserEnrolmentAssignments
 
   override def applyAssignmentsInEacd(
-    maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
-  ): Future[Option[UserEnrolmentAssignments]] = {
+    calculatedAssignments: UserEnrolmentAssignments
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] = {
 
-    // Currently only logging. Later, implement calls into ES11/ES12 to sync user enrolments.
-    logger.info(s"EACD assignments calculated: ${Json.toJson(maybeCalculatedAssignments)}")
+    logger.info(
+      s"EACD assignments calculated. Assign count: ${calculatedAssignments.assign.size}, Unassign count: ${calculatedAssignments.unassign.size}"
+    )
 
-    Future successful maybeCalculatedAssignments
+    userClientDetailsConnector.pushAssignments(calculatedAssignments)
   }
 }
