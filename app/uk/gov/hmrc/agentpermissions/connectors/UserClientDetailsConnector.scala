@@ -25,7 +25,8 @@ import uk.gov.hmrc.agent.kenshoo.monitoring.HttpAPIMonitor
 import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.http.HttpReads.Implicits.readRaw
-import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpResponse}
+import uk.gov.hmrc.http.HttpReads.is5xx
+import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpResponse, UpstreamErrorResponse}
 
 import java.net.URL
 import javax.inject.{Inject, Singleton}
@@ -109,13 +110,16 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
   override def getClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Seq[Client]]] = {
     val url = new URL(aucdBaseUrl, s"/agent-user-client-details/arn/${arn.value}/client-list")
 
-    monitor("ConsumedAPI-getClientList-GET") {
+    monitor("ConsumedAPI-AgentUserClientDetails-ClientList-GET") {
       http.GET[HttpResponse](url).map { response =>
         response.status match {
           case ACCEPTED =>
             None
           case OK =>
             response.json.asOpt[Seq[Client]]
+          case other if is5xx(other) =>
+            logger.error(s"Received $other status: ${response.body}")
+            throw UpstreamErrorResponse("Error fetching clients from backend", other)
           case other =>
             logger.warn(s"Received $other status: ${response.body}")
             None
