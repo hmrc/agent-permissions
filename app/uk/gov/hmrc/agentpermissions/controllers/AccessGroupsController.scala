@@ -55,6 +55,9 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
               case AccessGroupCreated(groupId) =>
                 logger.info(s"Created group for '${matchedArn.value}': '$groupId'")
                 Created(JsString(groupId))
+              case AccessGroupCreatedWithoutAssignmentsPushed(groupId) =>
+                logger.warn(s"Created group for '${matchedArn.value}': '$groupId', but assignments were not pushed")
+                Created(JsString(groupId))
               case AccessGroupNotCreated =>
                 logger.warn("Unable to create access group")
                 InternalServerError
@@ -135,6 +138,9 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
             NotModified
           case AccessGroupDeleted =>
             Ok
+          case AccessGroupDeletedWithoutAssignmentsPushed =>
+            logger.warn(s"Access group was deleted, but assignments were not pushed")
+            Ok
         }
       }
     } transformWith failureHandler
@@ -154,6 +160,9 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
                 logger.info("Access group was not updated")
                 NotFound
               case AccessGroupUpdated =>
+                Ok
+              case AccessGroupUpdatedWithoutAssignmentsPushed =>
+                logger.warn(s"Access group was updated, but assignments were not pushed")
                 Ok
             }
           }

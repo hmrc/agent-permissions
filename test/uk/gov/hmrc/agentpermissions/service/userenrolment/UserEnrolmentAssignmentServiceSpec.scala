@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, GroupId, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
+import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -136,13 +136,23 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
     }
   }
 
-  "Applying calculated assignments" should {
-    "return applied assignments" in new TestScope {
-      mockUserClientDetailsConnectorPushAssignments(AssignmentsPushed)
+  "Pushing assignments" when {
 
-      userEnrolmentAssignmentService
-        .applyAssignmentsInEacd(userEnrolmentAssignments)
-        .futureValue shouldBe AssignmentsPushed
+    "calculated assignments are nothing" should {
+      s"return $AssignmentsNotPushed" in new TestScope {
+        userEnrolmentAssignmentService.pushCalculatedAssignments(None).futureValue shouldBe AssignmentsNotPushed
+      }
+    }
+
+    "calculated assignments are some value" should {
+      "return status returned by connector" in new TestScope {
+        val statusReturnedByConnector = AssignmentsPushed
+        mockUserClientDetailsConnectorPushAssignments(statusReturnedByConnector)
+
+        userEnrolmentAssignmentService
+          .pushCalculatedAssignments(maybeUserEnrolmentAssignments)
+          .futureValue shouldBe statusReturnedByConnector
+      }
     }
   }
 }

@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.service
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
-import uk.gov.hmrc.agentpermissions.connectors.{EacdAssignmentsPushStatus, UserClientDetailsConnector}
+import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated}
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 import uk.gov.hmrc.http.HeaderCarrier
@@ -65,7 +65,18 @@ class AccessGroupsServiceImpl @Inject() (
 
   override def create(
     accessGroup: AccessGroup
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus] =
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus] = {
+
+    def pushAssignments(
+      maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
+    ): Future[EacdAssignmentsPushStatus] =
+      userEnrolmentAssignmentService.pushCalculatedAssignments(
+        maybeCalculatedAssignments
+      ) map { pushStatus =>
+        logger.info(s"Push status: $pushStatus")
+        pushStatus
+      }
+
     accessGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
       case Some(_) =>
         Future.successful(AccessGroupExistsForCreation)
@@ -73,17 +84,22 @@ class AccessGroupsServiceImpl @Inject() (
         for {
           maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupCreation(accessGroup)
           maybeCreationId            <- accessGroupsRepository.insert(accessGroup)
-        } yield maybeCreationId match {
-          case None =>
-            AccessGroupNotCreated
-          case Some(creationId) =>
-            maybeCalculatedAssignments.foreach(pushCalculatedAssignments)
-
-            val groupId = GroupId(accessGroup.arn, accessGroup.groupName).encode
-            logger.info(s"Created access group. DB id: '$creationId', gid: '$groupId'")
-            AccessGroupCreated(groupId)
-        }
+          accessGroupCreationStatus <- maybeCreationId match {
+                                         case None =>
+                                           Future.successful(AccessGroupNotCreated)
+                                         case Some(creationId) =>
+                                           pushAssignments(maybeCalculatedAssignments) map { pushStatus =>
+                                             val groupId = GroupId(accessGroup.arn, accessGroup.groupName).encode
+                                             logger.info(
+                                               s"Created access group. DB id: '$creationId', gid: '$groupId'"
+                                             )
+                                             if (pushStatus == AssignmentsPushed) AccessGroupCreated(groupId)
+                                             else AccessGroupCreatedWithoutAssignmentsPushed(groupId)
+                                           }
+                                       }
+        } yield accessGroupCreationStatus
     }
+  }
 
   override def getAllGroups(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]] =
     accessGroupsRepository.get(arn)
@@ -115,43 +131,75 @@ class AccessGroupsServiceImpl @Inject() (
 
   override def delete(
     groupId: GroupId
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus] =
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus] = {
+
+    def pushAssignments(
+      maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
+    ): Future[EacdAssignmentsPushStatus] =
+      userEnrolmentAssignmentService.pushCalculatedAssignments(
+        maybeCalculatedAssignments
+      ) map { pushStatus =>
+        logger.info(s"Push status: $pushStatus")
+        pushStatus
+      }
+
     for {
       maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupDeletion(groupId)
       maybeDeletedCount          <- accessGroupsRepository.delete(groupId.arn, groupId.groupName)
-    } yield maybeDeletedCount match {
-      case None =>
-        AccessGroupNotDeleted
-      case Some(deletedCount) =>
-        if (deletedCount == 1L) {
-          maybeCalculatedAssignments.foreach(pushCalculatedAssignments)
-
-          AccessGroupDeleted
-        } else {
-          AccessGroupNotDeleted
-        }
-    }
+      accessGroupDeletionStatus <- maybeDeletedCount match {
+                                     case None =>
+                                       Future.successful(AccessGroupNotDeleted)
+                                     case Some(deletedCount) =>
+                                       if (deletedCount == 1L) {
+                                         pushAssignments(maybeCalculatedAssignments) map {
+                                           case AssignmentsPushed =>
+                                             AccessGroupDeleted
+                                           case AssignmentsNotPushed =>
+                                             AccessGroupDeletedWithoutAssignmentsPushed
+                                         }
+                                       } else {
+                                         Future.successful(AccessGroupNotDeleted)
+                                       }
+                                   }
+    } yield accessGroupDeletionStatus
+  }
 
   override def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[AccessGroupUpdateStatus] =
+  ): Future[AccessGroupUpdateStatus] = {
+
+    def pushAssignments(
+      maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
+    ): Future[EacdAssignmentsPushStatus] =
+      userEnrolmentAssignmentService.pushCalculatedAssignments(
+        maybeCalculatedAssignments
+      ) map { pushStatus =>
+        logger.info(s"Push status: $pushStatus")
+        pushStatus
+      }
+
     for {
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
       maybeCalculatedAssignments   <- userEnrolmentAssignmentService.calculateForGroupUpdate(groupId, accessGroup)
       maybeUpdatedCount <- accessGroupsRepository.update(groupId.arn, groupId.groupName, accessGroupWithWhoIsUpdating)
-    } yield maybeUpdatedCount match {
-      case None =>
-        AccessGroupNotUpdated
-      case Some(updatedCount) =>
-        if (updatedCount == 1L) {
-          maybeCalculatedAssignments.foreach(pushCalculatedAssignments)
-
-          AccessGroupUpdated
-        } else {
-          AccessGroupNotUpdated
-        }
-    }
+      accessGroupUpdateStatus <- maybeUpdatedCount match {
+                                   case None =>
+                                     Future.successful(AccessGroupNotUpdated)
+                                   case Some(updatedCount) =>
+                                     if (updatedCount == 1L) {
+                                       pushAssignments(maybeCalculatedAssignments) map {
+                                         case AssignmentsPushed =>
+                                           AccessGroupUpdated
+                                         case AssignmentsNotPushed =>
+                                           AccessGroupUpdatedWithoutAssignmentsPushed
+                                       }
+                                     } else {
+                                       Future.successful(AccessGroupNotUpdated)
+                                     }
+                                 }
+    } yield accessGroupUpdateStatus
+  }
 
   override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
     for {
@@ -175,22 +223,13 @@ class AccessGroupsServiceImpl @Inject() (
   private def mergeWhoIsUpdating(accessGroup: AccessGroup, whoIsUpdating: AgentUser): Future[AccessGroup] =
     Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
 
-  private def pushCalculatedAssignments(
-    calculatedAssignments: UserEnrolmentAssignments
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] =
-    userEnrolmentAssignmentService
-      .applyAssignmentsInEacd(calculatedAssignments)
-      .map { pushStatus =>
-        logger.info(s"Push status: $pushStatus")
-        pushStatus
-      }
-
 }
 
 sealed trait AccessGroupCreationStatus
 case class AccessGroupCreated(creationId: String) extends AccessGroupCreationStatus
 case object AccessGroupExistsForCreation extends AccessGroupCreationStatus
 case object AccessGroupNotCreated extends AccessGroupCreationStatus
+case class AccessGroupCreatedWithoutAssignmentsPushed(creationId: String) extends AccessGroupCreationStatus
 
 sealed trait AccessGroupRenamingStatus
 case object AccessGroupNotExistsForRenaming extends AccessGroupRenamingStatus
@@ -200,7 +239,9 @@ case object AccessGroupRenamed extends AccessGroupRenamingStatus
 sealed trait AccessGroupDeletionStatus
 case object AccessGroupDeleted extends AccessGroupDeletionStatus
 case object AccessGroupNotDeleted extends AccessGroupDeletionStatus
+case object AccessGroupDeletedWithoutAssignmentsPushed extends AccessGroupDeletionStatus
 
 sealed trait AccessGroupUpdateStatus
 case object AccessGroupNotUpdated extends AccessGroupUpdateStatus
 case object AccessGroupUpdated extends AccessGroupUpdateStatus
+case object AccessGroupUpdatedWithoutAssignmentsPushed extends AccessGroupUpdateStatus

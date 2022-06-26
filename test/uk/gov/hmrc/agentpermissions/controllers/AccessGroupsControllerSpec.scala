@@ -24,7 +24,7 @@ import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client, Enrolment, GroupId, Identifier}
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupCreationStatus, AccessGroupDeleted, AccessGroupDeletionStatus, AccessGroupExistsForCreation, AccessGroupNotCreated, AccessGroupNotDeleted, AccessGroupNotExistsForRenaming, AccessGroupNotRenamed, AccessGroupNotUpdated, AccessGroupRenamed, AccessGroupRenamingStatus, AccessGroupUpdateStatus, AccessGroupUpdated, AccessGroupsService}
+import uk.gov.hmrc.agentpermissions.service.{AccessGroupCreated, AccessGroupCreatedWithoutAssignmentsPushed, AccessGroupCreationStatus, AccessGroupDeleted, AccessGroupDeletedWithoutAssignmentsPushed, AccessGroupDeletionStatus, AccessGroupExistsForCreation, AccessGroupNotCreated, AccessGroupNotDeleted, AccessGroupNotExistsForRenaming, AccessGroupNotRenamed, AccessGroupNotUpdated, AccessGroupRenamed, AccessGroupRenamingStatus, AccessGroupUpdateStatus, AccessGroupUpdated, AccessGroupUpdatedWithoutAssignmentsPushed, AccessGroupsService}
 import uk.gov.hmrc.auth.core.InvalidBearerToken
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -53,185 +53,6 @@ class AccessGroupsControllerSpec extends BaseSpec {
     "Frank Wright",
     Seq(Identifier("EtmpRegistrationNumber", "XAPPT0000012345"))
   )
-
-  def jsonPayloadForCreateGroup(groupName: String): JsValue =
-    Json.parse(s"""{
-                  |    "groupName": "$groupName",
-                  |    "clients": ${Json.toJson(Seq(enrolment1, enrolment2))},
-                  |    "teamMembers": ${Json.toJson(Seq(user1, user2))}
-                  |}""".stripMargin)
-
-  def jsonPayloadForRenameGroup(groupName: String): JsValue =
-    Json.parse(s"""{
-                  |    "group-name": "$groupName"
-                  |}""".stripMargin)
-
-  def jsonPayloadForUpdatingGroup(groupName: String): JsValue =
-    Json.parse(s"""{
-                  |    "arn": "KARN0762398",
-                  |    "groupName": "$groupName",
-                  |    "created": "2022-06-05T06:52:52.365",
-                  |    "lastUpdated": "2022-06-05T06:52:52.365",
-                  |    "createdBy": {
-                  |        "id": "agent1",
-                  |        "name": "Lucas Ling"
-                  |    },
-                  |    "lastUpdatedBy": {
-                  |        "id": "agent1",
-                  |        "name": "Lucas Ling"
-                  |    },
-                  |    "teamMembers": [
-                  |        {
-                  |            "id": "user2",
-                  |            "name": "User 2"
-                  |        },
-                  |        {
-                  |            "id": "user3",
-                  |            "name": "User 3"
-                  |        }
-                  |    ],
-                  |    "clients": [
-                  |        {
-                  |            "service": "HMRC-PPT-ORG",
-                  |            "state": "Activated",
-                  |            "friendlyName": "Frank Wright",
-                  |            "identifiers": [
-                  |                {
-                  |                    "key": "EtmpRegistrationNumber",
-                  |                    "value": "XAPPT0000012345"
-                  |                }
-                  |            ]
-                  |        }
-                  |    ]
-                  |}""".stripMargin)
-
-  def baseRequest: FakeRequest[AnyContentAsEmpty.type] = FakeRequest().withHeaders(CONTENTTYPE_APPLICATIONJSON)
-
-  trait TestScope {
-
-    val accessGroup: AccessGroup = AccessGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
-    val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
-    val mockAuthAction: AuthAction = mock[AuthAction]
-    implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
-    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
-    implicit val actorSystem: ActorSystem = ActorSystem()
-
-    val controller = new AccessGroupsController(mockAccessGroupsService, mockAuthAction)
-
-    def mockAuthActionGetAuthorisedAgent(
-      maybeAuthorisedAgent: Option[AuthorisedAgent]
-    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
-      (mockAuthAction
-        .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
-        .expects(*, *)
-        .returning(Future.successful(maybeAuthorisedAgent))
-
-    def mockAuthActionGetAuthorisedAgentWithExceptiom(
-      ex: Exception
-    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
-      (mockAuthAction
-        .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
-        .expects(*, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceCreate(
-      accessGroupCreationStatus: AccessGroupCreationStatus
-    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
-      (mockAccessGroupsService
-        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.successful(accessGroupCreationStatus))
-
-    def mockAccessGroupsServiceCreateWithException(
-      ex: Exception
-    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
-      (mockAccessGroupsService
-        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceGetGroups(
-      groups: Seq[AccessGroup]
-    ): CallHandler2[Arn, ExecutionContext, Future[Seq[AccessGroup]]] =
-      (mockAccessGroupsService
-        .getAllGroups(_: Arn)(_: ExecutionContext))
-        .expects(arn, *)
-        .returning(Future.successful(groups))
-
-    def mockAccessGroupsServiceGetGroupsWithException(
-      ex: Exception
-    ): CallHandler2[Arn, ExecutionContext, Future[Seq[AccessGroup]]] =
-      (mockAccessGroupsService
-        .getAllGroups(_: Arn)(_: ExecutionContext))
-        .expects(arn, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceGetGroup(
-      maybeAccessGroup: Option[AccessGroup]
-    ): CallHandler2[GroupId, ExecutionContext, Future[Option[AccessGroup]]] =
-      (mockAccessGroupsService
-        .get(_: GroupId)(_: ExecutionContext))
-        .expects(GroupId(arn, groupName), *)
-        .returning(Future.successful(maybeAccessGroup))
-
-    def mockAccessGroupsServiceGetGroupWithException(
-      ex: Exception
-    ): CallHandler2[GroupId, ExecutionContext, Future[Option[AccessGroup]]] =
-      (mockAccessGroupsService
-        .get(_: GroupId)(_: ExecutionContext))
-        .expects(GroupId(arn, groupName), *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceRename(
-      accessGroupRenamingStatus: AccessGroupRenamingStatus
-    ): CallHandler4[GroupId, String, AgentUser, ExecutionContext, Future[AccessGroupRenamingStatus]] =
-      (mockAccessGroupsService
-        .rename(_: GroupId, _: String, _: AgentUser)(_: ExecutionContext))
-        .expects(*, *, *, *)
-        .returning(Future.successful(accessGroupRenamingStatus))
-
-    def mockAccessGroupsServiceUpdate(
-      accessGroupUpdateStatus: AccessGroupUpdateStatus
-    ): CallHandler5[GroupId, AccessGroup, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
-      (mockAccessGroupsService
-        .update(_: GroupId, _: AccessGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *, *)
-        .returning(Future.successful(accessGroupUpdateStatus))
-
-    def mockAccessGroupsServiceRenameWithException(
-      ex: Exception
-    ): CallHandler4[GroupId, String, AgentUser, ExecutionContext, Future[AccessGroupRenamingStatus]] =
-      (mockAccessGroupsService
-        .rename(_: GroupId, _: String, _: AgentUser)(_: ExecutionContext))
-        .expects(*, *, *, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceDelete(
-      accessGroupDeletionStatus: AccessGroupDeletionStatus
-    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
-      (mockAccessGroupsService
-        .delete(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.successful(accessGroupDeletionStatus))
-
-    def mockAccessGroupsServiceDeleteWithException(
-      ex: Exception
-    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
-      (mockAccessGroupsService
-        .delete(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceGetUnassignedClients(
-      unassignedClients: Set[Client]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Set[Client]]] =
-      (mockAccessGroupsService
-        .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future successful unassignedClients)
-
-  }
 
   "Call to create access group" when {
 
@@ -325,7 +146,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
             }
           }
 
-          s"access groups service returns $AccessGroupExistsForCreation" should {
+          s"access groups service returns $AccessGroupCreated" should {
             s"return $CREATED" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
               mockAccessGroupsServiceCreate(AccessGroupCreated(createdId))
@@ -336,7 +157,18 @@ class AccessGroupsControllerSpec extends BaseSpec {
             }
           }
 
-          s"access groups service returns $AccessGroupExistsForCreation" should {
+          s"access groups service returns $AccessGroupCreatedWithoutAssignmentsPushed" should {
+            s"return $CREATED" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceCreate(AccessGroupCreatedWithoutAssignmentsPushed(createdId))
+
+              val result = controller.createGroup(arn)(request)
+
+              status(result) shouldBe CREATED
+            }
+          }
+
+          s"access groups service returns $AccessGroupNotCreated" should {
             s"return $INTERNAL_SERVER_ERROR" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
               mockAccessGroupsServiceCreate(AccessGroupNotCreated)
@@ -741,6 +573,17 @@ class AccessGroupsControllerSpec extends BaseSpec {
         }
       }
 
+      s"access groups service returns $AccessGroupDeletedWithoutAssignmentsPushed" should {
+        s"return $OK" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceDelete(AccessGroupDeletedWithoutAssignmentsPushed)
+
+          val result = controller.deleteGroup(gid)(baseRequest)
+
+          status(result) shouldBe OK
+        }
+      }
+
       s"access groups service throws an exception" should {
         s"return $INTERNAL_SERVER_ERROR" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
@@ -825,7 +668,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
         "provided group name length is less than the maximum allowed" when {
 
-          s"access groups service returns $AccessGroupNotExistsForRenaming" should {
+          s"access groups service returns $AccessGroupNotUpdated" should {
             s"return $NOT_FOUND" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
               mockAccessGroupsServiceUpdate(AccessGroupNotUpdated)
@@ -836,10 +679,21 @@ class AccessGroupsControllerSpec extends BaseSpec {
             }
           }
 
-          s"access groups service returns $AccessGroupNotExistsForRenaming" should {
+          s"access groups service returns $AccessGroupUpdated" should {
             s"return $OK" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
               mockAccessGroupsServiceUpdate(AccessGroupUpdated)
+
+              val result = controller.updateGroup(gid)(request)
+
+              status(result) shouldBe OK
+            }
+          }
+
+          s"access groups service returns $AccessGroupUpdatedWithoutAssignmentsPushed" should {
+            s"return $OK" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceUpdate(AccessGroupUpdatedWithoutAssignmentsPushed)
 
               val result = controller.updateGroup(gid)(request)
 
@@ -850,4 +704,183 @@ class AccessGroupsControllerSpec extends BaseSpec {
       }
     }
   }
+
+  trait TestScope {
+
+    val accessGroup: AccessGroup = AccessGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
+    val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
+    val mockAuthAction: AuthAction = mock[AuthAction]
+    implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
+    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    implicit val actorSystem: ActorSystem = ActorSystem()
+
+    val controller = new AccessGroupsController(mockAccessGroupsService, mockAuthAction)
+
+    def mockAuthActionGetAuthorisedAgent(
+      maybeAuthorisedAgent: Option[AuthorisedAgent]
+    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+      (mockAuthAction
+        .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+        .expects(*, *)
+        .returning(Future.successful(maybeAuthorisedAgent))
+
+    def mockAuthActionGetAuthorisedAgentWithExceptiom(
+      ex: Exception
+    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+      (mockAuthAction
+        .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
+        .expects(*, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceCreate(
+      accessGroupCreationStatus: AccessGroupCreationStatus
+    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
+      (mockAccessGroupsService
+        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.successful(accessGroupCreationStatus))
+
+    def mockAccessGroupsServiceCreateWithException(
+      ex: Exception
+    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
+      (mockAccessGroupsService
+        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceGetGroups(
+      groups: Seq[AccessGroup]
+    ): CallHandler2[Arn, ExecutionContext, Future[Seq[AccessGroup]]] =
+      (mockAccessGroupsService
+        .getAllGroups(_: Arn)(_: ExecutionContext))
+        .expects(arn, *)
+        .returning(Future.successful(groups))
+
+    def mockAccessGroupsServiceGetGroupsWithException(
+      ex: Exception
+    ): CallHandler2[Arn, ExecutionContext, Future[Seq[AccessGroup]]] =
+      (mockAccessGroupsService
+        .getAllGroups(_: Arn)(_: ExecutionContext))
+        .expects(arn, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceGetGroup(
+      maybeAccessGroup: Option[AccessGroup]
+    ): CallHandler2[GroupId, ExecutionContext, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsService
+        .get(_: GroupId)(_: ExecutionContext))
+        .expects(GroupId(arn, groupName), *)
+        .returning(Future.successful(maybeAccessGroup))
+
+    def mockAccessGroupsServiceGetGroupWithException(
+      ex: Exception
+    ): CallHandler2[GroupId, ExecutionContext, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsService
+        .get(_: GroupId)(_: ExecutionContext))
+        .expects(GroupId(arn, groupName), *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceRename(
+      accessGroupRenamingStatus: AccessGroupRenamingStatus
+    ): CallHandler4[GroupId, String, AgentUser, ExecutionContext, Future[AccessGroupRenamingStatus]] =
+      (mockAccessGroupsService
+        .rename(_: GroupId, _: String, _: AgentUser)(_: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.successful(accessGroupRenamingStatus))
+
+    def mockAccessGroupsServiceUpdate(
+      accessGroupUpdateStatus: AccessGroupUpdateStatus
+    ): CallHandler5[GroupId, AccessGroup, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
+      (mockAccessGroupsService
+        .update(_: GroupId, _: AccessGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *, *)
+        .returning(Future.successful(accessGroupUpdateStatus))
+
+    def mockAccessGroupsServiceRenameWithException(
+      ex: Exception
+    ): CallHandler4[GroupId, String, AgentUser, ExecutionContext, Future[AccessGroupRenamingStatus]] =
+      (mockAccessGroupsService
+        .rename(_: GroupId, _: String, _: AgentUser)(_: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceDelete(
+      accessGroupDeletionStatus: AccessGroupDeletionStatus
+    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
+      (mockAccessGroupsService
+        .delete(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.successful(accessGroupDeletionStatus))
+
+    def mockAccessGroupsServiceDeleteWithException(
+      ex: Exception
+    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
+      (mockAccessGroupsService
+        .delete(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceGetUnassignedClients(
+      unassignedClients: Set[Client]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Set[Client]]] =
+      (mockAccessGroupsService
+        .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future successful unassignedClients)
+
+  }
+
+  def jsonPayloadForCreateGroup(groupName: String): JsValue =
+    Json.parse(s"""{
+                  |    "groupName": "$groupName",
+                  |    "clients": ${Json.toJson(Seq(enrolment1, enrolment2))},
+                  |    "teamMembers": ${Json.toJson(Seq(user1, user2))}
+                  |}""".stripMargin)
+
+  def jsonPayloadForRenameGroup(groupName: String): JsValue =
+    Json.parse(s"""{
+                  |    "group-name": "$groupName"
+                  |}""".stripMargin)
+
+  def jsonPayloadForUpdatingGroup(groupName: String): JsValue =
+    Json.parse(s"""{
+                  |    "arn": "KARN0762398",
+                  |    "groupName": "$groupName",
+                  |    "created": "2022-06-05T06:52:52.365",
+                  |    "lastUpdated": "2022-06-05T06:52:52.365",
+                  |    "createdBy": {
+                  |        "id": "agent1",
+                  |        "name": "Lucas Ling"
+                  |    },
+                  |    "lastUpdatedBy": {
+                  |        "id": "agent1",
+                  |        "name": "Lucas Ling"
+                  |    },
+                  |    "teamMembers": [
+                  |        {
+                  |            "id": "user2",
+                  |            "name": "User 2"
+                  |        },
+                  |        {
+                  |            "id": "user3",
+                  |            "name": "User 3"
+                  |        }
+                  |    ],
+                  |    "clients": [
+                  |        {
+                  |            "service": "HMRC-PPT-ORG",
+                  |            "state": "Activated",
+                  |            "friendlyName": "Frank Wright",
+                  |            "identifiers": [
+                  |                {
+                  |                    "key": "EtmpRegistrationNumber",
+                  |                    "value": "XAPPT0000012345"
+                  |                }
+                  |            ]
+                  |        }
+                  |    ]
+                  |}""".stripMargin)
+
+  def baseRequest: FakeRequest[AnyContentAsEmpty.type] = FakeRequest().withHeaders(CONTENTTYPE_APPLICATIONJSON)
 }
