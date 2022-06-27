@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.service
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client, ClientList, Enrolment, EnrolmentKey, GroupId, Identifier, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
+import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated, UpsertType}
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 import uk.gov.hmrc.http.HeaderCarrier
@@ -159,12 +159,14 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .expects(arn, *, *)
         .returning(Future successful maybeClients)
 
-    def mockUserEnrolmentAssignmentServiceApplyAssignmentsInEacd(
+    def mockUserEnrolmentAssignmentServicePushCalculatedAssignments(
       eacdAssignmentsPushStatus: EacdAssignmentsPushStatus
-    ): CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Future[EacdAssignmentsPushStatus]] =
+    ): CallHandler3[Option[UserEnrolmentAssignments], HeaderCarrier, ExecutionContext, Future[
+      EacdAssignmentsPushStatus
+    ]] =
       (mockUserEnrolmentAssignmentService
-        .applyAssignmentsInEacd(_: UserEnrolmentAssignments)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(userEnrolmentAssignments, *, *)
+        .pushCalculatedAssignments(_: Option[UserEnrolmentAssignments])(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
         .returning(Future successful eacdAssignmentsPushStatus)
   }
 
@@ -194,16 +196,32 @@ class AccessGroupsServiceSpec extends BaseSpec {
         }
       }
 
-      s"insert calls returns an id" should {
-        s"return $AccessGroupCreated" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(maybeUserEnrolmentAssignments)
-          mockAccessGroupsRepositoryGet(None)
-          mockAccessGroupsRepositoryInsert(Some(insertedId))
-          mockUserEnrolmentAssignmentServiceApplyAssignmentsInEacd(AssignmentsPushed)
+      s"insert calls returns an id" when {
 
-          accessGroupsService
-            .create(accessGroup)
-            .futureValue shouldBe AccessGroupCreated("KARN1234567%7Esome+group")
+        "assignments get pushed" should {
+          s"return $AccessGroupCreated" in new TestScope {
+            mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(maybeUserEnrolmentAssignments)
+            mockAccessGroupsRepositoryGet(None)
+            mockAccessGroupsRepositoryInsert(Some(insertedId))
+            mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
+
+            accessGroupsService
+              .create(accessGroup)
+              .futureValue shouldBe AccessGroupCreated("KARN1234567%7Esome+group")
+          }
+        }
+
+        "assignments do not get pushed" should {
+          s"return $AccessGroupCreatedWithoutAssignmentsPushed" in new TestScope {
+            mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(maybeUserEnrolmentAssignments)
+            mockAccessGroupsRepositoryGet(None)
+            mockAccessGroupsRepositoryInsert(Some(insertedId))
+            mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
+
+            accessGroupsService
+              .create(accessGroup)
+              .futureValue shouldBe AccessGroupCreatedWithoutAssignmentsPushed("KARN1234567%7Esome+group")
+          }
         }
       }
     }
@@ -292,16 +310,6 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     "DB call to delete group returns some value" when {
 
-      "DB call to delete group indicates one record was deleted" should {
-        s"return $AccessGroupDeleted" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
-          mockAccessGroupsRepositoryDelete(Some(1L))
-          mockUserEnrolmentAssignmentServiceApplyAssignmentsInEacd(AssignmentsPushed)
-
-          accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupDeleted
-        }
-      }
-
       "DB call to delete group indicates no record was deleted" should {
         s"return $AccessGroupNotDeleted" in new TestScope {
           mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
@@ -311,38 +319,77 @@ class AccessGroupsServiceSpec extends BaseSpec {
         }
       }
 
-    }
+      "DB call to delete group indicates one record was deleted" when {
 
-    "Updating group" when {
+        "assignments get pushed" should {
+          s"return $AccessGroupDeleted" in new TestScope {
+            mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
+            mockAccessGroupsRepositoryDelete(Some(1L))
+            mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
 
-      "DB call to update group returns nothing" should {
-        s"return $AccessGroupNotUpdated" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(None)
-          mockAccessGroupsRepositoryUpdate(None)
+            accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupDeleted
+          }
+        }
 
-          accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
+        "assignments do not get pushed" should {
+          s"return $AccessGroupDeletedWithoutAssignmentsPushed" in new TestScope {
+            mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
+            mockAccessGroupsRepositoryDelete(Some(1L))
+            mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
+
+            accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupDeletedWithoutAssignmentsPushed
+          }
         }
       }
+    }
 
-      "DB call to update group indicates one record was updated" should {
+  }
+
+  "Updating group" when {
+
+    "DB call to update group returns nothing" should {
+      s"return $AccessGroupNotUpdated" in new TestScope {
+        mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(None)
+        mockAccessGroupsRepositoryUpdate(None)
+
+        accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
+      }
+    }
+
+    "DB call to update group indicates no record was updated" should {
+      s"return $AccessGroupNotUpdated" in new TestScope {
+        mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
+        mockAccessGroupsRepositoryUpdate(Some(0))
+
+        accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
+      }
+    }
+
+    "DB call to update group indicates one record was updated" when {
+
+      "assignments get pushed" should {
         s"return $AccessGroupUpdated" in new TestScope {
           mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
           mockAccessGroupsRepositoryUpdate(Some(1))
-          mockUserEnrolmentAssignmentServiceApplyAssignmentsInEacd(AssignmentsPushed)
+          mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
 
           accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupUpdated
         }
       }
 
-      "DB call to update group indicates no record was updated" should {
-        s"return $AccessGroupNotUpdated" in new TestScope {
+      "assignments do not get pushed" should {
+        s"return $AccessGroupUpdatedWithoutAssignmentsPushed" in new TestScope {
           mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
-          mockAccessGroupsRepositoryUpdate(Some(0))
+          mockAccessGroupsRepositoryUpdate(Some(1))
+          mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
 
-          accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
+          accessGroupsService
+            .update(groupId, accessGroup, user)
+            .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
         }
       }
     }
+
   }
 
   "Fetching all clients" when {

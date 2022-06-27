@@ -18,8 +18,9 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
+import play.api.libs.json.Json
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, GroupId, UserEnrolmentAssignments}
-import uk.gov.hmrc.agentpermissions.connectors.{EacdAssignmentsPushStatus, UserClientDetailsConnector}
+import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -42,8 +43,8 @@ trait UserEnrolmentAssignmentService {
     accessGroupToUpdate: AccessGroup
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
 
-  def applyAssignmentsInEacd(
-    calculatedAssignments: UserEnrolmentAssignments
+  def pushCalculatedAssignments(
+    maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus]
 }
 
@@ -85,14 +86,17 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
         Future.successful(userEnrolmentAssignmentCalculator.forGroupUpdate(accessGroupToUpdate, existingAccessGroups))
     } yield maybeUserEnrolmentAssignments
 
-  override def applyAssignmentsInEacd(
-    calculatedAssignments: UserEnrolmentAssignments
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] = {
+  override def pushCalculatedAssignments(
+    maybeAssignments: Option[UserEnrolmentAssignments]
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] =
+    maybeAssignments match {
+      case None =>
+        Future.successful(AssignmentsNotPushed)
+      case Some(assignments) =>
+        logger.debug(s"EACD assignments calculated: ${Json.toJson(assignments)}")
+        logger.info(s"Assign count: ${assignments.assign.size}, Unassign count: ${assignments.unassign.size}")
 
-    logger.info(
-      s"EACD assignments calculated. Assign count: ${calculatedAssignments.assign.size}, Unassign count: ${calculatedAssignments.unassign.size}"
-    )
+        userClientDetailsConnector.pushAssignments(assignments)
+    }
 
-    userClientDetailsConnector.pushAssignments(calculatedAssignments)
-  }
 }
