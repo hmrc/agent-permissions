@@ -201,20 +201,20 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
   "getClients" when {
 
     s"http response has $ACCEPTED status code" should {
-      "return nothing" in new TestScope {
+      "return some value" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
         mockMetricsDefaultRegistry
         mockHttpGet(
           s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list",
-          HttpResponse(ACCEPTED, "")
+          HttpResponse(ACCEPTED, "[]")
         )
 
-        userClientDetailsConnector.getClients(arn).futureValue shouldBe None
+        userClientDetailsConnector.getClients(arn).futureValue shouldBe Some(Seq.empty)
       }
     }
 
     s"http response has $OK status code" should {
-      "return clients" in new TestScope {
+      "return some value" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
         mockMetricsDefaultRegistry
         mockHttpGet(
@@ -253,6 +253,68 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
 
           val eventualMaybeClients: Future[Option[Seq[Client]]] = userClientDetailsConnector.getClients(arn)
           whenReady(eventualMaybeClients.failed) { ex =>
+            ex shouldBe a[UpstreamErrorResponse]
+          }
+        }
+      }
+    }
+  }
+
+  "getClientListStatus" when {
+
+    s"http response has $ACCEPTED status code" should {
+      s"return $ACCEPTED" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpGet(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list-status",
+          HttpResponse(ACCEPTED, "[]")
+        )
+
+        userClientDetailsConnector.getClientListStatus(arn).futureValue shouldBe Some(ACCEPTED)
+      }
+    }
+
+    s"http response has $OK status code" should {
+      s"return $OK" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpGet(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list-status",
+          HttpResponse(OK, "[]")
+        )
+
+        userClientDetailsConnector.getClientListStatus(arn).futureValue shouldBe Some(OK)
+      }
+    }
+
+    "http response has 4xx status codes" should {
+      Seq(NOT_FOUND, UNAUTHORIZED).foreach { statusCode =>
+        s"return nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpGet(
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list-status",
+            HttpResponse(statusCode, "")
+          )
+
+          userClientDetailsConnector.getClientListStatus(arn).futureValue shouldBe None
+        }
+      }
+    }
+
+    "http response has 5xx status codes" should {
+      Seq(INTERNAL_SERVER_ERROR, BAD_GATEWAY).foreach { statusCode =>
+        s"throw upstream exception nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpGet(
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list-status",
+            HttpResponse(statusCode, "")
+          )
+
+          val eventualMaybeClientListStatus: Future[Option[Int]] = userClientDetailsConnector.getClientListStatus(arn)
+          whenReady(eventualMaybeClientListStatus.failed) { ex =>
             ex shouldBe a[UpstreamErrorResponse]
           }
         }

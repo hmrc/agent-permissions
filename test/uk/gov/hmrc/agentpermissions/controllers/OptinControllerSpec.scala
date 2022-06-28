@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import org.scalamock.handlers.{CallHandler2, CallHandler3}
+import org.scalamock.handlers.{CallHandler2, CallHandler3, CallHandler4}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
@@ -53,32 +53,33 @@ class OptinControllerSpec extends BaseSpec {
 
     def mockOptinServiceOptinWithoutException(
       maybeOptinRequestStatus: Option[OptinRequestStatus]
-    ): CallHandler3[Arn, AgentUser, ExecutionContext, Future[Option[OptinRequestStatus]]] = (optinService
-      .optin(_: Arn, _: AgentUser)(_: ExecutionContext))
-      .expects(arn, user, *)
+    ): CallHandler4[Arn, AgentUser, ExecutionContext, HeaderCarrier, Future[Option[OptinRequestStatus]]] = (optinService
+      .optin(_: Arn, _: AgentUser)(_: ExecutionContext, _: HeaderCarrier))
+      .expects(arn, user, *, *)
       .returning(Future.successful(maybeOptinRequestStatus))
 
     def mockOptinServiceOptinWithException(
       ex: Exception
-    ): CallHandler3[Arn, AgentUser, ExecutionContext, Future[Option[OptinRequestStatus]]] =
+    ): CallHandler4[Arn, AgentUser, ExecutionContext, HeaderCarrier, Future[Option[OptinRequestStatus]]] =
       (optinService
-        .optin(_: Arn, _: AgentUser)(_: ExecutionContext))
-        .expects(arn, user, *)
+        .optin(_: Arn, _: AgentUser)(_: ExecutionContext, _: HeaderCarrier))
+        .expects(arn, user, *, *)
         .returning(Future failed ex)
 
     def mockOptinServiceOptoutWithoutException(
       maybeOptoutRequestStatus: Option[OptoutRequestStatus]
-    ): CallHandler3[Arn, AgentUser, ExecutionContext, Future[Option[OptoutRequestStatus]]] = (optinService
-      .optout(_: Arn, _: AgentUser)(_: ExecutionContext))
-      .expects(arn, user, *)
-      .returning(Future.successful(maybeOptoutRequestStatus))
+    ): CallHandler4[Arn, AgentUser, ExecutionContext, HeaderCarrier, Future[Option[OptoutRequestStatus]]] =
+      (optinService
+        .optout(_: Arn, _: AgentUser)(_: ExecutionContext, _: HeaderCarrier))
+        .expects(arn, user, *, *)
+        .returning(Future.successful(maybeOptoutRequestStatus))
 
     def mockOptinServiceOptoutWithException(
       ex: Exception
-    ): CallHandler3[Arn, AgentUser, ExecutionContext, Future[Option[OptoutRequestStatus]]] =
+    ): CallHandler4[Arn, AgentUser, ExecutionContext, HeaderCarrier, Future[Option[OptoutRequestStatus]]] =
       (optinService
-        .optout(_: Arn, _: AgentUser)(_: ExecutionContext))
-        .expects(arn, user, *)
+        .optout(_: Arn, _: AgentUser)(_: ExecutionContext, _: HeaderCarrier))
+        .expects(arn, user, *, *)
         .returning(Future failed ex)
 
     def mockOptinServiceOptinStatusWithoutException(

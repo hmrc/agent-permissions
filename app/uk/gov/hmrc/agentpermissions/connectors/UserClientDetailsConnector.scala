@@ -45,6 +45,10 @@ trait UserClientDetailsConnector {
   def pushAssignments(
     assignments: UserEnrolmentAssignments
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus]
+
+  def getClientListStatus(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]]
 }
 
 @Singleton
@@ -117,13 +121,32 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
     monitor("ConsumedAPI-AgentUserClientDetails-ClientList-GET") {
       http.GET[HttpResponse](url).map { response =>
         response.status match {
-          case ACCEPTED =>
-            None
-          case OK =>
+          case ACCEPTED | OK =>
             response.json.asOpt[Seq[Client]]
           case other if is5xx(other) =>
             logger.error(s"Received $other status: ${response.body}")
             throw UpstreamErrorResponse("Error fetching clients from backend", other)
+          case other =>
+            logger.warn(s"Received $other status: ${response.body}")
+            None
+        }
+      }
+    }
+  }
+
+  override def getClientListStatus(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]] = {
+    val url = new URL(aucdBaseUrl, s"/agent-user-client-details/arn/${arn.value}/client-list-status")
+
+    monitor("ConsumedAPI-AgentUserClientDetails-ClientListStatus-GET") {
+      http.GET[HttpResponse](url).map { response =>
+        response.status match {
+          case ACCEPTED | OK =>
+            Some(response.status)
+          case other if is5xx(other) =>
+            logger.error(s"Received $other status: ${response.body}")
+            throw UpstreamErrorResponse("Error fetching client list status from backend", other)
           case other =>
             logger.warn(s"Received $other status: ${response.body}")
             None
