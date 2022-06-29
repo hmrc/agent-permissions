@@ -16,11 +16,11 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client, ClientList, Enrolment, EnrolmentKey, GroupId, Identifier, UserEnrolmentAssignments}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
+import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
-import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated, UpsertType}
+import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -48,7 +48,6 @@ class AccessGroupsServiceSpec extends BaseSpec {
       Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CgtRef", "XMCGTP123456789")))
 
     val groupId: GroupId = GroupId(arn, groupName)
-    val renamedGroupName = "renamedGroupName"
 
     val accessGroup: AccessGroup = AccessGroup(
       arn,
@@ -102,14 +101,6 @@ class AccessGroupsServiceSpec extends BaseSpec {
       .insert(_: AccessGroup))
       .expects(accessGroup)
       .returning(Future.successful(maybeCreationId))
-
-    def mockAccessGroupsRepositoryRenameGroup(
-      maybeUpsertType: Option[UpsertType]
-    ): CallHandler4[Arn, String, String, AgentUser, Future[Option[UpsertType]]] =
-      (mockAccessGroupsRepository
-        .renameGroup(_: Arn, _: String, _: String, _: AgentUser))
-        .expects(arn, groupName, renamedGroupName, user)
-        .returning(Future.successful(maybeUpsertType))
 
     def mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
@@ -248,52 +239,6 @@ class AccessGroupsServiceSpec extends BaseSpec {
         accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
           Some(accessGroup)
       }
-    }
-  }
-
-  "Renaming group" when {
-
-    "group of that Arn and name does not exist" should {
-      s"return $AccessGroupNotExistsForRenaming" in new TestScope {
-        mockAccessGroupsRepositoryGet(None)
-
-        accessGroupsService.rename(groupId, renamedGroupName, user).futureValue shouldBe AccessGroupNotExistsForRenaming
-      }
-    }
-
-    "group of that Arn and name exists" when {
-
-      "DB call to rename group returns nothing" should {
-        s"return $AccessGroupNotRenamed" in new TestScope {
-          mockAccessGroupsRepositoryGet(Some(accessGroup))
-          mockAccessGroupsRepositoryRenameGroup(None)
-
-          accessGroupsService.rename(groupId, renamedGroupName, user).futureValue shouldBe AccessGroupNotRenamed
-        }
-      }
-
-      "DB call to rename group returns a value" when {
-
-        s"DB call to rename group returns $RecordInserted" should {
-          s"return $AccessGroupNotRenamed" in new TestScope {
-            mockAccessGroupsRepositoryGet(Some(accessGroup))
-            mockAccessGroupsRepositoryRenameGroup(Some(RecordInserted(insertedId)))
-
-            accessGroupsService.rename(groupId, renamedGroupName, user).futureValue shouldBe AccessGroupNotRenamed
-          }
-        }
-
-        s"DB call to rename group returns $RecordUpdated" should {
-          s"return $AccessGroupRenamed" in new TestScope {
-            mockAccessGroupsRepositoryGet(Some(accessGroup))
-            mockAccessGroupsRepositoryRenameGroup(Some(RecordUpdated))
-
-            accessGroupsService.rename(groupId, renamedGroupName, user).futureValue shouldBe AccessGroupRenamed
-          }
-        }
-
-      }
-
     }
   }
 

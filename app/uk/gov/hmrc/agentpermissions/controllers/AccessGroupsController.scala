@@ -100,33 +100,6 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
-  def renameGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
-      withGroupId(gid, authorisedAgent.arn) { groupId =>
-        withJsonParsed[RenameAccessGroupRequest] { renameAccessGroupRequest =>
-          if (renameAccessGroupRequest.groupName.length > MAX_LENGTH_GROUP_NAME) {
-            badRequestGroupNameMaxLength
-          } else {
-            for {
-              groupRenamingStatus <-
-                accessGroupsService.rename(groupId, renameAccessGroupRequest.groupName, authorisedAgent.agentUser)
-            } yield groupRenamingStatus match {
-              case AccessGroupNotExistsForRenaming =>
-                logger.info("Cannot rename a group that does not already exist")
-                NotFound
-              case AccessGroupNotRenamed =>
-                logger.warn("Unable to rename access group")
-                NotModified
-              case AccessGroupRenamed =>
-                logger.warn("Renamed access group")
-                Ok
-            }
-          }
-        }
-      }
-    } transformWith failureHandler
-  }
-
   def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
       withGroupId(gid, authorisedAgent.arn) { groupId =>
@@ -149,22 +122,26 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   def updateGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
       withGroupId(gid, authorisedAgent.arn) { groupId =>
-        withJsonParsed[AccessGroup] { accessGroup =>
-          if (accessGroup.groupName.length > MAX_LENGTH_GROUP_NAME) {
-            badRequestGroupNameMaxLength
-          } else {
-            for {
-              groupUpdateStatus <- accessGroupsService.update(groupId, accessGroup, authorisedAgent.agentUser)
-            } yield groupUpdateStatus match {
-              case AccessGroupNotUpdated =>
-                logger.info("Access group was not updated")
-                NotFound
-              case AccessGroupUpdated =>
-                Ok
-              case AccessGroupUpdatedWithoutAssignmentsPushed =>
-                logger.warn(s"Access group was updated, but assignments were not pushed")
-                Ok
-            }
+        withJsonParsed[UpdateAccessGroupRequest] { updateAccessGroupRequest =>
+          accessGroupsService.get(groupId).map(updateAccessGroupRequest.merge) flatMap {
+            case None =>
+              logger.info(s"Access group for $groupId was not found")
+              Future successful NotFound
+            case Some(mergedAccessGroup) =>
+              if (mergedAccessGroup.groupName.length > MAX_LENGTH_GROUP_NAME) {
+                badRequestGroupNameMaxLength
+              } else {
+                accessGroupsService.update(groupId, mergedAccessGroup, authorisedAgent.agentUser) map {
+                  case AccessGroupNotUpdated =>
+                    logger.info("Access group was not updated")
+                    NotFound
+                  case AccessGroupUpdated =>
+                    Ok
+                  case AccessGroupUpdatedWithoutAssignmentsPushed =>
+                    logger.warn(s"Access group was updated, but assignments were not pushed")
+                    Ok
+                }
+              }
           }
         }
       }
@@ -245,13 +222,11 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 }
 
-sealed trait AccessGroupRequest
-
 case class CreateAccessGroupRequest(
   groupName: String,
   teamMembers: Option[Set[AgentUser]],
   clients: Option[Set[Enrolment]]
-) extends AccessGroupRequest {
+) {
   def buildAccessGroup(
     arn: Arn,
     agentUser: AgentUser
@@ -275,15 +250,28 @@ object CreateAccessGroupRequest {
   implicit val formatCreateAccessGroupRequest: OFormat[CreateAccessGroupRequest] = Json.format[CreateAccessGroupRequest]
 }
 
-case class RenameAccessGroupRequest(groupName: String) extends AccessGroupRequest
+case class UpdateAccessGroupRequest(
+  groupName: Option[String],
+  teamMembers: Option[Set[AgentUser]],
+  clients: Option[Set[Enrolment]]
+) {
 
-object RenameAccessGroupRequest {
+  def merge(maybeExistingAccessGroup: Option[AccessGroup]): Option[AccessGroup] =
+    maybeExistingAccessGroup.flatMap { existingAccessGroup =>
+      for {
+        withMergedGroupName <-
+          Option(groupName.fold(existingAccessGroup)(gn => existingAccessGroup.copy(groupName = gn)))
 
-  implicit val reads: Reads[RenameAccessGroupRequest] = for {
-    groupName <- (JsPath \ "group-name").read[String]
-  } yield RenameAccessGroupRequest(groupName)
+        withMergedClients <-
+          Option(clients.fold(withMergedGroupName)(cls => withMergedGroupName.copy(clients = Some(cls))))
 
-  implicit val writes: Writes[RenameAccessGroupRequest] = Json.writes[RenameAccessGroupRequest]
+        withMergedTeamMembers <-
+          Option(teamMembers.fold(withMergedClients)(members => withMergedClients.copy(teamMembers = Some(members))))
 
-  implicit val formatRenameAccessGroupRequest: Format[RenameAccessGroupRequest] = Format(reads, writes)
+      } yield withMergedTeamMembers
+    }
+}
+
+object UpdateAccessGroupRequest {
+  implicit val format: OFormat[UpdateAccessGroupRequest] = Json.format[UpdateAccessGroupRequest]
 }

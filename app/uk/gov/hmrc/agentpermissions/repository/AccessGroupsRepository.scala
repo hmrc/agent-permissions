@@ -18,20 +18,17 @@ package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
 import com.mongodb.MongoWriteException
-import com.mongodb.client.model.Updates.set
 import com.mongodb.client.model.{Collation, IndexOptions}
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
-import org.mongodb.scala.model.{DeleteOptions, IndexModel, ReplaceOptions, UpdateOptions}
+import org.mongodb.scala.model.{DeleteOptions, IndexModel, ReplaceOptions}
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, Arn}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -40,12 +37,6 @@ trait AccessGroupsRepository {
   def get(arn: Arn): Future[Seq[AccessGroup]]
   def get(arn: Arn, groupName: String): Future[Option[AccessGroup]]
   def insert(accessGroup: AccessGroup): Future[Option[String]]
-  def renameGroup(
-    arn: Arn,
-    groupName: String,
-    renameGroupTo: String,
-    whoIsRenaming: AgentUser
-  ): Future[Option[UpsertType]]
   def delete(arn: Arn, groupName: String): Future[Option[Long]]
   def update(arn: Arn, groupName: String, accessGroup: AccessGroup): Future[Option[Long]]
 }
@@ -92,33 +83,6 @@ class AccessGroupsRepositoryImpl @Inject() (
         Future.successful(None)
       }
 
-  override def renameGroup(
-    arn: Arn,
-    groupName: String,
-    renameGroupTo: String,
-    whoIsRenaming: AgentUser
-  ): Future[Option[UpsertType]] =
-    collection
-      .updateOne(
-        and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),
-        Seq(
-          set("groupName", renameGroupTo),
-          set("lastUpdated", LocalDateTime.now().format(dateTimeFormatter)),
-          set("lastUpdatedBy.id", whoIsRenaming.id),
-          set("lastUpdatedBy.name", whoIsRenaming.name)
-        ),
-        new UpdateOptions().upsert(true).collation(caseInsensitiveCollation)
-      )
-      .headOption()
-      .map(
-        _.map(result =>
-          result.getModifiedCount match {
-            case 1L => RecordUpdated
-            case x  => throw new RuntimeException(s"Update modified count should not have been $x")
-          }
-        )
-      )
-
   override def delete(arn: Arn, groupName: String): Future[Option[Long]] =
     collection
       .deleteOne(
@@ -143,7 +107,6 @@ class AccessGroupsRepositoryImpl @Inject() (
   private lazy val replaceOptions: ReplaceOptions =
     new ReplaceOptions().upsert(true).collation(caseInsensitiveCollation)
 
-  private lazy val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
 }
 
 object AccessGroupsRepositoryImpl {

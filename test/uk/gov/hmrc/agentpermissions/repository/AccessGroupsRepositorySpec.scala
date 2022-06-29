@@ -35,7 +35,6 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
     val agent: AgentUser = AgentUser("userId", "userName")
     val user1: AgentUser = AgentUser("user1", "User 1")
     val user2: AgentUser = AgentUser("user2", "User 2")
-    val renamedGroupName = "renamedGroupName"
 
     val enrolment1: Enrolment =
       Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
@@ -129,19 +128,6 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
             accessGroup.copy(groupName = accessGroup.groupName.toUpperCase)
 
           accessGroupsRepository.insert(accessGroupHavingGroupNameOfDifferentCase).futureValue shouldBe None
-        }
-      }
-    }
-
-    "renaming group" when {
-
-      "group name provided is different than that existing in DB" should {
-        s"return $RecordUpdated" in new TestScope {
-          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
-
-          accessGroupsRepository.renameGroup(arn, groupName, renamedGroupName, agent).futureValue shouldBe Some(
-            RecordUpdated
-          )
         }
       }
     }

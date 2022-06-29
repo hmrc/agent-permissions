@@ -20,7 +20,7 @@ import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
-import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, RecordInserted, RecordUpdated}
+import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -37,10 +37,6 @@ trait AccessGroupsService {
   def getAllGroups(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]]
 
   def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]]
-
-  def rename(groupId: GroupId, renameGroupTo: String, agentUser: AgentUser)(implicit
-    ec: ExecutionContext
-  ): Future[AccessGroupRenamingStatus]
 
   def delete(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus]
 
@@ -106,28 +102,6 @@ class AccessGroupsServiceImpl @Inject() (
 
   override def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]] =
     accessGroupsRepository.get(groupId.arn, groupId.groupName)
-
-  override def rename(groupId: GroupId, renameGroupTo: String, whoIsRenaming: AgentUser)(implicit
-    ec: ExecutionContext
-  ): Future[AccessGroupRenamingStatus] =
-    accessGroupsRepository.get(groupId.arn, groupId.groupName) flatMap {
-      case None =>
-        Future.successful(AccessGroupNotExistsForRenaming)
-      case Some(_) =>
-        accessGroupsRepository.renameGroup(groupId.arn, groupId.groupName, renameGroupTo, whoIsRenaming) flatMap {
-          case None =>
-            Future.successful(AccessGroupNotRenamed)
-          case Some(upsertType) =>
-            upsertType match {
-              case RecordInserted(_) =>
-                logger.warn("Should not have inserted when the request was for an update")
-                Future.successful(AccessGroupNotRenamed)
-              case RecordUpdated =>
-                logger.info(s"Renamed access group")
-                Future.successful(AccessGroupRenamed)
-            }
-        }
-    }
 
   override def delete(
     groupId: GroupId
@@ -230,11 +204,6 @@ case class AccessGroupCreated(creationId: String) extends AccessGroupCreationSta
 case object AccessGroupExistsForCreation extends AccessGroupCreationStatus
 case object AccessGroupNotCreated extends AccessGroupCreationStatus
 case class AccessGroupCreatedWithoutAssignmentsPushed(creationId: String) extends AccessGroupCreationStatus
-
-sealed trait AccessGroupRenamingStatus
-case object AccessGroupNotExistsForRenaming extends AccessGroupRenamingStatus
-case object AccessGroupNotRenamed extends AccessGroupRenamingStatus
-case object AccessGroupRenamed extends AccessGroupRenamingStatus
 
 sealed trait AccessGroupDeletionStatus
 case object AccessGroupDeleted extends AccessGroupDeletionStatus
