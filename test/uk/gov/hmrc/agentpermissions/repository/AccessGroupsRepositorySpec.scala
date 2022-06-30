@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
+import org.bson.types.ObjectId
 import org.mongodb.scala.model.IndexModel
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
@@ -31,6 +32,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
+    val dbId: ObjectId = new ObjectId()
     val groupName: String = "Some Group".toLowerCase
     val agent: AgentUser = AgentUser("userId", "userName")
     val user1: AgentUser = AgentUser("user1", "User 1")
@@ -49,6 +51,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
     val accessGroup: AccessGroup =
       AccessGroup(
+        dbId,
         arn,
         groupName,
         now,
@@ -92,6 +95,15 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
       "no groups exist for Arn" should {
         "return nothing" in new TestScope {
           accessGroupsRepository.get(arn).futureValue shouldBe empty
+        }
+      }
+    }
+
+    "getting one group of Id" when {
+
+      "group of that name does not exist" should {
+        "return nothing" in new TestScope {
+          accessGroupsRepository.findById(dbId.toHexString).futureValue shouldBe None
         }
       }
     }
@@ -157,13 +169,6 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
         }
       }
 
-      "roup name provided is different than that existing in DB only case-sensitively" should {
-        "indicate the correct update count" in new TestScope {
-          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
-
-          accessGroupsRepository.update(arn, groupName.toUpperCase, accessGroup).futureValue shouldBe Some(1)
-        }
-      }
     }
   }
 

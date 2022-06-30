@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
+import org.bson.types.ObjectId
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
@@ -48,6 +49,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
       Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CgtRef", "XMCGTP123456789")))
 
     val groupId: GroupId = GroupId(arn, groupName)
+    val dbId: String = new ObjectId().toHexString
 
     val accessGroup: AccessGroup = AccessGroup(
       arn,
@@ -85,6 +87,14 @@ class AccessGroupsServiceSpec extends BaseSpec {
       (mockAccessGroupsRepository
         .get(_: Arn, _: String))
         .expects(arn, groupName)
+        .returning(Future.successful(maybeAccessGroup))
+
+    def mockAccessGroupsRepositoryGetById(
+      maybeAccessGroup: Option[AccessGroup]
+    ): CallHandler1[String, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsRepository
+        .findById(_: String))
+        .expects(dbId)
         .returning(Future.successful(maybeAccessGroup))
 
     def mockAccessGroupsRepositoryGetAll(
@@ -198,7 +208,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
             accessGroupsService
               .create(accessGroup)
-              .futureValue shouldBe AccessGroupCreated("KARN1234567%7Esome+group")
+              .futureValue shouldBe AccessGroupCreated(insertedId)
           }
         }
 
@@ -211,7 +221,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
             accessGroupsService
               .create(accessGroup)
-              .futureValue shouldBe AccessGroupCreatedWithoutAssignmentsPushed("KARN1234567%7Esome+group")
+              .futureValue shouldBe AccessGroupCreatedWithoutAssignmentsPushed(insertedId)
           }
         }
       }
@@ -237,6 +247,18 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockAccessGroupsRepositoryGet(Some(accessGroup))
 
         accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+          Some(accessGroup)
+      }
+    }
+  }
+
+  "Fetching group by id" when {
+
+    "group exists" should {
+      "return corresponding summaries" in new TestScope {
+        mockAccessGroupsRepositoryGetById(Some(accessGroup))
+
+        accessGroupsService.getById(dbId).futureValue shouldBe
           Some(accessGroup)
       }
     }

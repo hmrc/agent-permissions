@@ -40,10 +40,102 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
 
   "Merge" when {
 
-    "access group is not existing" should {
-      "return nothing" in {
-        val maybeExistingAccessGroup: Option[AccessGroup] = None
+    "request has nothing to update" should {
+      "return existing access group" in {
+        val maybeGroupNameToUpdate: Option[String] = None
+        val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
+        val maybeClientsToUpdate: Option[Set[Enrolment]] = None
 
+        val updateAccessGroupRequest =
+          UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
+
+        updateAccessGroupRequest.merge(accessGroup) shouldBe accessGroup
+      }
+    }
+
+    "request has only group name to update" should {
+      "return merged access group" in {
+        val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
+        val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
+        val maybeClientsToUpdate: Option[Set[Enrolment]] = None
+
+        val updateAccessGroupRequest =
+          UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
+
+        updateAccessGroupRequest.merge(accessGroup) shouldBe accessGroup.copy(groupName = groupNameToUpdate)
+      }
+    }
+
+    "request has only team members to update" should {
+      "return merged access group" in {
+        val maybeGroupNameToUpdate: Option[String] = None
+        val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
+        val maybeClientsToUpdate: Option[Set[Enrolment]] = None
+
+        val updateAccessGroupRequest =
+          UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
+
+        updateAccessGroupRequest.merge(accessGroup) shouldBe accessGroup.copy(teamMembers = Some(teamMembersToUpdate))
+      }
+    }
+
+    "request has only clients to update" should {
+      "return merged access group" in {
+        val maybeGroupNameToUpdate: Option[String] = None
+        val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
+        val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
+
+        val updateAccessGroupRequest =
+          UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
+
+        updateAccessGroupRequest.merge(accessGroup) shouldBe accessGroup.copy(clients = Some(clientsToUpdate))
+      }
+    }
+
+    "request has group name and team members to update" should {
+      "return merged access group" in {
+        val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
+        val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
+        val maybeClientsToUpdate: Option[Set[Enrolment]] = None
+
+        val updateAccessGroupRequest =
+          UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
+
+        updateAccessGroupRequest.merge(accessGroup) shouldBe
+          accessGroup.copy(groupName = groupNameToUpdate, teamMembers = Some(teamMembersToUpdate))
+      }
+    }
+
+    "request has group name and clients to update" should {
+      "return merged access group" in {
+        val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
+        val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
+        val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
+
+        val updateAccessGroupRequest =
+          UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
+
+        updateAccessGroupRequest.merge(accessGroup) shouldBe
+          accessGroup.copy(groupName = groupNameToUpdate, clients = Some(clientsToUpdate))
+      }
+    }
+
+    "request has team members and clients to update" should {
+      "return merged access group" in {
+        val maybeGroupNameToUpdate: Option[String] = None
+        val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
+        val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
+
+        val updateAccessGroupRequest =
+          UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
+
+        updateAccessGroupRequest.merge(accessGroup) shouldBe
+          accessGroup.copy(teamMembers = Some(teamMembersToUpdate), clients = Some(clientsToUpdate))
+      }
+    }
+
+    "request has group name, team members and clients to update" should {
+      "return merged access group" in {
         val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
         val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
         val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
@@ -51,145 +143,14 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
 
-        updateAccessGroupRequest.merge(maybeExistingAccessGroup) shouldBe None
+        updateAccessGroupRequest.merge(accessGroup) shouldBe
+          accessGroup.copy(
+            groupName = groupNameToUpdate,
+            teamMembers = Some(teamMembersToUpdate),
+            clients = Some(clientsToUpdate)
+          )
       }
     }
 
-    "access group exists" when {
-
-      "request has nothing to update" should {
-        "return existing access group" in {
-          val maybeExistingAccessGroup: Option[AccessGroup] = Some(accessGroup)
-
-          val maybeGroupNameToUpdate: Option[String] = None
-          val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
-          val maybeClientsToUpdate: Option[Set[Enrolment]] = None
-
-          val updateAccessGroupRequest =
-            UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
-
-          updateAccessGroupRequest.merge(maybeExistingAccessGroup) shouldBe maybeExistingAccessGroup
-        }
-      }
-
-      "request has only group name to update" should {
-        "return merged access group" in {
-          val maybeExistingAccessGroup: Option[AccessGroup] = Some(accessGroup)
-
-          val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
-          val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
-          val maybeClientsToUpdate: Option[Set[Enrolment]] = None
-
-          val updateAccessGroupRequest =
-            UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
-
-          updateAccessGroupRequest.merge(maybeExistingAccessGroup).get shouldBe accessGroup.copy(groupName =
-            groupNameToUpdate
-          )
-        }
-      }
-
-      "request has only team members to update" should {
-        "return merged access group" in {
-          val maybeExistingAccessGroup: Option[AccessGroup] = Some(accessGroup)
-
-          val maybeGroupNameToUpdate: Option[String] = None
-          val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
-          val maybeClientsToUpdate: Option[Set[Enrolment]] = None
-
-          val updateAccessGroupRequest =
-            UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
-
-          updateAccessGroupRequest.merge(maybeExistingAccessGroup).get shouldBe accessGroup.copy(teamMembers =
-            Some(teamMembersToUpdate)
-          )
-        }
-      }
-
-      "request has only clients to update" should {
-        "return merged access group" in {
-          val maybeExistingAccessGroup: Option[AccessGroup] = Some(accessGroup)
-
-          val maybeGroupNameToUpdate: Option[String] = None
-          val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
-          val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
-
-          val updateAccessGroupRequest =
-            UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
-
-          updateAccessGroupRequest.merge(maybeExistingAccessGroup).get shouldBe accessGroup.copy(clients =
-            Some(clientsToUpdate)
-          )
-        }
-      }
-
-      "request has group name and team members to update" should {
-        "return merged access group" in {
-          val maybeExistingAccessGroup: Option[AccessGroup] = Some(accessGroup)
-
-          val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
-          val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
-          val maybeClientsToUpdate: Option[Set[Enrolment]] = None
-
-          val updateAccessGroupRequest =
-            UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
-
-          updateAccessGroupRequest.merge(maybeExistingAccessGroup).get shouldBe
-            accessGroup.copy(groupName = groupNameToUpdate, teamMembers = Some(teamMembersToUpdate))
-        }
-      }
-
-      "request has group name and clients to update" should {
-        "return merged access group" in {
-          val maybeExistingAccessGroup: Option[AccessGroup] = Some(accessGroup)
-
-          val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
-          val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
-          val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
-
-          val updateAccessGroupRequest =
-            UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
-
-          updateAccessGroupRequest.merge(maybeExistingAccessGroup).get shouldBe
-            accessGroup.copy(groupName = groupNameToUpdate, clients = Some(clientsToUpdate))
-        }
-      }
-
-      "request has team members and clients to update" should {
-        "return merged access group" in {
-          val maybeExistingAccessGroup: Option[AccessGroup] = Some(accessGroup)
-
-          val maybeGroupNameToUpdate: Option[String] = None
-          val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
-          val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
-
-          val updateAccessGroupRequest =
-            UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
-
-          updateAccessGroupRequest.merge(maybeExistingAccessGroup).get shouldBe
-            accessGroup.copy(teamMembers = Some(teamMembersToUpdate), clients = Some(clientsToUpdate))
-        }
-      }
-
-      "request has group name, team members and clients to update" should {
-        "return merged access group" in {
-          val maybeExistingAccessGroup: Option[AccessGroup] = Some(accessGroup)
-
-          val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
-          val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
-          val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
-
-          val updateAccessGroupRequest =
-            UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
-
-          updateAccessGroupRequest.merge(maybeExistingAccessGroup).get shouldBe
-            accessGroup.copy(
-              groupName = groupNameToUpdate,
-              teamMembers = Some(teamMembersToUpdate),
-              clients = Some(clientsToUpdate)
-            )
-        }
-      }
-    }
   }
 }
