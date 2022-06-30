@@ -87,22 +87,23 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
 
   def getGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
-      withGroupId(gid, authorisedAgent.arn) { groupId =>
-        for {
-          maybeAccessGroup <- accessGroupsService.get(groupId)
-        } yield maybeAccessGroup match {
-          case None =>
-            NotFound
-          case Some(accessGroup) =>
+      accessGroupsService.getById(gid) map {
+        case None =>
+          NotFound
+        case Some(accessGroup) =>
+          if (accessGroup.arn != authorisedAgent.arn) {
+            logger.info("ARN obtained from provided group id did not match with that identified by auth")
+            Forbidden
+          } else {
             Ok(Json.toJson(accessGroup))
-        }
+          }
       }
     } transformWith failureHandler
   }
 
   def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
-      withGroupId(gid, authorisedAgent.arn) { groupId =>
+      withGroupId(gid, authorisedAgent.arn) { (groupId, _) =>
         for {
           groupDeletionStatus <- accessGroupsService.delete(groupId)
         } yield groupDeletionStatus match {
@@ -121,27 +122,23 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
 
   def updateGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
-      withGroupId(gid, authorisedAgent.arn) { groupId =>
-        withJsonParsed[UpdateAccessGroupRequest] { updateAccessGroupRequest =>
-          accessGroupsService.get(groupId).map(updateAccessGroupRequest.merge) flatMap {
-            case None =>
-              logger.info(s"Access group for $groupId was not found")
-              Future successful NotFound
-            case Some(mergedAccessGroup) =>
-              if (mergedAccessGroup.groupName.length > MAX_LENGTH_GROUP_NAME) {
-                badRequestGroupNameMaxLength
-              } else {
-                accessGroupsService.update(groupId, mergedAccessGroup, authorisedAgent.agentUser) map {
-                  case AccessGroupNotUpdated =>
-                    logger.info("Access group was not updated")
-                    NotFound
-                  case AccessGroupUpdated =>
-                    Ok
-                  case AccessGroupUpdatedWithoutAssignmentsPushed =>
-                    logger.warn(s"Access group was updated, but assignments were not pushed")
-                    Ok
-                }
-              }
+      withJsonParsed[UpdateAccessGroupRequest] { updateAccessGroupRequest =>
+        withGroupId(gid, authorisedAgent.arn) { (groupId, existingAccessGroup) =>
+          val mergedAccessGroup = updateAccessGroupRequest.merge(existingAccessGroup)
+
+          if (mergedAccessGroup.groupName.length > MAX_LENGTH_GROUP_NAME) {
+            badRequestGroupNameMaxLength
+          } else {
+            accessGroupsService.update(groupId, mergedAccessGroup, authorisedAgent.agentUser) map {
+              case AccessGroupNotUpdated =>
+                logger.info("Access group was not updated")
+                NotFound
+              case AccessGroupUpdated =>
+                Ok
+              case AccessGroupUpdatedWithoutAssignmentsPushed =>
+                logger.warn(s"Access group was updated, but assignments were not pushed")
+                Ok
+            }
           }
         }
       }
@@ -162,17 +159,19 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
       }
 
   private def withGroupId(gid: String, authorisedArn: Arn)(
-    body: GroupId => Future[Result]
+    body: (GroupId, AccessGroup) => Future[Result]
   ): Future[Result] =
-    GroupId.decode(gid) match {
+    accessGroupsService.getById(gid) flatMap {
       case None =>
-        Future.successful(BadRequest("Check provided group id"))
-      case Some(groupId) =>
+        logger.warn(s"Group not found for '$gid', cannot update")
+        Future.successful(BadRequest(s"Check provided gid '$gid"))
+      case Some(accessGroup) =>
+        val groupId = GroupId(accessGroup.arn, accessGroup.groupName)
         if (groupId.arn != authorisedArn) {
-          logger.info("ARN obtained from provided group id did not match with that identified by auth")
+          logger.warn("ARN obtained from provided group id did not match with that identified by auth")
           Future.successful(Forbidden)
         } else {
-          body(groupId)
+          body(groupId, accessGroup)
         }
     }
 
@@ -256,20 +255,11 @@ case class UpdateAccessGroupRequest(
   clients: Option[Set[Enrolment]]
 ) {
 
-  def merge(maybeExistingAccessGroup: Option[AccessGroup]): Option[AccessGroup] =
-    maybeExistingAccessGroup.flatMap { existingAccessGroup =>
-      for {
-        withMergedGroupName <-
-          Option(groupName.fold(existingAccessGroup)(gn => existingAccessGroup.copy(groupName = gn)))
-
-        withMergedClients <-
-          Option(clients.fold(withMergedGroupName)(cls => withMergedGroupName.copy(clients = Some(cls))))
-
-        withMergedTeamMembers <-
-          Option(teamMembers.fold(withMergedClients)(members => withMergedClients.copy(teamMembers = Some(members))))
-
-      } yield withMergedTeamMembers
-    }
+  def merge(existingAccessGroup: AccessGroup): AccessGroup = {
+    val withMergedGroupName = groupName.fold(existingAccessGroup)(gn => existingAccessGroup.copy(groupName = gn))
+    val withMergedClients = clients.fold(withMergedGroupName)(cls => withMergedGroupName.copy(clients = Some(cls)))
+    teamMembers.fold(withMergedClients)(members => withMergedClients.copy(teamMembers = Some(members)))
+  }
 }
 
 object UpdateAccessGroupRequest {

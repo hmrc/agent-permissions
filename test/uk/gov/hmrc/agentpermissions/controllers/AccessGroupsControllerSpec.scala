@@ -17,7 +17,8 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import akka.actor.ActorSystem
-import org.scalamock.handlers.{CallHandler2, CallHandler3, CallHandler5}
+import org.bson.types.ObjectId
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler5}
 import play.api.libs.json.{JsArray, JsString, JsValue, Json}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
@@ -43,7 +44,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
   lazy val now: LocalDateTime = LocalDateTime.now()
   val user1: AgentUser = AgentUser("user1", "User 1")
   val user2: AgentUser = AgentUser("user2", "User 2")
-  val gid = "KARN0762398%7Esome+group"
+  val dbId: ObjectId = new ObjectId()
   val enrolment1: Enrolment =
     Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
   val enrolment2: Enrolment = Enrolment(
@@ -258,7 +259,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
               status(result) shouldBe OK
               contentAsJson(result) shouldBe Json.parse(
-                s"""{"groups":[{"groupId":"$gid","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[]}"""
+                s"""{"groups":[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[]}"""
               )
             }
           }
@@ -273,7 +274,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
               status(result) shouldBe OK
               contentAsJson(result) shouldBe Json.parse(
-                s"""{"groups":[{"groupId":"$gid","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[]}"""
+                s"""{"groups":[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[]}"""
               )
             }
           }
@@ -294,7 +295,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
               status(result) shouldBe OK
               contentAsJson(result) shouldBe Json.parse(
-                s"""{"groups":[{"groupId":"$gid","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[{"enrolmentKey":"$enrolmentKey","friendlyName":"$friendlyName"}]}"""
+                s"""{"groups":[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[{"enrolmentKey":"$enrolmentKey","friendlyName":"$friendlyName"}]}"""
               )
             }
           }
@@ -321,18 +322,19 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"return $FORBIDDEN" in new TestScope {
         mockAuthActionGetAuthorisedAgent(None)
 
-        val result = controller.getGroup(gid)(baseRequest)
+        val result = controller.getGroup(dbId.toHexString)(baseRequest)
         status(result) shouldBe FORBIDDEN
       }
     }
 
     "group id is not in the expected format" should {
-      s"return $BAD_REQUEST" in new TestScope {
+      s"return $NOT_FOUND" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        mockAccessGroupsServiceGetGroupById(None)
 
         val result = controller.getGroup("bad")(baseRequest)
 
-        status(result) shouldBe BAD_REQUEST
+        status(result) shouldBe NOT_FOUND
       }
     }
 
@@ -343,8 +345,9 @@ class AccessGroupsControllerSpec extends BaseSpec {
           val nonMatchingArn: Arn = Arn("FARN3782960")
 
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup))
 
-          val result = controller.getGroup(gid)(baseRequest)
+          val result = controller.getGroup(dbId.toHexString)(baseRequest)
 
           status(result) shouldBe FORBIDDEN
         }
@@ -353,9 +356,9 @@ class AccessGroupsControllerSpec extends BaseSpec {
       "call to fetch group details returns nothing" should {
         s"return $NOT_FOUND" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroup(None)
+          mockAccessGroupsServiceGetGroupById(None)
 
-          val result = controller.getGroup(gid)(baseRequest)
+          val result = controller.getGroup(dbId.toHexString)(baseRequest)
 
           status(result) shouldBe NOT_FOUND
         }
@@ -364,9 +367,9 @@ class AccessGroupsControllerSpec extends BaseSpec {
       "call to fetch group details returns an access group" should {
         s"return $OK" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroup(Some(accessGroup))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup))
 
-          val result = controller.getGroup(gid)(baseRequest)
+          val result = controller.getGroup(dbId.toHexString)(baseRequest)
 
           status(result) shouldBe OK
 
@@ -384,9 +387,9 @@ class AccessGroupsControllerSpec extends BaseSpec {
       "call to fetch group details throws exception" should {
         s"return $INTERNAL_SERVER_ERROR" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroupWithException(new RuntimeException("boo boo"))
+          mockAccessGroupsServiceGetGroupByIdWithException(new RuntimeException("boo boo"))
 
-          val result = controller.getGroup(gid)(baseRequest)
+          val result = controller.getGroup(dbId.toHexString)(baseRequest)
 
           status(result) shouldBe INTERNAL_SERVER_ERROR
         }
@@ -402,7 +405,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"return $FORBIDDEN" in new TestScope {
         mockAuthActionGetAuthorisedAgent(None)
 
-        val result = controller.deleteGroup(gid)(baseRequest)
+        val result = controller.deleteGroup(dbId.toHexString)(baseRequest)
         status(result) shouldBe FORBIDDEN
       }
     }
@@ -410,6 +413,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
     "group id is not in the expected format" should {
       s"return $BAD_REQUEST" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        mockAccessGroupsServiceGetGroupById(None)
 
         val result = controller.deleteGroup("bad")(baseRequest)
 
@@ -424,8 +428,9 @@ class AccessGroupsControllerSpec extends BaseSpec {
           val nonMatchingArn: Arn = Arn("FARN3782960")
 
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup))
 
-          val result = controller.deleteGroup(gid)(baseRequest)
+          val result = controller.deleteGroup(dbId.toHexString)(baseRequest)
 
           status(result) shouldBe FORBIDDEN
         }
@@ -434,9 +439,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"access groups service returns $AccessGroupNotDeleted" should {
         s"return $NOT_MODIFIED" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup))
           mockAccessGroupsServiceDelete(AccessGroupNotDeleted)
 
-          val result = controller.deleteGroup(gid)(baseRequest)
+          val result = controller.deleteGroup(dbId.toHexString)(baseRequest)
 
           status(result) shouldBe NOT_MODIFIED
         }
@@ -445,9 +451,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"access groups service returns $AccessGroupDeleted" should {
         s"return $OK" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup))
           mockAccessGroupsServiceDelete(AccessGroupDeleted)
 
-          val result = controller.deleteGroup(gid)(baseRequest)
+          val result = controller.deleteGroup(dbId.toHexString)(baseRequest)
 
           status(result) shouldBe OK
         }
@@ -456,9 +463,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"access groups service returns $AccessGroupDeletedWithoutAssignmentsPushed" should {
         s"return $OK" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup))
           mockAccessGroupsServiceDelete(AccessGroupDeletedWithoutAssignmentsPushed)
 
-          val result = controller.deleteGroup(gid)(baseRequest)
+          val result = controller.deleteGroup(dbId.toHexString)(baseRequest)
 
           status(result) shouldBe OK
         }
@@ -467,9 +475,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"access groups service throws an exception" should {
         s"return $INTERNAL_SERVER_ERROR" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup))
           mockAccessGroupsServiceDeleteWithException(new RuntimeException("boo boo"))
 
-          val result = controller.deleteGroup(gid)(baseRequest)
+          val result = controller.deleteGroup(dbId.toHexString)(baseRequest)
 
           status(result) shouldBe INTERNAL_SERVER_ERROR
         }
@@ -485,7 +494,8 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"return $FORBIDDEN" in new TestScope {
         mockAuthActionGetAuthorisedAgent(None)
 
-        val result = controller.updateGroup(gid)(baseRequest.withBody(jsonPayloadForUpdatingGroup(groupName)))
+        val result =
+          controller.updateGroup(dbId.toHexString)(baseRequest.withBody(jsonPayloadForUpdatingGroup(groupName)))
         status(result) shouldBe FORBIDDEN
       }
     }
@@ -501,7 +511,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"return $BAD_REQUEST" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
 
-        val result = controller.updateGroup(gid)(baseRequest.withBody(JsString("")))
+        val result = controller.updateGroup(dbId.toHexString)(baseRequest.withBody(JsString("")))
         status(result) shouldBe BAD_REQUEST
       }
     }
@@ -513,6 +523,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       "group id is not in the expected format" should {
         s"return $BAD_REQUEST" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(None)
 
           val result = controller.updateGroup("bad")(request)
           status(result) shouldBe BAD_REQUEST
@@ -526,30 +537,31 @@ class AccessGroupsControllerSpec extends BaseSpec {
             val nonMatchingArn: Arn = Arn("FARN3782960")
 
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
+            mockAccessGroupsServiceGetGroupById(Some(accessGroup))
 
-            val result = controller.updateGroup(gid)(request)
+            val result = controller.updateGroup(dbId.toHexString)(request)
 
             status(result) shouldBe FORBIDDEN
           }
         }
 
         "group for provided id does not exist" should {
-          s"return $NOT_FOUND" in new TestScope {
+          s"return $BAD_REQUEST" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroup(None)
+            mockAccessGroupsServiceGetGroupById(None)
 
-            val result = controller.updateGroup(gid)(request)
+            val result = controller.updateGroup(dbId.toHexString)(request)
 
-            status(result) shouldBe NOT_FOUND
+            status(result) shouldBe BAD_REQUEST
           }
         }
 
         "provided group name length is more than the maximum allowed" should {
           s"return $BAD_REQUEST" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroup(Some(accessGroup))
+            mockAccessGroupsServiceGetGroupById(Some(accessGroup))
 
-            val result = controller.updateGroup(gid)(
+            val result = controller.updateGroup(dbId.toHexString)(
               baseRequest
                 .withBody(jsonPayloadForUpdatingGroup("0123456789012345678901234567890123"))
             )
@@ -563,10 +575,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
           s"access groups service returns $AccessGroupNotUpdated" should {
             s"return $NOT_FOUND" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockAccessGroupsServiceGetGroup(Some(accessGroup))
+              mockAccessGroupsServiceGetGroupById(Some(accessGroup))
               mockAccessGroupsServiceUpdate(AccessGroupNotUpdated)
 
-              val result = controller.updateGroup(gid)(request)
+              val result = controller.updateGroup(dbId.toHexString)(request)
 
               status(result) shouldBe NOT_FOUND
             }
@@ -575,10 +587,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
           s"access groups service returns $AccessGroupUpdated" should {
             s"return $OK" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockAccessGroupsServiceGetGroup(Some(accessGroup))
+              mockAccessGroupsServiceGetGroupById(Some(accessGroup))
               mockAccessGroupsServiceUpdate(AccessGroupUpdated)
 
-              val result = controller.updateGroup(gid)(request)
+              val result = controller.updateGroup(dbId.toHexString)(request)
 
               status(result) shouldBe OK
             }
@@ -587,10 +599,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
           s"access groups service returns $AccessGroupUpdatedWithoutAssignmentsPushed" should {
             s"return $OK" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockAccessGroupsServiceGetGroup(Some(accessGroup))
+              mockAccessGroupsServiceGetGroupById(Some(accessGroup))
               mockAccessGroupsServiceUpdate(AccessGroupUpdatedWithoutAssignmentsPushed)
 
-              val result = controller.updateGroup(gid)(request)
+              val result = controller.updateGroup(dbId.toHexString)(request)
 
               status(result) shouldBe OK
             }
@@ -602,7 +614,8 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
   trait TestScope {
 
-    val accessGroup: AccessGroup = AccessGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
+    val accessGroup: AccessGroup =
+      AccessGroup(dbId, arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
     val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
     val mockAuthAction: AuthAction = mock[AuthAction]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
@@ -659,6 +672,22 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .getAllGroups(_: Arn)(_: ExecutionContext))
         .expects(arn, *)
         .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceGetGroupById(
+      maybeAccessGroup: Option[AccessGroup]
+    ): CallHandler1[String, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsService
+        .getById(_: String))
+        .expects(*)
+        .returning(Future.successful(maybeAccessGroup))
+
+    def mockAccessGroupsServiceGetGroupByIdWithException(
+      ex: Exception
+    ): CallHandler1[String, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsService
+        .getById(_: String))
+        .expects(*)
+        .returning(Future failed ex)
 
     def mockAccessGroupsServiceGetGroup(
       maybeAccessGroup: Option[AccessGroup]

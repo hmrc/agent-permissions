@@ -30,6 +30,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[AccessGroupsServiceImpl])
 trait AccessGroupsService {
+  def getById(id: String): Future[Option[AccessGroup]]
+
   def create(
     accessGroup: AccessGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus]
@@ -59,6 +61,8 @@ class AccessGroupsServiceImpl @Inject() (
   userClientDetailsConnector: UserClientDetailsConnector
 ) extends AccessGroupsService with Logging {
 
+  override def getById(id: String): Future[Option[AccessGroup]] = accessGroupsRepository.findById(id)
+
   override def create(
     accessGroup: AccessGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus] = {
@@ -85,12 +89,10 @@ class AccessGroupsServiceImpl @Inject() (
                                            Future.successful(AccessGroupNotCreated)
                                          case Some(creationId) =>
                                            pushAssignments(maybeCalculatedAssignments) map { pushStatus =>
-                                             val groupId = GroupId(accessGroup.arn, accessGroup.groupName).encode
-                                             logger.info(
-                                               s"Created access group. DB id: '$creationId', gid: '$groupId'"
-                                             )
-                                             if (pushStatus == AssignmentsPushed) AccessGroupCreated(groupId)
-                                             else AccessGroupCreatedWithoutAssignmentsPushed(groupId)
+                                             logger.info(s"Created access group. DB id: '$creationId")
+
+                                             if (pushStatus == AssignmentsPushed) AccessGroupCreated(creationId)
+                                             else AccessGroupCreatedWithoutAssignmentsPushed(creationId)
                                            }
                                        }
         } yield accessGroupCreationStatus
@@ -196,7 +198,6 @@ class AccessGroupsServiceImpl @Inject() (
 
   private def mergeWhoIsUpdating(accessGroup: AccessGroup, whoIsUpdating: AgentUser): Future[AccessGroup] =
     Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
-
 }
 
 sealed trait AccessGroupCreationStatus

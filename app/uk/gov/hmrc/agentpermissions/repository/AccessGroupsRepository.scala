@@ -17,8 +17,8 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
-import com.mongodb.MongoWriteException
 import com.mongodb.client.model.{Collation, IndexOptions}
+import com.mongodb.{BasicDBObject, MongoWriteException}
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
@@ -34,6 +34,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[AccessGroupsRepositoryImpl])
 trait AccessGroupsRepository {
+  def findById(id: String): Future[Option[AccessGroup]]
   def get(arn: Arn): Future[Seq[AccessGroup]]
   def get(arn: Arn, groupName: String): Future[Option[AccessGroup]]
   def insert(accessGroup: AccessGroup): Future[Option[String]]
@@ -61,6 +62,11 @@ class AccessGroupsRepositoryImpl @Inject() (
       )
     ) with AccessGroupsRepository with Logging {
 
+  override def findById(id: String): Future[Option[AccessGroup]] =
+    collection
+      .find(new BasicDBObject("_id", id))
+      .headOption()
+
   override def get(arn: Arn): Future[Seq[AccessGroup]] =
     collection
       .find(equal(FIELD_ARN, arn.value))
@@ -78,7 +84,7 @@ class AccessGroupsRepositoryImpl @Inject() (
     collection
       .insertOne(accessGroup)
       .headOption()
-      .map(_.map(result => result.getInsertedId.asObjectId().getValue.toString))
+      .map(_.map(result => result.getInsertedId.asString().getValue))
       .recoverWith { case e: MongoWriteException =>
         Future.successful(None)
       }
