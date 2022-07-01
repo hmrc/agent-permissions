@@ -4,8 +4,8 @@ POST    /arn/:arn/optin                     uk.gov.hmrc.agentpermissions.control
 POST    /arn/:arn/optout                    uk.gov.hmrc.agentpermissions.controllers.OptinController.optout(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/optin-status              uk.gov.hmrc.agentpermissions.controllers.OptinController.optinStatus(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 
-POST    /arn/:arn/group/create              uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/groups-information        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupsSummaries(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /gid/:gid/group                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
-DELETE  /group/gid/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
+POST    /arn/:arn/groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupsSummaries(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
+DELETE  /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
 PATCH   /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
