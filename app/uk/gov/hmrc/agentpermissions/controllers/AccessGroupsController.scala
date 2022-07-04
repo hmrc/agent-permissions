@@ -145,6 +145,21 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
+  def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent { authorisedAgent =>
+      withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
+        for {
+          existingGroups <- accessGroupsService.getAllGroups(matchedArn)
+        } yield
+          if (existingGroups.exists(_.groupName.equalsIgnoreCase(name))) {
+            Conflict
+          } else {
+            Ok
+          }
+      }
+    } transformWith failureHandler
+  }
+
   private def withAuthorisedAgent[T](
     body: AuthorisedAgent => Future[Result]
   )(implicit request: Request[T], ec: ExecutionContext): Future[Result] =

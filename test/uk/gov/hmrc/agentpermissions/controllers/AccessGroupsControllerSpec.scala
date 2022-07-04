@@ -612,6 +612,79 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
   }
 
+  "Call to check group name" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.groupNameCheck(arn, groupName)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "provided arn is not valid" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.groupNameCheck(invalidArn, groupName)(baseRequest)
+
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "provided arn is valid" when {
+
+      "provided arn does not match that identified by auth" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          val result = controller.groupNameCheck(nonMatchingArn, groupName)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "call to fetch access groups returns empty collection" should {
+        s"return $OK" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroups(Seq.empty)
+
+          val result = controller.groupNameCheck(arn, groupName)(baseRequest)
+
+          status(result) shouldBe OK
+        }
+      }
+
+      "call to fetch access groups returns non-empty collection" when {
+
+        "existing access groups contain a group whose name matches (even case-insensitively) that is being checked" should {
+          s"return $CONFLICT" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+
+            val result = controller.groupNameCheck(arn, groupName.toUpperCase)(baseRequest)
+
+            status(result) shouldBe CONFLICT
+          }
+        }
+
+        "existing access groups do not contain any group whose name matches that is being checked" should {
+          s"return $OK" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+
+            val result = controller.groupNameCheck(arn, "non existing group")(baseRequest)
+
+            status(result) shouldBe OK
+          }
+        }
+      }
+    }
+  }
+
   trait TestScope {
 
     val accessGroup: AccessGroup =
