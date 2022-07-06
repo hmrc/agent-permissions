@@ -151,7 +151,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
         for {
           existingGroups <- accessGroupsService.getAllGroups(matchedArn)
         } yield
-          if (existingGroups.exists(_.groupName.equalsIgnoreCase(name))) {
+          if (existingGroups.exists(_.groupName.equalsIgnoreCase(Option(name).map(_.trim).getOrElse("")))) {
             Conflict
           } else {
             Ok
@@ -249,7 +249,7 @@ case class CreateAccessGroupRequest(
 
     AccessGroup(
       arn,
-      groupName,
+      Option(groupName).map(_.trim).getOrElse(""),
       now,
       now,
       agentUser,
@@ -271,7 +271,9 @@ case class UpdateAccessGroupRequest(
 ) {
 
   def merge(existingAccessGroup: AccessGroup): AccessGroup = {
-    val withMergedGroupName = groupName.fold(existingAccessGroup)(gn => existingAccessGroup.copy(groupName = gn))
+    val withMergedGroupName = groupName.fold(existingAccessGroup)(name =>
+      existingAccessGroup.copy(groupName = Option(name).map(_.trim).getOrElse(""))
+    )
     val withMergedClients = clients.fold(withMergedGroupName)(cls => withMergedGroupName.copy(clients = Some(cls)))
     teamMembers.fold(withMergedClients)(members => withMergedClients.copy(teamMembers = Some(members)))
   }

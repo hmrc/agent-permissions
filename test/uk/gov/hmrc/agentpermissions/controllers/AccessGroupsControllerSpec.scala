@@ -671,6 +671,17 @@ class AccessGroupsControllerSpec extends BaseSpec {
           }
         }
 
+        "existing access groups contain a group whose name matches (except whitespace) that is being checked" should {
+          s"return $CONFLICT" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+
+            val result = controller.groupNameCheck(arn, " " + groupName)(baseRequest)
+
+            status(result) shouldBe CONFLICT
+          }
+        }
+
         "existing access groups do not contain any group whose name matches that is being checked" should {
           s"return $OK" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
