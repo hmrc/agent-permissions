@@ -31,6 +31,7 @@ import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpResponse, UpstreamErrorR
 import java.net.URL
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 @ImplementedBy(classOf[UserClientDetailsConnectorImpl])
 trait UserClientDetailsConnector {
@@ -160,15 +161,19 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] = {
     val url = new URL(aucdBaseUrl, s"/agent-user-client-details/user-enrolment-assignments")
 
-    monitor("ConsumedAPI-AgentUserClientDetails-ClientList-GET") {
-      http.POST[UserEnrolmentAssignments, HttpResponse](url, userEnrolmentAssignments).map { response =>
-        response.status match {
-          case ACCEPTED =>
-            AssignmentsPushed
-          case other =>
-            logger.warn(s"EACD assignments not pushed. Received $other status: ${response.body}")
-            AssignmentsNotPushed
-        }
+    monitor("ConsumedAPI-AgentUserClientDetails-PushAssignments-POST") {
+      http.POST[UserEnrolmentAssignments, HttpResponse](url, userEnrolmentAssignments) transformWith {
+        case Success(response) =>
+          response.status match {
+            case ACCEPTED =>
+              Future successful AssignmentsPushed
+            case other =>
+              logger.warn(s"EACD assignments not pushed. Received $other status: ${response.body}")
+              Future successful AssignmentsNotPushed
+          }
+        case Failure(ex) =>
+          logger.error(s"EACD assignments not pushed. Error: ${ex.getMessage}")
+          Future successful AssignmentsNotPushed
       }
     }
   }
