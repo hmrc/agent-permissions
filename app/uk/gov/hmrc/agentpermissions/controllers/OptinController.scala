@@ -75,6 +75,15 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
       } transformWith failureHandler
   }
 
+  def optinRecordExists(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+    optinService
+      .optinRecordExists(arn)
+      .map {
+        case true  => NoContent
+        case false => NotFound
+      } transformWith failureHandler
+  }
+
   private def withAuthorisedAgent[T](
     body: AuthorisedAgent => Future[Result]
   )(implicit request: Request[T], ec: ExecutionContext): Future[Result] =
