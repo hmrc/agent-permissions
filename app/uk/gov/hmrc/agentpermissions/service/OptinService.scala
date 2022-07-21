@@ -40,6 +40,8 @@ trait OptinService {
   ): Future[Option[OptoutRequestStatus]]
 
   def optinStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]]
+
+  def optinRecordExists(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean]
 }
 
 @Singleton
@@ -79,6 +81,11 @@ class OptinServiceImpl @Inject() (
                               notOptedInStatusHandler.identifyStatus(arn)
                           }
     } yield maybeOptinStatus
+
+  override def optinRecordExists(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean] =
+    for {
+      maybeOptinRecord <- optinRepository.get(arn)
+    } yield maybeOptinRecord.fold(false)(_.status == OptedIn)
 
   private def handleOptinOptout(arn: Arn, user: AgentUser, optinEventTypeToMatch: OptinEventType)(implicit
     ec: ExecutionContext,

@@ -97,6 +97,22 @@ class OptinControllerSpec extends BaseSpec {
         .optinStatus(_: Arn)(_: ExecutionContext, _: HeaderCarrier))
         .expects(arn, *, *)
         .returning(Future failed ex)
+
+    def mockOptinRecordExistsWithoutException(
+      optinRecordExists: Boolean
+    ): CallHandler3[Arn, ExecutionContext, HeaderCarrier, Future[Boolean]] =
+      (optinService
+        .optinRecordExists(_: Arn)(_: ExecutionContext, _: HeaderCarrier))
+        .expects(arn, *, *)
+        .returning(Future successful optinRecordExists)
+
+    def mockOptinRecordExistsWithException(
+      ex: Exception
+    ): CallHandler3[Arn, ExecutionContext, HeaderCarrier, Future[Boolean]] =
+      (optinService
+        .optinRecordExists(_: Arn)(_: ExecutionContext, _: HeaderCarrier))
+        .expects(arn, *, *)
+        .returning(Future failed ex)
   }
 
   "Call to opt-in" when {
@@ -244,4 +260,34 @@ class OptinControllerSpec extends BaseSpec {
     }
 
   }
+
+  "Call to optin record exists" when {
+
+    "optin record exists" should {
+      s"return $NO_CONTENT" in new TestScope {
+        mockOptinRecordExistsWithoutException(true)
+        val result = controller.optinRecordExists(arn)(request)
+        status(result) shouldBe NO_CONTENT
+      }
+    }
+
+    "optin record does not exist" should {
+      s"return $NOT_FOUND" in new TestScope {
+        mockOptinRecordExistsWithoutException(false)
+        val result = controller.optinRecordExists(arn)(request)
+        status(result) shouldBe NOT_FOUND
+      }
+    }
+
+    "optin service throws exception" should {
+      s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+        mockOptinRecordExistsWithException(new RuntimeException("boo boo"))
+
+        val result = controller.optinRecordExists(arn)(request)
+        status(result) shouldBe INTERNAL_SERVER_ERROR
+      }
+    }
+
+  }
+
 }
