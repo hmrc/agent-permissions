@@ -250,4 +250,38 @@ class OptinServiceSpec extends BaseSpec {
 
   }
 
+  s"Calling optin record exists" when {
+
+    "optin record does not exist" should {
+
+      s"return false" in new TestScope {
+        mockOptinRepositoryGet(None)
+
+        optinService.optinRecordExists(arn).futureValue shouldBe false
+      }
+    }
+
+    "optin record exists" when {
+
+      s"optin record status is $OptedIn" should {
+
+        s"return true" in new TestScope {
+          mockOptinRepositoryGet(Some(OptinRecord(arn, List(OptinEvent(OptedIn, user, LocalDateTime.now())))))
+
+          optinService.optinRecordExists(arn).futureValue shouldBe true
+        }
+      }
+
+      s"optin record status is $OptedOut" should {
+
+        s"return false" in new TestScope {
+          mockOptinRepositoryGet(Some(OptinRecord(arn, List(OptinEvent(OptedOut, user, LocalDateTime.now())))))
+
+          optinService.optinRecordExists(arn).futureValue shouldBe false
+        }
+      }
+    }
+
+  }
+
 }
