@@ -160,6 +160,14 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
+  def syncWithEacd(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent { authorisedAgent =>
+      withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
+        accessGroupsService.syncWithEacd(matchedArn, authorisedAgent.agentUser).map(_ => Ok)
+      }
+    } transformWith failureHandler
+  }
+
   private def withAuthorisedAgent[T](
     body: AuthorisedAgent => Future[Result]
   )(implicit request: Request[T], ec: ExecutionContext): Future[Result] =
