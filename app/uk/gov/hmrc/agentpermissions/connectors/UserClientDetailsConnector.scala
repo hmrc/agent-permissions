@@ -22,7 +22,7 @@ import com.kenshoo.play.metrics.Metrics
 import play.api.Logging
 import play.api.http.Status._
 import uk.gov.hmrc.agent.kenshoo.monitoring.HttpAPIMonitor
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client, GroupDelegatedEnrolments, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.http.HttpReads.Implicits.readRaw
 import uk.gov.hmrc.http.HttpReads.is5xx
@@ -50,6 +50,10 @@ trait UserClientDetailsConnector {
   def getClientListStatus(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]]
+
+  def getClientsWithAssignedUsers(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[GroupDelegatedEnrolments]]
 }
 
 @Singleton
@@ -174,6 +178,24 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
         case Failure(ex) =>
           logger.error(s"EACD assignments not pushed. Error: ${ex.getMessage}")
           Future successful AssignmentsNotPushed
+      }
+    }
+  }
+
+  override def getClientsWithAssignedUsers(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[GroupDelegatedEnrolments]] = {
+    val url = new URL(aucdBaseUrl, s"/agent-user-client-details/arn/${arn.value}/clients-assigned-users")
+
+    monitor("ConsumedAPI-AgentUserClientDetails-ClientsWithAssignedUsers-GET") {
+      http.GET[HttpResponse](url).map { response =>
+        response.status match {
+          case OK =>
+            Some(response.json.as[GroupDelegatedEnrolments])
+          case other =>
+            logger.warn(s"Received $other status: ${response.body}")
+            None
+        }
       }
     }
   }

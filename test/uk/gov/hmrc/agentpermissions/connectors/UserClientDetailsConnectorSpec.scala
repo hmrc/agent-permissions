@@ -21,7 +21,7 @@ import com.kenshoo.play.metrics.Metrics
 import org.scalamock.handlers.CallHandler0
 import play.api.http.Status._
 import play.api.libs.json.{Json, Writes}
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, AssignedClient, Client, GroupDelegatedEnrolments, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpReads, HttpResponse, UpstreamErrorResponse}
@@ -352,6 +352,39 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
           userClientDetailsConnector
             .pushAssignments(UserEnrolmentAssignments(Set.empty, Set.empty))
             .futureValue shouldBe AssignmentsNotPushed
+        }
+      }
+    }
+  }
+
+  "getClientsWithAssignedUsers" when {
+
+    s"http response has $OK status code" should {
+      "return some value" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpGet(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users",
+          HttpResponse(OK, Json.obj("clients" -> Seq.empty[AssignedClient]).toString)
+        )
+
+        userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe Some(
+          GroupDelegatedEnrolments(Seq.empty)
+        )
+      }
+    }
+
+    "http response has non-200 status codes" should {
+      Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+        s"return nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpGet(
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users",
+            HttpResponse(statusCode, "")
+          )
+
+          userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe None
         }
       }
     }

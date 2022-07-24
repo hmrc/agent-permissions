@@ -47,7 +47,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
       Seq(Identifier("EtmpRegistrationNumber", "XAPPT0000012345"))
     )
     val enrolment3: Enrolment =
-      Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CgtRef", "XMCGTP123456789")))
+      Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CGTPDRef", "XMCGTP123456789")))
 
     val accessGroup: AccessGroup =
       AccessGroup(
