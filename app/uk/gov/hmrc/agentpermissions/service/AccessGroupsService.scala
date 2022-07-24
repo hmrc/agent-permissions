@@ -21,7 +21,7 @@ import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
-import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
+import uk.gov.hmrc.agentpermissions.service.userenrolment.{AccessGroupSynchronizer, UserEnrolmentAssignmentService}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -52,13 +52,19 @@ trait AccessGroupsService {
   def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
 
   def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
+
+  def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupUpdateStatus]]
 }
 
 @Singleton
 class AccessGroupsServiceImpl @Inject() (
   accessGroupsRepository: AccessGroupsRepository,
   userEnrolmentAssignmentService: UserEnrolmentAssignmentService,
-  userClientDetailsConnector: UserClientDetailsConnector
+  userClientDetailsConnector: UserClientDetailsConnector,
+  accessGroupSynchronizer: AccessGroupSynchronizer
 ) extends AccessGroupsService with Logging {
 
   override def getById(id: String): Future[Option[AccessGroup]] = accessGroupsRepository.findById(id)
@@ -198,6 +204,19 @@ class AccessGroupsServiceImpl @Inject() (
 
   private def mergeWhoIsUpdating(accessGroup: AccessGroup, whoIsUpdating: AgentUser): Future[AccessGroup] =
     Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
+
+  override def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupUpdateStatus]] =
+    for {
+      maybeGroupDelegatedEnrolments <- userClientDetailsConnector.getClientsWithAssignedUsers(arn)
+      updateStatuses <-
+        maybeGroupDelegatedEnrolments.fold(Future.successful(Seq.empty[AccessGroupUpdateStatus]))(
+          groupDelegatedEnrolments => accessGroupSynchronizer.syncWithEacd(arn, groupDelegatedEnrolments, whoIsUpdating)
+        )
+    } yield updateStatuses
+
 }
 
 sealed trait AccessGroupCreationStatus
