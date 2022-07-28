@@ -44,7 +44,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
     )
 
     val enrolment3: Enrolment =
-      Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CgtRef", "XMCGTP123456789")))
+      Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CGTPDRef", "XMCGTP123456789")))
 
     val enrolment4: Enrolment =
       Enrolment("HMRC-MTD-IT", "Activated", "MTD IT Client", Seq(Identifier("MTDITID", "236216873678126")))

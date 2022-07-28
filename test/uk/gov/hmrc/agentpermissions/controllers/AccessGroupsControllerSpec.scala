@@ -18,14 +18,14 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import akka.actor.ActorSystem
 import org.bson.types.ObjectId
-import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler5}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4, CallHandler5}
 import play.api.libs.json.{JsArray, JsString, JsValue, Json}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.service._
+import uk.gov.hmrc.agentpermissions.service.{AccessGroupUpdateStatus, _}
 import uk.gov.hmrc.auth.core.InvalidBearerToken
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -696,6 +696,58 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
   }
 
+  "Call to sync with EACD" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.syncWithEacd(arn)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "provided arn is not valid" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.syncWithEacd(invalidArn)(baseRequest)
+
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "provided arn is valid" when {
+
+      "provided arn does not match that identified by auth" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          val result = controller.syncWithEacd(nonMatchingArn)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "provided arn matches that identified by auth" when {
+
+        "sync is successful" should {
+          s"return $OK" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceSyncWithEacd(Seq(AccessGroupUpdated))
+
+            val result = controller.syncWithEacd(arn)(baseRequest)
+
+            status(result) shouldBe OK
+          }
+        }
+      }
+
+    }
+  }
+
   trait TestScope {
 
     val accessGroup: AccessGroup =
@@ -820,6 +872,14 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful unassignedClients)
+
+    def mockAccessGroupsServiceSyncWithEacd(
+      accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
+    ): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
+      (mockAccessGroupsService
+        .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future successful accessGroupUpdateStatuses)
 
   }
 
