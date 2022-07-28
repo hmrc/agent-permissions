@@ -10,5 +10,6 @@ GET     /arn/:arn/groups                    uk.gov.hmrc.agentpermissions.control
 GET     /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
 DELETE  /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
 PATCH   /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
-GET     /arn/:arn/access-group-name-check   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupNameCheck(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, name: String)
+PUT     /groups/:gid/add-unassigned           uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: String)
+GET    /arn/:arn/access-group-name-check   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupNameCheck(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, name: String)
 PATCH   /arn/:arn/sync                      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)

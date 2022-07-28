@@ -145,6 +145,31 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
+  def addUnassignedMembers(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+    withAuthorisedAgent { authorisedAgent =>
+      withJsonParsed[AddMembersToAccessGroupRequest] { updateAccessGroupRequest =>
+        withGroupId(gid, authorisedAgent.arn) { (groupId, group) =>
+          val groupWithClientsAdded = updateAccessGroupRequest.clients.fold(group)(enrolments =>
+            group.copy(clients = Some(group.clients.getOrElse(Set.empty) ++ enrolments))
+          )
+          val groupWithTeamMembersAdded = updateAccessGroupRequest.teamMembers.fold(groupWithClientsAdded)(tms =>
+            group.copy(teamMembers = Some(group.teamMembers.getOrElse(Set.empty) ++ tms))
+          )
+          accessGroupsService.update(groupId, groupWithTeamMembersAdded, authorisedAgent.agentUser) map {
+            case AccessGroupNotUpdated =>
+              logger.info("Access group was not updated")
+              NotFound
+            case AccessGroupUpdated =>
+              Ok
+            case AccessGroupUpdatedWithoutAssignmentsPushed =>
+              logger.warn(s"Access group was updated, but assignments were not pushed")
+              Ok
+          }
+        }
+      }
+    } transformWith failureHandler
+  }
+
   def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
@@ -289,4 +314,10 @@ case class UpdateAccessGroupRequest(
 
 object UpdateAccessGroupRequest {
   implicit val format: OFormat[UpdateAccessGroupRequest] = Json.format[UpdateAccessGroupRequest]
+}
+
+case class AddMembersToAccessGroupRequest(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Enrolment]])
+
+object AddMembersToAccessGroupRequest {
+  implicit val format: OFormat[AddMembersToAccessGroupRequest] = Json.format[AddMembersToAccessGroupRequest]
 }

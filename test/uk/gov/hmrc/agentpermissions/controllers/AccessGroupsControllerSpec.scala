@@ -748,6 +748,99 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
   }
 
+  "Call to add unassigned clients/team members to a group" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.addUnassignedMembers(dbId.toHexString)(
+          baseRequest.withBody(jsonPayloadForUpdatingGroup(groupName))
+        )
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "request does not contain json payload" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        val result = controller.addUnassignedMembers("bad")(baseRequest)
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "request contains incorrect json payload" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.addUnassignedMembers(dbId.toHexString)(baseRequest.withBody(JsString("")))
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "request contains correct json payload" when {
+
+      implicit val request = baseRequest.withBody(jsonPayloadForAddingMembersToAGroup(groupName))
+
+      "group id is not in the expected format" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(None)
+
+          val result = controller.addUnassignedMembers("bad")(request)
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "group id is in the expected format" when {
+
+        s"access groups service returns $AccessGroupUpdated" should {
+          s"return $OK" in new TestScope {
+
+            val group = accessGroup.copy(
+              teamMembers = Some(Set(AgentUser("1", "existing"))),
+              clients = Some(Set(Enrolment("whatever", "state", "friendly", Seq.empty)))
+            )
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceGetGroupById(Some(group))
+            mockAccessGroupsServiceUpdate(AccessGroupUpdated)
+
+            val result = controller.addUnassignedMembers(dbId.toHexString)(request)
+
+            status(result) shouldBe OK
+          }
+        }
+
+        s"access groups service returns $AccessGroupUpdatedWithoutAssignmentsPushed" should {
+          s"return $OK" in new TestScope {
+            val group = accessGroup.copy(
+              teamMembers = Some(Set(AgentUser("1", "existing"))),
+              clients = Some(Set(Enrolment("whatever", "state", "friendly", Seq.empty)))
+            )
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceGetGroupById(Some(group))
+            mockAccessGroupsServiceUpdate(AccessGroupUpdated)
+
+            val result = controller.addUnassignedMembers(dbId.toHexString)(request)
+
+            status(result) shouldBe OK
+          }
+        }
+
+        "group for provided id does not exist" should {
+          s"return $BAD_REQUEST" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceGetGroupById(None)
+
+            val result = controller.addUnassignedMembers(dbId.toHexString)(request)
+
+            status(result) shouldBe BAD_REQUEST
+          }
+        }
+
+      }
+    }
+  }
+
   trait TestScope {
 
     val accessGroup: AccessGroup =
@@ -894,6 +987,33 @@ class AccessGroupsControllerSpec extends BaseSpec {
     Json.parse(s"""{
                   |    "groupName": "$groupName",
                   |    "teamMembers": [
+                  |        {
+                  |            "id": "user2",
+                  |            "name": "User 2"
+                  |        },
+                  |        {
+                  |            "id": "user3",
+                  |            "name": "User 3"
+                  |        }
+                  |    ],
+                  |    "clients": [
+                  |        {
+                  |            "service": "HMRC-PPT-ORG",
+                  |            "state": "Activated",
+                  |            "friendlyName": "Frank Wright",
+                  |            "identifiers": [
+                  |                {
+                  |                    "key": "EtmpRegistrationNumber",
+                  |                    "value": "XAPPT0000012345"
+                  |                }
+                  |            ]
+                  |        }
+                  |    ]
+                  |}""".stripMargin)
+
+  def jsonPayloadForAddingMembersToAGroup(groupName: String): JsValue =
+    Json.parse(s"""{
+                  |   "teamMembers": [
                   |        {
                   |            "id": "user2",
                   |            "name": "User 2"
