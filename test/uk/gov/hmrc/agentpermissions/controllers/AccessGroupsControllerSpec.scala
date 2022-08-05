@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import akka.actor.ActorSystem
 import org.bson.types.ObjectId
-import org.scalamock.handlers.{CallHandler1, CallHandler14, CallHandler2, CallHandler3, CallHandler4, CallHandler5}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4, CallHandler5}
 import play.api.libs.json.{JsArray, JsString, JsValue, Json}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
