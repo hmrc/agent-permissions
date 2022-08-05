@@ -399,6 +399,39 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
   }
 
+  "Call to get groups for client" should {
+
+    "return only groups that the client is in" in new TestScope {
+      mockAccessGroupsServiceGetGroupsForClient(Seq(AccessGroupSummary(dbId.toHexString, groupName, 3, 3)))
+
+      val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
+
+      status(result) shouldBe OK
+
+      contentAsJson(result) shouldBe Json.parse(
+        s"""[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":3,"teamMemberCount":3}]"""
+      )
+
+    }
+
+    "return Not Found if there are no groups for the client" in new TestScope {
+      mockAccessGroupsServiceGetGroupsForClient(Seq.empty)
+
+      val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
+
+      status(result) shouldBe NOT_FOUND
+    }
+
+    s"return $INTERNAL_SERVER_ERROR if there was some exception" in new TestScope {
+      mockAccessGroupsServiceGetGroupsForClientWithException(new NullPointerException("bad"))
+
+      val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
+
+      status(result) shouldBe INTERNAL_SERVER_ERROR
+    }
+
+  }
+
   "Call to delete group" when {
 
     "authorised agent is not identified by auth" should {
@@ -973,6 +1006,22 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(Future successful accessGroupUpdateStatuses)
+
+    def mockAccessGroupsServiceGetGroupsForClient(
+      accessGroupSummaries: Seq[AccessGroupSummary]
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockAccessGroupsService
+        .get(_: Arn, _: String)(_: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future successful accessGroupSummaries)
+
+    def mockAccessGroupsServiceGetGroupsForClientWithException(
+      ex: Exception
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockAccessGroupsService
+        .get(_: Arn, _: String)(_: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.failed(ex))
 
   }
 

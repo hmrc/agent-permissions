@@ -40,6 +40,8 @@ trait AccessGroupsService {
 
   def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]]
 
+  def get(arn: Arn, enrolmentKey: String)(implicit ec: ExecutionContext): Future[Seq[AccessGroupSummary]]
+
   def delete(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus]
 
   def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
@@ -110,6 +112,15 @@ class AccessGroupsServiceImpl @Inject() (
 
   override def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]] =
     accessGroupsRepository.get(groupId.arn, groupId.groupName)
+
+  override def get(arn: Arn, enrolmentKey: String)(implicit ec: ExecutionContext): Future[Seq[AccessGroupSummary]] =
+    accessGroupsRepository
+      .get(arn)
+      .map(accessGroups =>
+        accessGroups
+          .filter(_.clients.fold(false)(_.map(toKey(_)).contains(enrolmentKey)))
+          .map(AccessGroupSummary.convert(_))
+      )
 
   override def delete(
     groupId: GroupId
@@ -216,6 +227,15 @@ class AccessGroupsServiceImpl @Inject() (
           groupDelegatedEnrolments => accessGroupSynchronizer.syncWithEacd(arn, groupDelegatedEnrolments, whoIsUpdating)
         )
     } yield updateStatuses
+
+  private val toKey: Enrolment => String = (enrolment: Enrolment) => {
+    val service = enrolment.service
+    val identifier = enrolment.identifiers.headOption match {
+      case Some(identifier) => s"${identifier.key}~${identifier.value}"
+      case None             => throw new NullPointerException(s"identifier missing from enrolment")
+    }
+    s"$service~$identifier"
+  }
 
 }
 

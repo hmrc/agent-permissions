@@ -111,6 +111,24 @@ class AccessGroupsServiceSpec extends BaseSpec {
     }
   }
 
+  "Fetching groups for client" when {
+
+    "groups found" should {
+      "return corresponding summaries" in new TestScope {
+
+        val ag1 = accessGroup
+        val ag2 = accessGroup.copy(groupName = "group 2", clients = Some(Set(enrolment1)))
+
+        mockAccessGroupsRepositoryGetAll(
+          Seq(ag1, ag2)
+        )
+
+        accessGroupsService.get(arn, "HMRC-CGT-PD~CGTPDRef~XMCGTP123456789").futureValue shouldBe
+          Seq(AccessGroupSummary(ag1._id.toHexString, "some group", 3, 3))
+      }
+    }
+  }
+
   "Fetching group by id" when {
 
     "group exists" should {

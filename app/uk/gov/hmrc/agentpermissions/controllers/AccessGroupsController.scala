@@ -101,6 +101,14 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
+  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String) = Action.async { implicit request =>
+    {
+      accessGroupsService
+        .get(arn, enrolmentKey)
+        .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
+    } transformWith failureHandler
+  }
+
   def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
       withGroupId(gid, authorisedAgent.arn) { (groupId, _) =>
