@@ -25,7 +25,7 @@ import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
 import org.mongodb.scala.model.{DeleteOptions, IndexModel, ReplaceOptions}
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, Arn}
-import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
+import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_CLIENTS, FIELD_GROUPNAME, caseInsensitiveCollation}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
@@ -118,6 +118,7 @@ class AccessGroupsRepositoryImpl @Inject() (
 object AccessGroupsRepositoryImpl {
   private val FIELD_ARN = "arn"
   private val FIELD_GROUPNAME = "groupName"
+  private val FIELD_CLIENTS = "clients"
 
   private def caseInsensitiveCollation: Collation =
     Collation.builder().locale("en").collationStrength(SECONDARY).build()
