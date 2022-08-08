@@ -29,7 +29,7 @@ class AppConfigSpec extends BaseSpec {
   "App config" should {
     "be set up correctly" in {
       appConfig.agentUserClientDetailsBaseUrl shouldBe "http://localhost:9449"
-      appConfig.agentSizeMaxClientCountAllowed shouldBe 50
+      appConfig.agentSizeMaxClientCountAllowed shouldBe 900
     }
   }
 }
