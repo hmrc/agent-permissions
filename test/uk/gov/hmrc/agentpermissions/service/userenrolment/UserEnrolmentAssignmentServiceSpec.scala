@@ -32,7 +32,7 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
   val user: AgentUser = AgentUser("userId", "userName")
   val groupName = "some group"
   val groupId: GroupId = GroupId(arn, groupName)
-  val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty)
+  val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)
   val maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments] = Some(userEnrolmentAssignments)
 
   val accessGroup: AccessGroup = AccessGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))

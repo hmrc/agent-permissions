@@ -41,43 +41,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
   implicit val hc: HeaderCarrier = HeaderCarrier()
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
-  trait TestScope {
-    lazy val userClientDetailsConnector: UserClientDetailsConnector =
-      new UserClientDetailsConnectorImpl(mockHttpClient, mockMetrics)
-
-    def mockAppConfigAgentUserClientDetailsBaseUrl: CallHandler0[String] =
-      (mockAppConfig.agentUserClientDetailsBaseUrl _)
-        .expects()
-        .returning("http://someBaseUrl")
-        .noMoreThanTwice
-
-    def mockMetricsDefaultRegistry: CallHandler0[MetricRegistry] =
-      (mockMetrics.defaultRegistry _)
-        .expects()
-        .returning(noopMetricRegistry)
-
-    def mockHttpGet[A](url: String, response: A): Unit =
-      (mockHttpClient
-        .GET[A](_: String, _: Seq[(String, String)], _: Seq[(String, String)])(
-          _: HttpReads[A],
-          _: HeaderCarrier,
-          _: ExecutionContext
-        ))
-        .expects(url, *, *, *, *, *)
-        .returning(Future.successful(response))
-
-    def mockHttpPost[I, A](url: String, response: A): Unit =
-      (mockHttpClient
-        .POST[I, A](_: String, _: I, _: Seq[(String, String)])(
-          _: Writes[I],
-          _: HttpReads[A],
-          _: HeaderCarrier,
-          _: ExecutionContext
-        ))
-        .expects(url, *, *, *, *, *, *)
-        .returning(Future.successful(response))
-  }
-
   "agentSize" when {
 
     s"http response has $OK status code" should {
@@ -193,6 +156,50 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
           )
 
           userClientDetailsConnector.outstandingWorkItemsExist(arn).futureValue shouldBe None
+        }
+      }
+    }
+  }
+
+  "outstandingAssignmentsWorkItemsExist" when {
+
+    s"http response has $OK status code" should {
+      "return true" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpGet(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/assignments-work-items-exist",
+          HttpResponse(OK, "")
+        )
+
+        userClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn).futureValue shouldBe Some(true)
+      }
+    }
+
+    s"http response has $NO_CONTENT status code" should {
+      "return false" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpGet(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/assignments-work-items-exist",
+          HttpResponse(NO_CONTENT, "")
+        )
+
+        userClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn).futureValue shouldBe Some(false)
+      }
+    }
+
+    "http response has non-200 status codes" should {
+      Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+        s"return nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpGet(
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/assignments-work-items-exist",
+            HttpResponse(statusCode, "")
+          )
+
+          userClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn).futureValue shouldBe None
         }
       }
     }
@@ -334,7 +341,7 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         )
 
         userClientDetailsConnector
-          .pushAssignments(UserEnrolmentAssignments(Set.empty, Set.empty))
+          .pushAssignments(UserEnrolmentAssignments(Set.empty, Set.empty, arn))
           .futureValue shouldBe AssignmentsPushed
       }
     }
@@ -350,7 +357,7 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
           )
 
           userClientDetailsConnector
-            .pushAssignments(UserEnrolmentAssignments(Set.empty, Set.empty))
+            .pushAssignments(UserEnrolmentAssignments(Set.empty, Set.empty, arn))
             .futureValue shouldBe AssignmentsNotPushed
         }
       }
@@ -388,6 +395,43 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         }
       }
     }
+  }
+
+  trait TestScope {
+    lazy val userClientDetailsConnector: UserClientDetailsConnector =
+      new UserClientDetailsConnectorImpl(mockHttpClient, mockMetrics)
+
+    def mockAppConfigAgentUserClientDetailsBaseUrl: CallHandler0[String] =
+      (mockAppConfig.agentUserClientDetailsBaseUrl _)
+        .expects()
+        .returning("http://someBaseUrl")
+        .noMoreThanTwice
+
+    def mockMetricsDefaultRegistry: CallHandler0[MetricRegistry] =
+      (mockMetrics.defaultRegistry _)
+        .expects()
+        .returning(noopMetricRegistry)
+
+    def mockHttpGet[A](url: String, response: A): Unit =
+      (mockHttpClient
+        .GET[A](_: String, _: Seq[(String, String)], _: Seq[(String, String)])(
+          _: HttpReads[A],
+          _: HeaderCarrier,
+          _: ExecutionContext
+        ))
+        .expects(url, *, *, *, *, *)
+        .returning(Future.successful(response))
+
+    def mockHttpPost[I, A](url: String, response: A): Unit =
+      (mockHttpClient
+        .POST[I, A](_: String, _: I, _: Seq[(String, String)])(
+          _: Writes[I],
+          _: HttpReads[A],
+          _: HeaderCarrier,
+          _: ExecutionContext
+        ))
+        .expects(url, *, *, *, *, *, *)
+        .returning(Future.successful(response))
   }
 
 }

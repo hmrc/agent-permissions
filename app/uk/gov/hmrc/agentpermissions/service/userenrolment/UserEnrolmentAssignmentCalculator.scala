@@ -95,7 +95,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
   ) =
     existingAccessGroups
       .filterNot(_.groupName.equalsIgnoreCase(accessGroupToProcess.groupName))
-      .foldLeft(UserEnrolmentAssignments(seedAssigns, seedUnassigns)) {
+      .foldLeft(UserEnrolmentAssignments(seedAssigns, seedUnassigns, accessGroupToProcess.arn)) {
         (userEnrolmentAssignments, existingAccessGroup) =>
           val userEnrolments = explodeUserEnrolments(existingAccessGroup)
 
