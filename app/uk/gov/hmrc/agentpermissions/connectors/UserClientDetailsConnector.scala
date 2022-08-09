@@ -41,6 +41,9 @@ trait UserClientDetailsConnector {
 
   def outstandingWorkItemsExist(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]]
 
+  def outstandingAssignmentsWorkItemsExist(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]]
   def getClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Seq[Client]]]
 
   def pushAssignments(
@@ -106,6 +109,26 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
     val url = new URL(aucdBaseUrl, s"/agent-user-client-details/arn/${arn.value}/work-items-exist")
 
     monitor(s"ConsumedAPI-AgentUserClientDetails-WorkItemsExist-GET") {
+      http.GET[HttpResponse](url.toString).map { response =>
+        response.status match {
+          case OK =>
+            Option(true)
+          case NO_CONTENT =>
+            Option(false)
+          case other =>
+            logger.warn(s"Received $other status: ${response.body}")
+            None
+        }
+      }
+    }
+  }
+
+  override def outstandingAssignmentsWorkItemsExist(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
+    val url = new URL(aucdBaseUrl, s"/agent-user-client-details/arn/${arn.value}/assignments-work-items-exist")
+
+    monitor(s"ConsumedAPI-AgentUserClientDetails-AssignmentsWorkItemsExist-GET") {
       http.GET[HttpResponse](url.toString).map { response =>
         response.status match {
           case OK =>

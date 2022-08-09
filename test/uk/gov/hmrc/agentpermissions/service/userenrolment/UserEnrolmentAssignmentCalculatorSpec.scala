@@ -87,7 +87,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
         accessGroupToCreate,
         Seq(existingAccessGroup1, existingAccessGroup2)
       ) shouldBe
-        Some(UserEnrolmentAssignments(expectedAssigns, expectedUnassigns))
+        Some(UserEnrolmentAssignments(expectedAssigns, expectedUnassigns, arn))
     }
   }
 
@@ -121,7 +121,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
         accessGroupToUpdate,
         Seq(accessGroupToUpdatePreviousVersion, existingAccessGroup2)
       ) shouldBe
-        Some(UserEnrolmentAssignments(expectedAssigns, expectedUnassigns))
+        Some(UserEnrolmentAssignments(expectedAssigns, expectedUnassigns, arn))
     }
   }
 
@@ -147,7 +147,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
 
       userEnrolmentAssignmentCalculator
         .forGroupDeletion(accessGroupToDelete, Seq(accessGroupToDelete, existingAccessGroup2)) shouldBe
-        Some(UserEnrolmentAssignments(expectedAssigns, expectedUnassigns))
+        Some(UserEnrolmentAssignments(expectedAssigns, expectedUnassigns, arn))
     }
   }
 }

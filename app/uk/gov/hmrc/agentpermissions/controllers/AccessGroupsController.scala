@@ -101,7 +101,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
-  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String) = Action.async { implicit request =>
+  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String) = Action.async {
     {
       accessGroupsService
         .get(arn, enrolmentKey)

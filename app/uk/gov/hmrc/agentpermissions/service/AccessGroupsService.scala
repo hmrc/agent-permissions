@@ -221,7 +221,13 @@ class AccessGroupsServiceImpl @Inject() (
     ec: ExecutionContext
   ): Future[Seq[AccessGroupUpdateStatus]] =
     for {
-      maybeGroupDelegatedEnrolments <- userClientDetailsConnector.getClientsWithAssignedUsers(arn)
+      maybeOutstandingAssignmentsWorkItemsExist <- userClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn)
+      maybeGroupDelegatedEnrolments <- maybeOutstandingAssignmentsWorkItemsExist match {
+                                         case None => Future successful None
+                                         case Some(outstandingAssignmentsWorkItemsExist) =>
+                                           if (outstandingAssignmentsWorkItemsExist) Future.successful(None)
+                                           else userClientDetailsConnector.getClientsWithAssignedUsers(arn)
+                                       }
       updateStatuses <-
         maybeGroupDelegatedEnrolments.fold(Future.successful(Seq.empty[AccessGroupUpdateStatus]))(
           groupDelegatedEnrolments => accessGroupSynchronizer.syncWithEacd(arn, groupDelegatedEnrolments, whoIsUpdating)
