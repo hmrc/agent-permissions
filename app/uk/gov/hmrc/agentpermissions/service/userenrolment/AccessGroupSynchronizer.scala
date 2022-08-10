@@ -21,11 +21,13 @@ import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.agentpermissions.service.{AccessGroupNotUpdated, AccessGroupUpdateStatus, AccessGroupUpdated}
+import uk.gov.hmrc.http.HeaderCarrier
 
-import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+
+case class RemovalSet(enrolmentKeysToRemove: Set[String], userIdsToRemove: Set[String])
 
 @ImplementedBy(classOf[AccessGroupSynchronizerImpl])
 trait AccessGroupSynchronizer {
@@ -33,18 +35,27 @@ trait AccessGroupSynchronizer {
     arn: Arn,
     groupDelegatedEnrolments: GroupDelegatedEnrolments,
     whoIsUpdating: AgentUser
-  )(implicit ec: ExecutionContext): Future[Seq[AccessGroupUpdateStatus]]
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupUpdateStatus]]
 }
 
 @Singleton
-class AccessGroupSynchronizerImpl @Inject() (accessGroupsRepository: AccessGroupsRepository)
-    extends AccessGroupSynchronizer with Logging {
+class AccessGroupSynchronizerImpl @Inject() (
+  accessGroupsRepository: AccessGroupsRepository,
+  groupClientsRemover: GroupClientsRemover,
+  groupTeamMembersRemover: GroupTeamMembersRemover
+) extends AccessGroupSynchronizer with Logging {
 
   override def syncWithEacd(
     arn: Arn,
     groupDelegatedEnrolments: GroupDelegatedEnrolments,
     whoIsUpdating: AgentUser
-  )(implicit ec: ExecutionContext): Future[Seq[AccessGroupUpdateStatus]] =
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupUpdateStatus]] =
     for {
       accessGroups <- accessGroupsRepository.get(arn)
       removalSet = calculateRemovalSet(accessGroups, groupDelegatedEnrolments)
@@ -56,27 +67,33 @@ class AccessGroupSynchronizerImpl @Inject() (accessGroupsRepository: AccessGroup
   def calculateRemovalSet(
     accessGroups: Seq[AccessGroup],
     groupDelegatedEnrolments: GroupDelegatedEnrolments
-  ): Set[UserEnrolment] = {
+  ): RemovalSet = {
     val globalGroupView: Set[UserEnrolment] = userEnrolmentsOf(accessGroups)
     val eacdAllocatedView: Set[UserEnrolment] = userEnrolmentsOf(groupDelegatedEnrolments)
 
-    val removalSet = globalGroupView.diff(eacdAllocatedView)
+    val enrolmentKeysToRemove = globalGroupView.map(_.enrolmentKey).diff(eacdAllocatedView.map(_.enrolmentKey))
+    val userIdsToRemove = globalGroupView.map(_.userId).diff(eacdAllocatedView.map(_.userId))
+
+    val removalSet = RemovalSet(enrolmentKeysToRemove, userIdsToRemove)
     logger.info(s"Calculated removal set: $removalSet")
     removalSet
   }
 
   def applyRemovalsOnAccessGroups(
     existingAccessGroups: Seq[AccessGroup],
-    removalSet: Set[UserEnrolment],
+    removalSet: RemovalSet,
     whoIsUpdating: AgentUser
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
   ): Future[Seq[AccessGroup]] = {
 
-    val removalEnrolments: Set[Enrolment] = buildEnrolmentsFromKeys(removalSet.map(_.enrolmentKey)).flatten
-    val removalUserIds: Set[String] = removalSet.map(_.userId)
+    val removalEnrolments: Set[Enrolment] = buildEnrolmentsFromKeys(removalSet.enrolmentKeysToRemove).flatten
+    val removalUserIds: Set[String] = removalSet.userIdsToRemove
 
     Future successful existingAccessGroups
-      .map(removeClientsFromGroup(_, removalEnrolments, whoIsUpdating))
-      .map(removeTeamMembersFromGroup(_, removalUserIds, whoIsUpdating))
+      .map(groupClientsRemover.removeClientsFromGroup(_, removalEnrolments, whoIsUpdating))
+      .map(groupTeamMembersRemover.removeTeamMembersFromGroup(_, removalUserIds, whoIsUpdating))
   }
 
   def persistAccessGroups(accessGroups: Seq[AccessGroup])(implicit
@@ -127,81 +144,5 @@ class AccessGroupSynchronizerImpl @Inject() (accessGroupsRepository: AccessGroup
           None
       }
     }
-
-  private def removeClientsFromGroup(
-    accessGroup: AccessGroup,
-    removalEnrolments: Set[Enrolment],
-    whoIsUpdating: AgentUser
-  ): AccessGroup = {
-
-    def findEnrolmentsToRemoveFromAccessGroup(enrolmentsOfAccessGroup: Set[Enrolment]): Set[Enrolment] =
-      enrolmentsOfAccessGroup.foldLeft(Set.empty[Enrolment]) { (acc, enrolmentOfAccessGroup) =>
-        removalEnrolments.find(removalEnrolment =>
-          removalEnrolment.service == enrolmentOfAccessGroup.service && removalEnrolment.identifiers == enrolmentOfAccessGroup.identifiers
-        ) match {
-          case None        => acc
-          case Some(found) => acc + found
-        }
-      }
-
-    accessGroup.clients match {
-      case None =>
-        accessGroup
-      case Some(enrolments) =>
-        val enrolmentsToRemoveFromAccessGroup = findEnrolmentsToRemoveFromAccessGroup(enrolments)
-
-        if (enrolmentsToRemoveFromAccessGroup.nonEmpty) {
-          accessGroup.copy(
-            lastUpdated = LocalDateTime.now(),
-            lastUpdatedBy = whoIsUpdating,
-            clients = Some(
-              enrolments.filterNot(enrolment =>
-                enrolmentsToRemoveFromAccessGroup.exists(enrolmentToRemove =>
-                  enrolmentToRemove.service == enrolment.service && enrolmentToRemove.identifiers == enrolment.identifiers
-                )
-              )
-            )
-          )
-        } else {
-          accessGroup
-        }
-    }
-  }
-
-  private def removeTeamMembersFromGroup(
-    accessGroup: AccessGroup,
-    removalUserIds: Set[String],
-    whoIsUpdating: AgentUser
-  ) = {
-
-    def findUsersToRemoveFromAccessGroup(agentUsersOfAccessGroup: Set[AgentUser]) =
-      agentUsersOfAccessGroup.foldLeft(Set.empty[AgentUser]) { (acc, agentUserOfAccessGroup) =>
-        removalUserIds.find(_ == agentUserOfAccessGroup.id) match {
-          case None    => acc
-          case Some(_) => acc + agentUserOfAccessGroup
-        }
-      }
-
-    accessGroup.teamMembers match {
-      case None =>
-        accessGroup
-      case Some(agentUsers) =>
-        val usersToRemoveFromAccessGroup = findUsersToRemoveFromAccessGroup(agentUsers)
-
-        if (usersToRemoveFromAccessGroup.nonEmpty) {
-          accessGroup.copy(
-            lastUpdated = LocalDateTime.now(),
-            lastUpdatedBy = whoIsUpdating,
-            teamMembers = Some(
-              agentUsers.filterNot(agentUser =>
-                usersToRemoveFromAccessGroup.exists(userToRemove => agentUser.id == userToRemove.id)
-              )
-            )
-          )
-        } else {
-          accessGroup
-        }
-    }
-  }
 
 }

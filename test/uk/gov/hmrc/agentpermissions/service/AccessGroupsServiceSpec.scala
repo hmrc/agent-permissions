@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.bson.types.ObjectId
-import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler5}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
@@ -540,10 +540,12 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     def mockAccessGroupSynchronizerSyncWithEacd(
       accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
-    ): CallHandler4[Arn, GroupDelegatedEnrolments, AgentUser, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
+    ): CallHandler5[Arn, GroupDelegatedEnrolments, AgentUser, HeaderCarrier, ExecutionContext, Future[
+      Seq[AccessGroupUpdateStatus]
+    ]] =
       (mockAccessGroupSynchronizer
-        .syncWithEacd(_: Arn, _: GroupDelegatedEnrolments, _: AgentUser)(_: ExecutionContext))
-        .expects(arn, *, *, *)
+        .syncWithEacd(_: Arn, _: GroupDelegatedEnrolments, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *, *, *)
         .returning(Future successful accessGroupUpdateStatuses)
 
   }

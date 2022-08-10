@@ -229,9 +229,12 @@ class AccessGroupsServiceImpl @Inject() (
                                            else userClientDetailsConnector.getClientsWithAssignedUsers(arn)
                                        }
       updateStatuses <-
-        maybeGroupDelegatedEnrolments.fold(Future.successful(Seq.empty[AccessGroupUpdateStatus]))(
-          groupDelegatedEnrolments => accessGroupSynchronizer.syncWithEacd(arn, groupDelegatedEnrolments, whoIsUpdating)
-        )
+        maybeGroupDelegatedEnrolments match {
+          case None =>
+            Future successful Seq.empty[AccessGroupUpdateStatus]
+          case Some(groupDelegatedEnrolments) =>
+            accessGroupSynchronizer.syncWithEacd(arn, groupDelegatedEnrolments, whoIsUpdating)
+        }
     } yield updateStatuses
 
   private val toKey: Enrolment => String = (enrolment: Enrolment) => {
