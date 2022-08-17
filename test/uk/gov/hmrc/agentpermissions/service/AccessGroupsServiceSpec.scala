@@ -123,8 +123,26 @@ class AccessGroupsServiceSpec extends BaseSpec {
           Seq(ag1, ag2)
         )
 
-        accessGroupsService.get(arn, "HMRC-CGT-PD~CGTPDRef~XMCGTP123456789").futureValue shouldBe
+        accessGroupsService.getGroupSummariesForClient(arn, "HMRC-CGT-PD~CGTPDRef~XMCGTP123456789").futureValue shouldBe
           Seq(AccessGroupSummary(ag1._id.toHexString, "some group", 3, 3))
+      }
+    }
+  }
+
+  "Fetching groups for team member" when {
+
+    "groups found" should {
+      "return corresponding summaries" in new TestScope {
+
+        val ag1 = accessGroup
+        val ag2 = accessGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
+
+        mockAccessGroupsRepositoryGetAll(
+          Seq(ag1, ag2)
+        )
+
+        accessGroupsService.getGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
+          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", 3, 1))
       }
     }
   }
@@ -385,6 +403,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
     val insertedId = "insertedId"
     val user1: AgentUser = AgentUser("user1", "User 1")
     val user2: AgentUser = AgentUser("user2", "User 2")
+    val user3: AgentUser = AgentUser("user3", "User 3")
     val enrolment1: Enrolment =
       Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
     val enrolment2: Enrolment = Enrolment(
