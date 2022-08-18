@@ -104,7 +104,15 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   def getGroupSummariesForClient(arn: Arn, enrolmentKey: String) = Action.async {
     {
       accessGroupsService
-        .get(arn, enrolmentKey)
+        .getGroupSummariesForClient(arn, enrolmentKey)
+        .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
+    } transformWith failureHandler
+  }
+
+  def getGroupSummariesForTeamMember(arn: Arn, userId: String) = Action.async {
+    {
+      accessGroupsService
+        .getGroupSummariesForTeamMember(arn, userId)
         .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
     } transformWith failureHandler
   }

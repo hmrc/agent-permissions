@@ -40,7 +40,13 @@ trait AccessGroupsService {
 
   def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]]
 
-  def get(arn: Arn, enrolmentKey: String)(implicit ec: ExecutionContext): Future[Seq[AccessGroupSummary]]
+  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupSummary]]
+
+  def getGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupSummary]]
 
   def delete(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus]
 
@@ -113,12 +119,25 @@ class AccessGroupsServiceImpl @Inject() (
   override def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]] =
     accessGroupsRepository.get(groupId.arn, groupId.groupName)
 
-  override def get(arn: Arn, enrolmentKey: String)(implicit ec: ExecutionContext): Future[Seq[AccessGroupSummary]] =
+  override def getGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupSummary]] =
     accessGroupsRepository
       .get(arn)
       .map(accessGroups =>
         accessGroups
           .filter(_.clients.fold(false)(_.map(toKey(_)).contains(enrolmentKey)))
+          .map(AccessGroupSummary.convert(_))
+      )
+
+  override def getGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupSummary]] =
+    accessGroupsRepository
+      .get(arn)
+      .map(accessGroups =>
+        accessGroups
+          .filter(_.teamMembers.fold(false)(_.map(_.id).contains(userId)))
           .map(AccessGroupSummary.convert(_))
       )
 

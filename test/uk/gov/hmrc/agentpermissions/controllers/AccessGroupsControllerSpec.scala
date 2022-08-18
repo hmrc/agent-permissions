@@ -399,7 +399,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
   }
 
-  "Call to get groups for client" should {
+  "Call to get groups summaries for client" should {
 
     "return only groups that the client is in" in new TestScope {
       mockAccessGroupsServiceGetGroupsForClient(Seq(AccessGroupSummary(dbId.toHexString, groupName, 3, 3)))
@@ -426,6 +426,39 @@ class AccessGroupsControllerSpec extends BaseSpec {
       mockAccessGroupsServiceGetGroupsForClientWithException(new NullPointerException("bad"))
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
+
+      status(result) shouldBe INTERNAL_SERVER_ERROR
+    }
+
+  }
+
+  "Call to get groups summaries for a team member" should {
+
+    "return only groups that the team member is in" in new TestScope {
+      mockAccessGroupsServiceGetGroupsForTeamMember(Seq(AccessGroupSummary(dbId.toHexString, groupName, 3, 3)))
+
+      val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
+
+      status(result) shouldBe OK
+
+      contentAsJson(result) shouldBe Json.parse(
+        s"""[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":3,"teamMemberCount":3}]"""
+      )
+
+    }
+
+    "return Not Found if there are no groups for the team member" in new TestScope {
+      mockAccessGroupsServiceGetGroupsForTeamMember(Seq.empty)
+
+      val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
+
+      status(result) shouldBe NOT_FOUND
+    }
+
+    s"return $INTERNAL_SERVER_ERROR if there was some exception" in new TestScope {
+      mockAccessGroupsServiceGetGroupsForTeamMemberWithException(new NullPointerException("bad"))
+
+      val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
 
       status(result) shouldBe INTERNAL_SERVER_ERROR
     }
@@ -1011,7 +1044,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       accessGroupSummaries: Seq[AccessGroupSummary]
     ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
       (mockAccessGroupsService
-        .get(_: Arn, _: String)(_: ExecutionContext))
+        .getGroupSummariesForClient(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful accessGroupSummaries)
 
@@ -1019,7 +1052,23 @@ class AccessGroupsControllerSpec extends BaseSpec {
       ex: Exception
     ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
       (mockAccessGroupsService
-        .get(_: Arn, _: String)(_: ExecutionContext))
+        .getGroupSummariesForClient(_: Arn, _: String)(_: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceGetGroupsForTeamMember(
+      accessGroupSummaries: Seq[AccessGroupSummary]
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockAccessGroupsService
+        .getGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future successful accessGroupSummaries)
+
+    def mockAccessGroupsServiceGetGroupsForTeamMemberWithException(
+      ex: Exception
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockAccessGroupsService
+        .getGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 

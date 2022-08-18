@@ -14,3 +14,4 @@ PUT     /groups/:gid/add-unassigned           uk.gov.hmrc.agentpermissions.contr
 GET    /arn/:arn/access-group-name-check   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupNameCheck(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, name: String)
 PATCH   /arn/:arn/sync                      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/client/:enrolmentKey/groups uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForClient(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, enrolmentKey)
+GET     /arn/:arn/team-member/:userId/groups  uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForTeamMember(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, userId: String)
