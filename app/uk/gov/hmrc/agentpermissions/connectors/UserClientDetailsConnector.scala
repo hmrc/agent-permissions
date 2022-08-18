@@ -144,10 +144,13 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
   }
 
   override def getClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Seq[Client]]] = {
-    val url = new URL(aucdBaseUrl, s"/agent-user-client-details/arn/${arn.value}/client-list")
+    val url = aucdBaseUrl + s"/agent-user-client-details/arn/${arn.value}/client-list"
+
+    def buildHeaders: Seq[(String, String)] =
+      Seq("PLAY_LANG" -> hc.otherHeaders.toMap.getOrElse("PLAY_LANG", ""))
 
     monitor("ConsumedAPI-AgentUserClientDetails-ClientList-GET") {
-      http.GET[HttpResponse](url).map { response =>
+      http.GET[HttpResponse](url, queryParams = Seq.empty[(String, String)], headers = buildHeaders).map { response =>
         response.status match {
           case ACCEPTED | OK =>
             response.json.asOpt[Seq[Client]]
