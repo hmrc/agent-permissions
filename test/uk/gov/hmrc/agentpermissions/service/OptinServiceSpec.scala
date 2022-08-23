@@ -18,11 +18,13 @@ package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.{CallHandler1, CallHandler3, CallHandler4}
 import play.api.http.Status.OK
+import play.api.libs.json.JsObject
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, RecordInserted, RecordUpdated, UpsertType}
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
@@ -39,6 +41,7 @@ class OptinServiceSpec extends BaseSpec {
     val mockOptedInStatusHandler: OptedInStatusHandler = mock[OptedInStatusHandler]
     val mockNotOptedInStatusHandler: NotOptedInStatusHandler = mock[NotOptedInStatusHandler]
     val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
+    val mockAuditConnector: AuditConnector = mock[AuditConnector]
 
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
@@ -49,7 +52,8 @@ class OptinServiceSpec extends BaseSpec {
         mockOptinRecordBuilder,
         mockOptedInStatusHandler,
         mockNotOptedInStatusHandler,
-        mockUserClientDetailsConnector
+        mockUserClientDetailsConnector,
+        mockAuditConnector
       )
 
     def mockOptinRepositoryGet(maybeOptinRecord: Option[OptinRecord]): CallHandler1[Arn, Future[Option[OptinRecord]]] =
@@ -90,6 +94,12 @@ class OptinServiceSpec extends BaseSpec {
         .expects(arn, executionContext, headerCarrier)
         .returning(Future.successful(maybeOptinStatus))
 
+    def mockAuditConnectorSendExplicitAudit(): CallHandler4[String, JsObject, HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditConnector
+        .sendExplicitAudit(_: String, _: JsObject)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(())
+
     def mockUserClientDetailsConnectorGetClientListStatus(
       maybeClientListStatus: Option[Int]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Int]]] =
@@ -110,6 +120,7 @@ class OptinServiceSpec extends BaseSpec {
           Some(OptinRecord(arn, List(OptinEvent(OptedIn, user, LocalDateTime.now()))))
         mockOptinRecordBuilderForUpdating(None, maybeOptinRecordToUpdate, OptedIn)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordInserted(insertedId)))
+        mockAuditConnectorSendExplicitAudit()
         mockUserClientDetailsConnectorGetClientListStatus(Some(OK))
 
         whenReady(optinService.optin(arn, user)) { maybeOptinRequestStatus =>
@@ -146,6 +157,7 @@ class OptinServiceSpec extends BaseSpec {
         )
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, maybeOptinRecordToUpdate, OptedIn)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordUpdated))
+        mockAuditConnectorSendExplicitAudit()
         mockUserClientDetailsConnectorGetClientListStatus(Some(OK))
 
         whenReady(optinService.optin(arn, user)) { maybeOptinRequestStatus =>
@@ -166,6 +178,7 @@ class OptinServiceSpec extends BaseSpec {
           Some(OptinRecord(arn, List(OptinEvent(OptedOut, user, LocalDateTime.now()))))
         mockOptinRecordBuilderForUpdating(None, maybeOptinRecordToUpdate, OptedOut)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordInserted(insertedId)))
+        mockAuditConnectorSendExplicitAudit()
         mockUserClientDetailsConnectorGetClientListStatus(Some(OK))
 
         whenReady(optinService.optout(arn, user)) { maybeOptoutRequestStatus =>
@@ -202,6 +215,7 @@ class OptinServiceSpec extends BaseSpec {
         )
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, maybeOptinRecordToUpdate, OptedOut)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordUpdated))
+        mockAuditConnectorSendExplicitAudit()
         mockUserClientDetailsConnectorGetClientListStatus(Some(OK))
 
         whenReady(optinService.optout(arn, user)) { maybeOptoutRequestStatus =>

@@ -1010,18 +1010,18 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAccessGroupsServiceDelete(
       accessGroupDeletionStatus: AccessGroupDeletionStatus
-    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
+    ): CallHandler4[GroupId, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
       (mockAccessGroupsService
-        .delete(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
+        .delete(_: GroupId, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
         .returning(Future.successful(accessGroupDeletionStatus))
 
     def mockAccessGroupsServiceDeleteWithException(
       ex: Exception
-    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
+    ): CallHandler4[GroupId, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
       (mockAccessGroupsService
-        .delete(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
+        .delete(_: GroupId, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
         .returning(Future.failed(ex))
 
     def mockAccessGroupsServiceGetUnassignedClients(

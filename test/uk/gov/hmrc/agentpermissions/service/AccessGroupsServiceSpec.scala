@@ -17,13 +17,15 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.bson.types.ObjectId
-import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler5}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4, CallHandler5}
+import play.api.libs.json.JsObject
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.agentpermissions.service.userenrolment.{AccessGroupSynchronizer, UserEnrolmentAssignmentService}
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
@@ -64,6 +66,8 @@ class AccessGroupsServiceSpec extends BaseSpec {
             mockAccessGroupsRepositoryGet(None)
             mockAccessGroupsRepositoryInsert(Some(insertedId))
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
+            mockAuditConnectorSendExplicitAudit("GranularPermissionsES11AssignmentsUnassignmentsPushed")
+            mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupCreated")
 
             accessGroupsService
               .create(accessGroup)
@@ -77,6 +81,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
             mockAccessGroupsRepositoryGet(None)
             mockAccessGroupsRepositoryInsert(Some(insertedId))
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
+            mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupCreated")
 
             accessGroupsService
               .create(accessGroup)
@@ -116,8 +121,8 @@ class AccessGroupsServiceSpec extends BaseSpec {
     "groups found" should {
       "return corresponding summaries" in new TestScope {
 
-        val ag1 = accessGroup
-        val ag2 = accessGroup.copy(groupName = "group 2", clients = Some(Set(enrolment1)))
+        val ag1: AccessGroup = accessGroup
+        val ag2: AccessGroup = accessGroup.copy(groupName = "group 2", clients = Some(Set(enrolment1)))
 
         mockAccessGroupsRepositoryGetAll(
           Seq(ag1, ag2)
@@ -134,8 +139,8 @@ class AccessGroupsServiceSpec extends BaseSpec {
     "groups found" should {
       "return corresponding summaries" in new TestScope {
 
-        val ag1 = accessGroup
-        val ag2 = accessGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
+        val ag1: AccessGroup = accessGroup
+        val ag2: AccessGroup = accessGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
 
         mockAccessGroupsRepositoryGetAll(
           Seq(ag1, ag2)
@@ -166,7 +171,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(None)
         mockAccessGroupsRepositoryDelete(None)
 
-        accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupNotDeleted
+        accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupNotDeleted
       }
     }
 
@@ -177,7 +182,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
           mockAccessGroupsRepositoryDelete(Some(0L))
 
-          accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupNotDeleted
+          accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupNotDeleted
         }
       }
 
@@ -188,8 +193,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
             mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
             mockAccessGroupsRepositoryDelete(Some(1L))
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
+            mockAuditConnectorSendExplicitAudit("GranularPermissionsES11AssignmentsUnassignmentsPushed")
+            mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted")
 
-            accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupDeleted
+            accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupDeleted
           }
         }
 
@@ -198,8 +205,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
             mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
             mockAccessGroupsRepositoryDelete(Some(1L))
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
+            mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted")
 
-            accessGroupsService.delete(groupId).futureValue shouldBe AccessGroupDeletedWithoutAssignmentsPushed
+            accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupDeletedWithoutAssignmentsPushed
           }
         }
       }
@@ -234,6 +242,8 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
           mockAccessGroupsRepositoryUpdate(Some(1))
           mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
+          mockAuditConnectorSendExplicitAudit("GranularPermissionsES11AssignmentsUnassignmentsPushed")
+          mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated")
 
           accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupUpdated
         }
@@ -244,6 +254,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
           mockAccessGroupsRepositoryUpdate(Some(1))
           mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
+          mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated")
 
           accessGroupsService
             .update(groupId, accessGroup, user)
@@ -438,13 +449,15 @@ class AccessGroupsServiceSpec extends BaseSpec {
     val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
     val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
     val mockAccessGroupSynchronizer: AccessGroupSynchronizer = mock[AccessGroupSynchronizer]
+    val mockAuditConnector: AuditConnector = mock[AuditConnector]
 
     val accessGroupsService: AccessGroupsService =
       new AccessGroupsServiceImpl(
         mockAccessGroupsRepository,
         mockUserEnrolmentAssignmentService,
         mockUserClientDetailsConnector,
-        mockAccessGroupSynchronizer
+        mockAccessGroupSynchronizer,
+        mockAuditConnector
       )
 
     val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)
@@ -566,6 +579,14 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .syncWithEacd(_: Arn, _: GroupDelegatedEnrolments, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *, *, *)
         .returning(Future successful accessGroupUpdateStatuses)
+
+    def mockAuditConnectorSendExplicitAudit(
+      eventType: String
+    ): CallHandler4[String, JsObject, HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditConnector
+        .sendExplicitAudit(_: String, _: JsObject)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(eventType, *, *, *)
+        .returning(())
 
   }
 

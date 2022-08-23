@@ -101,7 +101,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
-  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String) = Action.async {
+  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
     {
       accessGroupsService
         .getGroupSummariesForClient(arn, enrolmentKey)
@@ -109,7 +109,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
-  def getGroupSummariesForTeamMember(arn: Arn, userId: String) = Action.async {
+  def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async {
     {
       accessGroupsService
         .getGroupSummariesForTeamMember(arn, userId)
@@ -121,7 +121,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     withAuthorisedAgent { authorisedAgent =>
       withGroupId(gid, authorisedAgent.arn) { (groupId, _) =>
         for {
-          groupDeletionStatus <- accessGroupsService.delete(groupId)
+          groupDeletionStatus <- accessGroupsService.delete(groupId, authorisedAgent.agentUser)
         } yield groupDeletionStatus match {
           case AccessGroupNotDeleted =>
             logger.info("Access group was not deleted")
