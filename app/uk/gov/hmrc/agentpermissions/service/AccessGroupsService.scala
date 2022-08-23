@@ -18,11 +18,13 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
+import play.api.libs.json.Json
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.agentpermissions.service.userenrolment.{AccessGroupSynchronizer, UserEnrolmentAssignmentService}
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
 import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
@@ -48,7 +50,10 @@ trait AccessGroupsService {
     ec: ExecutionContext
   ): Future[Seq[AccessGroupSummary]]
 
-  def delete(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus]
+  def delete(groupId: GroupId, agentUser: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[AccessGroupDeletionStatus]
 
   def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
@@ -72,25 +77,15 @@ class AccessGroupsServiceImpl @Inject() (
   accessGroupsRepository: AccessGroupsRepository,
   userEnrolmentAssignmentService: UserEnrolmentAssignmentService,
   userClientDetailsConnector: UserClientDetailsConnector,
-  accessGroupSynchronizer: AccessGroupSynchronizer
+  accessGroupSynchronizer: AccessGroupSynchronizer,
+  auditConnector: AuditConnector
 ) extends AccessGroupsService with Logging {
 
   override def getById(id: String): Future[Option[AccessGroup]] = accessGroupsRepository.findById(id)
 
   override def create(
     accessGroup: AccessGroup
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus] = {
-
-    def pushAssignments(
-      maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
-    ): Future[EacdAssignmentsPushStatus] =
-      userEnrolmentAssignmentService.pushCalculatedAssignments(
-        maybeCalculatedAssignments
-      ) map { pushStatus =>
-        logger.info(s"Push status: $pushStatus")
-        pushStatus
-      }
-
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus] =
     accessGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
       case Some(_) =>
         Future.successful(AccessGroupExistsForCreation)
@@ -102,7 +97,15 @@ class AccessGroupsServiceImpl @Inject() (
                                          case None =>
                                            Future.successful(AccessGroupNotCreated)
                                          case Some(creationId) =>
-                                           pushAssignments(maybeCalculatedAssignments) map { pushStatus =>
+                                           for {
+                                             pushStatus <- pushAssignments(maybeCalculatedAssignments, accessGroup.arn)
+                                             _ <- Future successful auditAccessGroupEvent(
+                                                    "GranularPermissionsAccessGroupCreated",
+                                                    accessGroup.arn,
+                                                    accessGroup.groupName,
+                                                    accessGroup.createdBy
+                                                  )
+                                           } yield {
                                              logger.info(s"Created access group. DB id: '$creationId")
 
                                              if (pushStatus == AssignmentsPushed) AccessGroupCreated(creationId)
@@ -111,7 +114,6 @@ class AccessGroupsServiceImpl @Inject() (
                                        }
         } yield accessGroupCreationStatus
     }
-  }
 
   override def getAllGroups(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]] =
     accessGroupsRepository.get(arn)
@@ -127,7 +129,7 @@ class AccessGroupsServiceImpl @Inject() (
       .map(accessGroups =>
         accessGroups
           .filter(_.clients.fold(false)(_.map(toKey(_)).contains(enrolmentKey)))
-          .map(AccessGroupSummary.convert(_))
+          .map(AccessGroupSummary.convert)
       )
 
   override def getGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
@@ -138,23 +140,13 @@ class AccessGroupsServiceImpl @Inject() (
       .map(accessGroups =>
         accessGroups
           .filter(_.teamMembers.fold(false)(_.map(_.id).contains(userId)))
-          .map(AccessGroupSummary.convert(_))
+          .map(AccessGroupSummary.convert)
       )
 
   override def delete(
-    groupId: GroupId
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus] = {
-
-    def pushAssignments(
-      maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
-    ): Future[EacdAssignmentsPushStatus] =
-      userEnrolmentAssignmentService.pushCalculatedAssignments(
-        maybeCalculatedAssignments
-      ) map { pushStatus =>
-        logger.info(s"Push status: $pushStatus")
-        pushStatus
-      }
-
+    groupId: GroupId,
+    agentUser: AgentUser
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus] =
     for {
       maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupDeletion(groupId)
       maybeDeletedCount          <- accessGroupsRepository.delete(groupId.arn, groupId.groupName)
@@ -163,7 +155,15 @@ class AccessGroupsServiceImpl @Inject() (
                                        Future.successful(AccessGroupNotDeleted)
                                      case Some(deletedCount) =>
                                        if (deletedCount == 1L) {
-                                         pushAssignments(maybeCalculatedAssignments) map {
+                                         for {
+                                           pushStatus <- pushAssignments(maybeCalculatedAssignments, groupId.arn)
+                                           _ <- Future successful auditAccessGroupEvent(
+                                                  "GranularPermissionsAccessGroupDeleted",
+                                                  groupId.arn,
+                                                  groupId.groupName,
+                                                  agentUser
+                                                )
+                                         } yield pushStatus match {
                                            case AssignmentsPushed =>
                                              AccessGroupDeleted
                                            case AssignmentsNotPushed =>
@@ -174,23 +174,11 @@ class AccessGroupsServiceImpl @Inject() (
                                        }
                                    }
     } yield accessGroupDeletionStatus
-  }
 
   override def update(groupId: GroupId, accessGroup: AccessGroup, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[AccessGroupUpdateStatus] = {
-
-    def pushAssignments(
-      maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
-    ): Future[EacdAssignmentsPushStatus] =
-      userEnrolmentAssignmentService.pushCalculatedAssignments(
-        maybeCalculatedAssignments
-      ) map { pushStatus =>
-        logger.info(s"Push status: $pushStatus")
-        pushStatus
-      }
-
+  ): Future[AccessGroupUpdateStatus] =
     for {
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
       maybeCalculatedAssignments   <- userEnrolmentAssignmentService.calculateForGroupUpdate(groupId, accessGroup)
@@ -200,7 +188,15 @@ class AccessGroupsServiceImpl @Inject() (
                                      Future.successful(AccessGroupNotUpdated)
                                    case Some(updatedCount) =>
                                      if (updatedCount == 1L) {
-                                       pushAssignments(maybeCalculatedAssignments) map {
+                                       for {
+                                         pushStatus <- pushAssignments(maybeCalculatedAssignments, groupId.arn)
+                                         _ <- Future successful auditAccessGroupEvent(
+                                                "GranularPermissionsAccessGroupUpdated",
+                                                groupId.arn,
+                                                groupId.groupName,
+                                                whoIsUpdating
+                                              )
+                                       } yield pushStatus match {
                                          case AssignmentsPushed =>
                                            AccessGroupUpdated
                                          case AssignmentsNotPushed =>
@@ -211,7 +207,6 @@ class AccessGroupsServiceImpl @Inject() (
                                      }
                                  }
     } yield accessGroupUpdateStatus
-  }
 
   override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
     for {
@@ -264,6 +259,41 @@ class AccessGroupsServiceImpl @Inject() (
     }
     s"$service~$identifier"
   }
+
+  private def pushAssignments(
+    maybeCalculatedAssignments: Option[UserEnrolmentAssignments],
+    arn: Arn
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[EacdAssignmentsPushStatus] =
+    for {
+      pushStatus <- userEnrolmentAssignmentService.pushCalculatedAssignments(maybeCalculatedAssignments)
+    } yield {
+      if (pushStatus == AssignmentsPushed) {
+        auditEs11AssignmentUnassignments(maybeCalculatedAssignments)
+      }
+      logger.info(s"Push status: $pushStatus")
+      pushStatus
+    }
+
+  private def auditAccessGroupEvent(eventType: String, arn: Arn, groupName: String, agentUser: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Unit =
+    auditConnector.sendExplicitAudit(
+      auditType = eventType,
+      Json.obj("arn" -> s"${arn.value}", "groupName" -> s"$groupName", "user" -> agentUser)
+    )
+
+  private def auditEs11AssignmentUnassignments(maybeCalculatedAssignments: Option[UserEnrolmentAssignments])(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Unit =
+    auditConnector.sendExplicitAudit(
+      "GranularPermissionsES11AssignmentsUnassignmentsPushed",
+      Json.obj("value" -> maybeCalculatedAssignments)
+    )
 
 }
 
