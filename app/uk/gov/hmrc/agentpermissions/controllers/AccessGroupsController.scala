@@ -22,6 +22,7 @@ import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.auth.core.AuthorisationException
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import java.time.LocalDateTime
@@ -224,7 +225,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
 
   private def withGroupId(gid: String, authorisedArn: Arn)(
     body: (GroupId, AccessGroup) => Future[Result]
-  ): Future[Result] =
+  )(implicit hc: HeaderCarrier): Future[Result] =
     accessGroupsService.getById(gid) flatMap {
       case None =>
         logger.warn(s"Group not found for '$gid', cannot update")
