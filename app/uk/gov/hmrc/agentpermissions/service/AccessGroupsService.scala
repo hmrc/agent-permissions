@@ -32,15 +32,15 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[AccessGroupsServiceImpl])
 trait AccessGroupsService {
-  def getById(id: String): Future[Option[AccessGroup]]
+  def getById(id: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[AccessGroup]]
 
   def create(
     accessGroup: AccessGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus]
 
-  def getAllGroups(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]]
+  def getAllGroups(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[AccessGroup]]
 
-  def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]]
+  def get(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[AccessGroup]]
 
   def getGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     ec: ExecutionContext
@@ -81,7 +81,10 @@ class AccessGroupsServiceImpl @Inject() (
   auditConnector: AuditConnector
 ) extends AccessGroupsService with Logging {
 
-  override def getById(id: String): Future[Option[AccessGroup]] = accessGroupsRepository.findById(id)
+  override def getById(id: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[AccessGroup]] =
+    accessGroupsRepository
+      .findById(id)
+      .flatMap(withClientNames)
 
   override def create(
     accessGroup: AccessGroup
@@ -92,7 +95,7 @@ class AccessGroupsServiceImpl @Inject() (
       case _ =>
         for {
           maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupCreation(accessGroup)
-          maybeCreationId            <- accessGroupsRepository.insert(accessGroup)
+          maybeCreationId            <- accessGroupsRepository.insert(withClientNamesRemoved(accessGroup))
           accessGroupCreationStatus <- maybeCreationId match {
                                          case None =>
                                            Future.successful(AccessGroupNotCreated)
@@ -115,11 +118,15 @@ class AccessGroupsServiceImpl @Inject() (
         } yield accessGroupCreationStatus
     }
 
-  override def getAllGroups(arn: Arn)(implicit ec: ExecutionContext): Future[Seq[AccessGroup]] =
-    accessGroupsRepository.get(arn)
+  override def getAllGroups(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[AccessGroup]] =
+    accessGroupsRepository
+      .get(arn)
+      .flatMap(withClientNames)
 
-  override def get(groupId: GroupId)(implicit ec: ExecutionContext): Future[Option[AccessGroup]] =
-    accessGroupsRepository.get(groupId.arn, groupId.groupName)
+  override def get(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[AccessGroup]] =
+    accessGroupsRepository
+      .get(groupId.arn, groupId.groupName)
+      .flatMap(withClientNames)
 
   override def getGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     ec: ExecutionContext
@@ -182,7 +189,9 @@ class AccessGroupsServiceImpl @Inject() (
     for {
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
       maybeCalculatedAssignments   <- userEnrolmentAssignmentService.calculateForGroupUpdate(groupId, accessGroup)
-      maybeUpdatedCount <- accessGroupsRepository.update(groupId.arn, groupId.groupName, accessGroupWithWhoIsUpdating)
+      maybeUpdatedCount <-
+        accessGroupsRepository
+          .update(groupId.arn, groupId.groupName, withClientNamesRemoved(accessGroupWithWhoIsUpdating))
       accessGroupUpdateStatus <- maybeUpdatedCount match {
                                    case None =>
                                      Future.successful(AccessGroupNotUpdated)
@@ -295,6 +304,45 @@ class AccessGroupsServiceImpl @Inject() (
       Json.obj("value" -> maybeCalculatedAssignments)
     )
 
+  private def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup = {
+    val nameRemover: Enrolment => Enrolment = (e: Enrolment) => e.copy(friendlyName = "")
+    accessGroup.copy(clients = accessGroup.clients.map(_.map(nameRemover)))
+  }
+
+  private def withClientNames(
+    accessGroup: Option[AccessGroup]
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[AccessGroup]] =
+    accessGroup.fold(Future successful Option.empty[AccessGroup])(ag =>
+      userClientDetailsConnector.getClients(ag.arn).map { case Some(clients) =>
+        Option.apply(ag.copy(clients = copyNamesToEnrolments(ag.clients)(clients)))
+      }
+    )
+
+  private def copyNamesToEnrolments(enrolments: Option[Set[Enrolment]])(clients: Seq[Client]): Option[Set[Enrolment]] =
+    enrolments
+      .map(
+        _.map(enrolment =>
+          enrolment.copy(friendlyName =
+            clients.find(_.enrolmentKey == EnrolmentKey.enrolmentKeys(enrolment).head) match {
+              case Some(client) => client.friendlyName
+              case None         => ""
+            }
+          )
+        )
+      )
+
+  private def withClientNames(
+    accessGroups: Seq[AccessGroup]
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[AccessGroup]] =
+    accessGroups match {
+      case Nil => Future successful accessGroups
+      case accessGroups =>
+        userClientDetailsConnector.getClients(accessGroups.head.arn).map { case Some(clients) =>
+          accessGroups.map(accessGroup =>
+            accessGroup.copy(clients = copyNamesToEnrolments(accessGroup.clients)(clients))
+          )
+        }
+    }
 }
 
 sealed trait AccessGroupCreationStatus

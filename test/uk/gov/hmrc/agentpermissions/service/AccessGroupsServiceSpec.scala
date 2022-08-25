@@ -36,7 +36,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     "group of that name already exists" should {
       s"return $AccessGroupExistsForCreation" in new TestScope {
-        mockAccessGroupsRepositoryGet(Some(accessGroup))
+        mockAccessGroupsRepositoryGet(Some(accessGroupInMongo))
 
         accessGroupsService
           .create(accessGroup)
@@ -50,7 +50,8 @@ class AccessGroupsServiceSpec extends BaseSpec {
         s"return $AccessGroupNotCreated" in new TestScope {
           mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(None)
           mockAccessGroupsRepositoryGet(None)
-          mockAccessGroupsRepositoryInsert(None)
+
+          mockAccessGroupsRepositoryInsert(accessGroupInMongo, None)
 
           accessGroupsService
             .create(accessGroup)
@@ -64,7 +65,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           s"return $AccessGroupCreated" in new TestScope {
             mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(maybeUserEnrolmentAssignments)
             mockAccessGroupsRepositoryGet(None)
-            mockAccessGroupsRepositoryInsert(Some(insertedId))
+            mockAccessGroupsRepositoryInsert(accessGroupInMongo, Some(insertedId))
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
             mockAuditConnectorSendExplicitAudit("GranularPermissionsES11AssignmentsUnassignmentsPushed")
             mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupCreated")
@@ -79,7 +80,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           s"return $AccessGroupCreatedWithoutAssignmentsPushed" in new TestScope {
             mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(maybeUserEnrolmentAssignments)
             mockAccessGroupsRepositoryGet(None)
-            mockAccessGroupsRepositoryInsert(Some(insertedId))
+            mockAccessGroupsRepositoryInsert(accessGroupInMongo, Some(insertedId))
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
             mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupCreated")
 
@@ -96,10 +97,20 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     "access groups exist" should {
       "return corresponding groups" in new TestScope {
-        mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+        mockAccessGroupsRepositoryGetAll(Seq(accessGroupInMongo))
+        mockUserClientDetailsConnectorGetClients(Some(clients))
 
         accessGroupsService.getAllGroups(arn).futureValue shouldBe
           Seq(accessGroup)
+      }
+    }
+
+    "no groups found" should {
+      "return no access groups" in new TestScope {
+        mockAccessGroupsRepositoryGetAll(Seq.empty)
+
+        accessGroupsService.getAllGroups(arn).futureValue shouldBe
+          Seq.empty
       }
     }
   }
@@ -108,301 +119,324 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     "group exists" should {
       "return corresponding summaries" in new TestScope {
-        mockAccessGroupsRepositoryGet(Some(accessGroup))
+        mockAccessGroupsRepositoryGet(Some(accessGroupInMongo))
+        mockUserClientDetailsConnectorGetClients(Some(clients))
 
         accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
           Some(accessGroup)
       }
     }
-  }
 
-  "Fetching groups for client" when {
+    "group does not exists" should {
+      "return no group" in new TestScope {
+        mockAccessGroupsRepositoryGet(None)
 
-    "groups found" should {
-      "return corresponding summaries" in new TestScope {
-
-        val ag1: AccessGroup = accessGroup
-        val ag2: AccessGroup = accessGroup.copy(groupName = "group 2", clients = Some(Set(enrolment1)))
-
-        mockAccessGroupsRepositoryGetAll(
-          Seq(ag1, ag2)
-        )
-
-        accessGroupsService.getGroupSummariesForClient(arn, "HMRC-CGT-PD~CGTPDRef~XMCGTP123456789").futureValue shouldBe
-          Seq(AccessGroupSummary(ag1._id.toHexString, "some group", 3, 3))
-      }
-    }
-  }
-
-  "Fetching groups for team member" when {
-
-    "groups found" should {
-      "return corresponding summaries" in new TestScope {
-
-        val ag1: AccessGroup = accessGroup
-        val ag2: AccessGroup = accessGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
-
-        mockAccessGroupsRepositoryGetAll(
-          Seq(ag1, ag2)
-        )
-
-        accessGroupsService.getGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
-          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", 3, 1))
-      }
-    }
-  }
-
-  "Fetching group by id" when {
-
-    "group exists" should {
-      "return corresponding summaries" in new TestScope {
-        mockAccessGroupsRepositoryGetById(Some(accessGroup))
-
-        accessGroupsService.getById(dbId).futureValue shouldBe
-          Some(accessGroup)
-      }
-    }
-  }
-
-  "Deleting group" when {
-
-    "DB call to delete group returns nothing" should {
-      s"return $AccessGroupNotDeleted" in new TestScope {
-        mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(None)
-        mockAccessGroupsRepositoryDelete(None)
-
-        accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupNotDeleted
+        accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+          None
       }
     }
 
-    "DB call to delete group returns some value" when {
+    "group with no clients" should {
+      "return the group" in new TestScope {
+        mockAccessGroupsRepositoryGet(Some(accessGroup.copy(clients = None)))
+        mockUserClientDetailsConnectorGetClients(Some(clients))
 
-      "DB call to delete group indicates no record was deleted" should {
+        accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+          Some(accessGroup.copy(clients = None))
+      }
+    }
+
+    "Fetching groups for client" when {
+
+      "groups found" should {
+        "return corresponding summaries" in new TestScope {
+
+          val ag1: AccessGroup = accessGroup
+          val ag2: AccessGroup = accessGroup.copy(groupName = "group 2", clients = Some(Set(enrolment1)))
+
+          mockAccessGroupsRepositoryGetAll(
+            Seq(withClientNamesRemoved(ag1), withClientNamesRemoved(ag2))
+          )
+
+          accessGroupsService
+            .getGroupSummariesForClient(arn, "HMRC-CGT-PD~CGTPDRef~XMCGTP123456789")
+            .futureValue shouldBe
+            Seq(AccessGroupSummary(ag1._id.toHexString, "some group", 3, 3))
+        }
+      }
+    }
+
+    "Fetching groups for team member" when {
+
+      "groups found" should {
+        "return corresponding summaries" in new TestScope {
+
+          val ag1: AccessGroup = accessGroup
+          val ag2: AccessGroup = accessGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
+
+          mockAccessGroupsRepositoryGetAll(
+            Seq(withClientNamesRemoved(ag1), withClientNamesRemoved(ag2))
+          )
+
+          accessGroupsService.getGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
+            Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", 3, 1))
+        }
+      }
+    }
+
+    "Fetching group by id" when {
+
+      "group exists" should {
+        "return corresponding summaries" in new TestScope {
+          mockAccessGroupsRepositoryGetById(Some(accessGroupInMongo))
+          mockUserClientDetailsConnectorGetClients(Some(clients))
+
+          accessGroupsService.getById(dbId).futureValue shouldBe
+            Some(accessGroup)
+        }
+      }
+    }
+
+    "Deleting group" when {
+
+      "DB call to delete group returns nothing" should {
         s"return $AccessGroupNotDeleted" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
-          mockAccessGroupsRepositoryDelete(Some(0L))
+          mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(None)
+          mockAccessGroupsRepositoryDelete(None)
 
           accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupNotDeleted
         }
       }
 
-      "DB call to delete group indicates one record was deleted" when {
+      "DB call to delete group returns some value" when {
+
+        "DB call to delete group indicates no record was deleted" should {
+          s"return $AccessGroupNotDeleted" in new TestScope {
+            mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
+            mockAccessGroupsRepositoryDelete(Some(0L))
+
+            accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupNotDeleted
+          }
+        }
+
+        "DB call to delete group indicates one record was deleted" when {
+
+          "assignments get pushed" should {
+            s"return $AccessGroupDeleted" in new TestScope {
+              mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
+              mockAccessGroupsRepositoryDelete(Some(1L))
+              mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
+              mockAuditConnectorSendExplicitAudit("GranularPermissionsES11AssignmentsUnassignmentsPushed")
+              mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted")
+
+              accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupDeleted
+            }
+          }
+
+          "assignments do not get pushed" should {
+            s"return $AccessGroupDeletedWithoutAssignmentsPushed" in new TestScope {
+              mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
+              mockAccessGroupsRepositoryDelete(Some(1L))
+              mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
+              mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted")
+
+              accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupDeletedWithoutAssignmentsPushed
+            }
+          }
+        }
+      }
+
+    }
+
+    "Updating group" when {
+
+      "DB call to update group returns nothing" should {
+        s"return $AccessGroupNotUpdated" in new TestScope {
+          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(None)
+          mockAccessGroupsRepositoryUpdate(None)
+
+          accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
+        }
+      }
+
+      "DB call to update group indicates no record was updated" should {
+        s"return $AccessGroupNotUpdated" in new TestScope {
+          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
+          mockAccessGroupsRepositoryUpdate(Some(0))
+
+          accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
+        }
+      }
+
+      "DB call to update group indicates one record was updated" when {
 
         "assignments get pushed" should {
-          s"return $AccessGroupDeleted" in new TestScope {
-            mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
-            mockAccessGroupsRepositoryDelete(Some(1L))
+          s"return $AccessGroupUpdated" in new TestScope {
+            mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
+            mockAccessGroupsRepositoryUpdate(Some(1))
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
             mockAuditConnectorSendExplicitAudit("GranularPermissionsES11AssignmentsUnassignmentsPushed")
-            mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted")
+            mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated")
 
-            accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupDeleted
+            accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupUpdated
           }
         }
 
         "assignments do not get pushed" should {
-          s"return $AccessGroupDeletedWithoutAssignmentsPushed" in new TestScope {
-            mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
-            mockAccessGroupsRepositoryDelete(Some(1L))
+          s"return $AccessGroupUpdatedWithoutAssignmentsPushed" in new TestScope {
+            mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
+            mockAccessGroupsRepositoryUpdate(Some(1))
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
-            mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted")
+            mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated")
 
-            accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupDeletedWithoutAssignmentsPushed
+            accessGroupsService
+              .update(groupId, accessGroup, user)
+              .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
           }
         }
       }
+
     }
 
-  }
+    "Fetching all clients" when {
 
-  "Updating group" when {
-
-    "DB call to update group returns nothing" should {
-      s"return $AccessGroupNotUpdated" in new TestScope {
-        mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(None)
-        mockAccessGroupsRepositoryUpdate(None)
-
-        accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
-      }
-    }
-
-    "DB call to update group indicates no record was updated" should {
-      s"return $AccessGroupNotUpdated" in new TestScope {
-        mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
-        mockAccessGroupsRepositoryUpdate(Some(0))
-
-        accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
-      }
-    }
-
-    "DB call to update group indicates one record was updated" when {
-
-      "assignments get pushed" should {
-        s"return $AccessGroupUpdated" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
-          mockAccessGroupsRepositoryUpdate(Some(1))
-          mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
-          mockAuditConnectorSendExplicitAudit("GranularPermissionsES11AssignmentsUnassignmentsPushed")
-          mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated")
-
-          accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupUpdated
-        }
-      }
-
-      "assignments do not get pushed" should {
-        s"return $AccessGroupUpdatedWithoutAssignmentsPushed" in new TestScope {
-          mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
-          mockAccessGroupsRepositoryUpdate(Some(1))
-          mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
-          mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated")
-
-          accessGroupsService
-            .update(groupId, accessGroup, user)
-            .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
-        }
-      }
-    }
-
-  }
-
-  "Fetching all clients" when {
-
-    "AUCD connector returns nothing" should {
-      "return no unassigned clients" in new TestScope {
-        mockUserClientDetailsConnectorGetClients(None)
-
-        accessGroupsService.getAllClients(arn).futureValue shouldBe
-          ClientList(Set.empty, Set.empty)
-      }
-    }
-
-    "AUCD connector returns something" when {
-
-      "AUCD connector returns empty list of clients" should {
-        "return correct clients" in new TestScope {
-          mockUserClientDetailsConnectorGetClients(Some(Seq.empty))
+      "AUCD connector returns nothing" should {
+        "return no unassigned clients" in new TestScope {
+          mockUserClientDetailsConnectorGetClients(None)
 
           accessGroupsService.getAllClients(arn).futureValue shouldBe
             ClientList(Set.empty, Set.empty)
         }
       }
 
-      "AUCD connector returns non-empty list of clients" when {
+      "AUCD connector returns something" when {
 
-        "no access groups exist" should {
+        "AUCD connector returns empty list of clients" should {
           "return correct clients" in new TestScope {
-            val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client")
-
-            mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
-            mockAccessGroupsRepositoryGetAll(Seq.empty)
+            mockUserClientDetailsConnectorGetClients(Some(Seq.empty))
 
             accessGroupsService.getAllClients(arn).futureValue shouldBe
-              ClientList(Set.empty, Set(client1))
+              ClientList(Set.empty, Set.empty)
           }
         }
 
-        "access groups exist" when {
+        "AUCD connector returns non-empty list of clients" when {
 
-          "access group exists whose assigned clients match those returned by AUCD connector" should {
+          "no access groups exist" should {
             "return correct clients" in new TestScope {
               val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client")
-              mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
-              mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
 
-              accessGroupsService.getAllClients(arn).futureValue shouldBe
-                ClientList(Set(client1), Set.empty)
-            }
-          }
-
-          "access group exists whose assigned clients do not match those returned by AUCD connector" should {
-            "return correct clients" in new TestScope {
-              val client1: Client = Client("unmatchedEnrolmentKey", "existing client")
               mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
-              mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+              mockAccessGroupsRepositoryGetAll(Seq.empty)
 
               accessGroupsService.getAllClients(arn).futureValue shouldBe
                 ClientList(Set.empty, Set(client1))
             }
           }
+
+          "access groups exist" when {
+
+            "access group exists whose assigned clients match those returned by AUCD connector" should {
+              "return correct clients" in new TestScope {
+                val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client")
+                mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
+                mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+
+                accessGroupsService.getAllClients(arn).futureValue shouldBe
+                  ClientList(Set(client1), Set.empty)
+              }
+            }
+
+            "access group exists whose assigned clients do not match those returned by AUCD connector" should {
+              "return correct clients" in new TestScope {
+                val client1: Client = Client("unmatchedEnrolmentKey", "existing client")
+                mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
+                mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+
+                accessGroupsService.getAllClients(arn).futureValue shouldBe
+                  ClientList(Set.empty, Set(client1))
+              }
+            }
+          }
         }
       }
     }
-  }
 
-  "Fetching assigned clients" when {
-    "access group exists whose assigned clients match some of those returned by AUCD connector" should {
-      "return correct assigned clients" in new TestScope {
-        val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client1")
-        val client2: Client = Client("unmatchedEnrolmentKey", "existing client2")
-        mockUserClientDetailsConnectorGetClients(Some(Seq(client1, client2)))
-        mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+    "Fetching assigned clients" when {
+      "access group exists whose assigned clients match some of those returned by AUCD connector" should {
+        "return correct assigned clients" in new TestScope {
+          val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client1")
+          val client2: Client = Client("unmatchedEnrolmentKey", "existing client2")
+          mockUserClientDetailsConnectorGetClients(Some(Seq(client1, client2)))
+          mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
 
-        accessGroupsService.getAssignedClients(arn).futureValue shouldBe
-          Set(client1)
-      }
-    }
-  }
-
-  "Fetching unassigned clients" when {
-    "access group exists whose assigned clients match some of those returned by AUCD connector" should {
-      "return correct unassigned clients" in new TestScope {
-        val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client1")
-        val client2: Client = Client("unmatchedEnrolmentKey", "existing client2")
-        mockUserClientDetailsConnectorGetClients(Some(Seq(client1, client2)))
-        mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
-
-        accessGroupsService.getUnassignedClients(arn).futureValue shouldBe
-          Set(client2)
-      }
-    }
-  }
-
-  "Syncing with EACD" when {
-
-    "call to check outstanding assignments work items exist returns nothing" should {
-      "neither fetch clients with assigned users nor call access groups synchronizer" in new TestScope {
-        mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(None)
-
-        accessGroupsService.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
+          accessGroupsService.getAssignedClients(arn).futureValue shouldBe
+            Set(client1)
+        }
       }
     }
 
-    "call to check outstanding assignments work items exist returns some value" when {
+    "Fetching unassigned clients" when {
+      "access group exists whose assigned clients match some of those returned by AUCD connector" should {
+        "return correct unassigned clients" in new TestScope {
+          val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client1")
+          val client2: Client = Client("unmatchedEnrolmentKey", "existing client2")
+          mockUserClientDetailsConnectorGetClients(Some(Seq(client1, client2)))
+          mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
 
-      "call to check outstanding assignments work items exist returns true" should {
+          accessGroupsService.getUnassignedClients(arn).futureValue shouldBe
+            Set(client2)
+        }
+      }
+    }
+
+    "Syncing with EACD" when {
+
+      "call to check outstanding assignments work items exist returns nothing" should {
         "neither fetch clients with assigned users nor call access groups synchronizer" in new TestScope {
-          mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(true))
+          mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(None)
 
           accessGroupsService.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
         }
       }
 
-      "call to check outstanding assignments work items exist returns false" when {
+      "call to check outstanding assignments work items exist returns some value" when {
 
-        "assigned users are not returned by connector" should {
-          "not call access groups synchronizer" in new TestScope {
-            mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
-            mockUserClientDetailsConnectorGetClientsWithAssignedUsers(None)
+        "call to check outstanding assignments work items exist returns true" should {
+          "neither fetch clients with assigned users nor call access groups synchronizer" in new TestScope {
+            mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(true))
 
             accessGroupsService.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
           }
         }
 
-        "assigned users are returned by connector" when {
+        "call to check outstanding assignments work items exist returns false" when {
 
-          "call to access groups synchronizer returns non-empty update statuses" should {
-            "indicate access groups were updated" in new TestScope {
+          "assigned users are not returned by connector" should {
+            "not call access groups synchronizer" in new TestScope {
               mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
-              mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
-                Some(GroupDelegatedEnrolments(Seq(assignedClient)))
-              )
-              mockAccessGroupSynchronizerSyncWithEacd(Seq(AccessGroupUpdated))
+              mockUserClientDetailsConnectorGetClientsWithAssignedUsers(None)
 
-              accessGroupsService.syncWithEacd(arn, user).futureValue shouldBe Seq(AccessGroupUpdated)
+              accessGroupsService.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
             }
           }
-        }
 
+          "assigned users are returned by connector" when {
+
+            "call to access groups synchronizer returns non-empty update statuses" should {
+              "indicate access groups were updated" in new TestScope {
+                mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
+                mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
+                  Some(GroupDelegatedEnrolments(Seq(assignedClient)))
+                )
+                mockAccessGroupSynchronizerSyncWithEacd(Seq(AccessGroupUpdated))
+
+                accessGroupsService.syncWithEacd(arn, user).futureValue shouldBe Seq(AccessGroupUpdated)
+              }
+            }
+          }
+
+        }
       }
     }
   }
@@ -439,6 +473,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
       Some(Set(user, user1, user2)),
       Some(Set(enrolment1, enrolment2, enrolment3))
     )
+
+    val clients = Seq(enrolment1, enrolment2, enrolment3).map(Client.fromEnrolment)
+
+    val accessGroupInMongo = withClientNamesRemoved(accessGroup)
 
     val assignedClient = AssignedClient("service", Seq(Identifier("key", "value")), None, "user")
 
@@ -490,6 +528,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .returning(Future.successful(accessGroups))
 
     def mockAccessGroupsRepositoryInsert(
+      accessGroup: AccessGroup,
       maybeCreationId: Option[String]
     ): CallHandler1[AccessGroup, Future[Option[String]]] = (mockAccessGroupsRepository
       .insert(_: AccessGroup))
@@ -588,6 +627,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .expects(eventType, *, *, *)
         .returning(())
 
+    def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup = {
+      val nameRemover: Enrolment => Enrolment = (e: Enrolment) => e.copy(friendlyName = "")
+      accessGroup.copy(clients = accessGroup.clients.map(_.map(nameRemover)))
+    }
   }
-
 }
