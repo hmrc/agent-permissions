@@ -22,7 +22,7 @@ import play.api.libs.json.Json
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
-import uk.gov.hmrc.agentpermissions.service.userenrolment.{AccessGroupSynchronizer, UserEnrolmentAssignmentService}
+import uk.gov.hmrc.agentpermissions.service.userenrolment.{AccessGroupSynchronizer, UserEnrolmentAssignmentService, UserEnrolmentAssignmentsSplitter}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
@@ -271,7 +271,7 @@ class AccessGroupsServiceImpl @Inject() (
       pushStatus <- userEnrolmentAssignmentService.pushCalculatedAssignments(maybeCalculatedAssignments)
     } yield {
       if (pushStatus == AssignmentsPushed) {
-        auditEs11AssignmentUnassignments(maybeCalculatedAssignments)
+        maybeCalculatedAssignments.foreach(auditEsAssignmentUnassignments)
       }
       logger.info(s"Push status: $pushStatus")
       pushStatus
@@ -286,14 +286,16 @@ class AccessGroupsServiceImpl @Inject() (
       Json.obj("arn" -> s"${arn.value}", "groupName" -> s"$groupName", "user" -> agentUser)
     )
 
-  private def auditEs11AssignmentUnassignments(maybeCalculatedAssignments: Option[UserEnrolmentAssignments])(implicit
+  private def auditEsAssignmentUnassignments(userEnrolmentAssignments: UserEnrolmentAssignments)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit =
-    auditConnector.sendExplicitAudit(
-      "GranularPermissionsES11AssignmentsUnassignmentsPushed",
-      Json.obj("value" -> maybeCalculatedAssignments)
-    )
+    UserEnrolmentAssignmentsSplitter.split(userEnrolmentAssignments).foreach { chunkUserEnrolmentAssignments =>
+      auditConnector.sendExplicitAudit(
+        "GranularPermissionsESAssignmentsUnassignmentsPushed",
+        Json.obj("value" -> chunkUserEnrolmentAssignments)
+      )
+    }
 
   private def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup =
     accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = ""))))

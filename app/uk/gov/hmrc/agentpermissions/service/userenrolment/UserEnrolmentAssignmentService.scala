@@ -20,7 +20,7 @@ import com.google.inject.ImplementedBy
 import play.api.Logging
 import play.api.libs.json.Json
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, GroupId, UserEnrolmentAssignments}
-import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
+import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -87,16 +87,26 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     } yield maybeUserEnrolmentAssignments
 
   override def pushCalculatedAssignments(
-    maybeAssignments: Option[UserEnrolmentAssignments]
+    maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] =
-    maybeAssignments match {
+    maybeUserEnrolmentAssignments match {
       case None =>
         Future.successful(AssignmentsNotPushed)
-      case Some(assignments) =>
-        logger.debug(s"EACD assignments calculated: ${Json.toJson(assignments)}")
-        logger.info(s"Assign count: ${assignments.assign.size}, Unassign count: ${assignments.unassign.size}")
+      case Some(userEnrolmentAssignments) =>
+        logger.debug(s"EACD assignments calculated: ${Json.toJson(userEnrolmentAssignments)}")
+        logger.info(
+          s"Assign count: ${userEnrolmentAssignments.assign.size}, Unassign count: ${userEnrolmentAssignments.unassign.size}"
+        )
 
-        userClientDetailsConnector.pushAssignments(assignments)
+        Future
+          .sequence(
+            UserEnrolmentAssignmentsSplitter
+              .split(userEnrolmentAssignments)
+              .map(userClientDetailsConnector.pushAssignments(_))
+          )
+          .map(pushStatuses =>
+            if (pushStatuses.forall(_ == AssignmentsPushed)) AssignmentsPushed else AssignmentsNotPushed
+          )
     }
 
 }
