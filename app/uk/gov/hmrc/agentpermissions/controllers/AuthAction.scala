@@ -19,6 +19,7 @@ package uk.gov.hmrc.agentpermissions.controllers
 import play.api.mvc.Request
 import play.api.{Configuration, Environment, Logging}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn}
+import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.auth.core.AuthProvider.GovernmentGateway
 import uk.gov.hmrc.auth.core._
 import uk.gov.hmrc.auth.core.retrieve.v2.Retrievals.{allEnrolments, credentialRole, credentials, name}
@@ -32,7 +33,11 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 @Singleton
-class AuthAction @Inject() (val authConnector: AuthConnector, val env: Environment, val config: Configuration)
+class AuthAction @Inject() (
+  val authConnector: AuthConnector,
+  val env: Environment,
+  val config: Configuration
+)(implicit appConfig: AppConfig)
     extends AuthRedirects with AuthorisedFunctions with Logging {
 
   private val agentEnrolment = "HMRC-AS-AGENT"
@@ -51,7 +56,16 @@ class AuthAction @Inject() (val authConnector: AuthConnector, val env: Environme
           getArnAndAgentUser(enrols, name, credentials) match {
             case Some(authorisedAgent) =>
               credRole match {
-                case Some(User) | Some(Admin) => Future.successful(Option(authorisedAgent))
+                case Some(User) | Some(Admin) =>
+                  if (appConfig.checkArnAllowList) {
+                    if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
+                      Future successful Option(authorisedAgent)
+                    } else {
+                      Future successful None
+                    }
+                  } else {
+                    Future successful Option(authorisedAgent)
+                  }
                 case _ =>
                   logger.warn("Invalid credential role")
                   Future.successful(None)

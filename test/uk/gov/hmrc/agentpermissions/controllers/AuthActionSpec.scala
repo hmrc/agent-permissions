@@ -16,11 +16,13 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
+import org.scalamock.handlers.CallHandler0
 import play.api.mvc.AnyContentAsEmpty
 import play.api.test.FakeRequest
 import play.api.{Configuration, Environment}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn}
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.auth.core._
 
 import scala.concurrent.ExecutionContext
@@ -31,22 +33,62 @@ class AuthActionSpec extends BaseSpec with AuthorisationMockSupport {
     implicit val mockAuthConnector: AuthConnector = mock[AuthConnector]
     val mockEnvironment: Environment = mock[Environment]
     val mockConfiguration: Configuration = mock[Configuration]
+    implicit lazy val mockAppConfig: AppConfig = mock[AppConfig]
 
     val authAction = new AuthAction(mockAuthConnector, mockEnvironment, mockConfiguration)
 
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val request: FakeRequest[AnyContentAsEmpty.type] = FakeRequest()
+
+    def mockAppConfigCheckArnAllowList(toCheckArnAllowList: Boolean): CallHandler0[Boolean] =
+      (() => mockAppConfig.checkArnAllowList)
+        .expects()
+        .returning(toCheckArnAllowList)
+
+    def mockAppConfigAllowedArns(allowedArns: Seq[String]): CallHandler0[Seq[String]] =
+      (() => mockAppConfig.allowedArns)
+        .expects()
+        .returning(allowedArns)
   }
 
   "Getting AuthorisedAgent" when {
 
-    "auth response indicates request is authorised" should {
-      "return an authorised agent" in new TestScope {
-        mockAuthResponseWithoutException(buildAuthorisedResponse)
+    "auth response indicates request is authorised" when {
 
-        authAction.getAuthorisedAgent().futureValue shouldBe Some(
-          AuthorisedAgent(Arn("KARN0762398"), AgentUser("user1", "Jane Doe"))
-        )
+      "check for Arn Allow List is false" should {
+        "return an authorised agent" in new TestScope {
+          mockAuthResponseWithoutException(buildAuthorisedResponse)
+          mockAppConfigCheckArnAllowList(toCheckArnAllowList = false)
+
+          authAction.getAuthorisedAgent().futureValue shouldBe Some(
+            AuthorisedAgent(Arn("KARN0762398"), AgentUser("user1", "Jane Doe"))
+          )
+        }
+      }
+
+      "check for Arn Allow List is true" when {
+
+        "arn is not in allowed list" should {
+          "not return an authorised agent" in new TestScope {
+            mockAuthResponseWithoutException(buildAuthorisedResponse)
+            mockAppConfigCheckArnAllowList(toCheckArnAllowList = true)
+            mockAppConfigAllowedArns(Seq.empty)
+
+            authAction.getAuthorisedAgent().futureValue shouldBe None
+          }
+        }
+
+        "arn is in allowed list" should {
+          "return an authorised agent" in new TestScope {
+            mockAuthResponseWithoutException(buildAuthorisedResponse)
+            mockAppConfigCheckArnAllowList(toCheckArnAllowList = true)
+            mockAppConfigAllowedArns(Seq(arn))
+
+            authAction.getAuthorisedAgent().futureValue shouldBe Some(
+              AuthorisedAgent(Arn("KARN0762398"), AgentUser("user1", "Jane Doe"))
+            )
+          }
+        }
       }
     }
 

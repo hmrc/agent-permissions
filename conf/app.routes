@@ -15,3 +15,6 @@ GET    /arn/:arn/access-group-name-check   uk.gov.hmrc.agentpermissions.controll
 PATCH   /arn/:arn/sync                      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/client/:enrolmentKey/groups uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForClient(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, enrolmentKey)
 GET     /arn/:arn/team-member/:userId/groups  uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForTeamMember(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, userId: String)
+
+# ARN Allow List
+GET     /arn-allowed                        uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.isArnAllowed

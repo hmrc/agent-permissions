@@ -17,6 +17,7 @@
 package uk.gov.hmrc.agentpermissions.config
 
 import com.google.inject.ImplementedBy
+import play.api.Configuration
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
 import javax.inject.{Inject, Singleton}
@@ -25,10 +26,16 @@ import javax.inject.{Inject, Singleton}
 trait AppConfig {
   def agentUserClientDetailsBaseUrl: String
   def agentSizeMaxClientCountAllowed: Int
+
+  def checkArnAllowList: Boolean
+
+  def allowedArns: Seq[String]
 }
 
 @Singleton
-class AppConfigImpl @Inject() (servicesConfig: ServicesConfig) extends AppConfig {
-  lazy val agentUserClientDetailsBaseUrl: String = servicesConfig.baseUrl("agent-user-client-details")
-  lazy val agentSizeMaxClientCountAllowed: Int = servicesConfig.getInt("agentsize.maxClientCountAllowed")
+class AppConfigImpl @Inject() (servicesConfig: ServicesConfig, configuration: Configuration) extends AppConfig {
+  override lazy val agentUserClientDetailsBaseUrl: String = servicesConfig.baseUrl("agent-user-client-details")
+  override lazy val agentSizeMaxClientCountAllowed: Int = servicesConfig.getInt("agentsize.maxClientCountAllowed")
+  override lazy val checkArnAllowList: Boolean = servicesConfig.getBoolean("features.check-arn-allow-list")
+  override lazy val allowedArns: Seq[String] = configuration.get[Seq[String]]("allowed.arns")
 }

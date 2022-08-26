@@ -24,7 +24,7 @@ class AppConfigSpec extends BaseSpec {
 
   private val env = Environment.simple()
   private val configuration = Configuration.load(env)
-  private val appConfig = new AppConfigImpl(new ServicesConfig(configuration))
+  private val appConfig = new AppConfigImpl(new ServicesConfig(configuration), configuration)
 
   "App config" should {
     "be set up correctly" in {
