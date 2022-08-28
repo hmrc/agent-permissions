@@ -38,16 +38,9 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
     val user1: AgentUser = AgentUser("user1", "User 1")
     val user2: AgentUser = AgentUser("user2", "User 2")
 
-    val enrolment1: Enrolment =
-      Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
-    val enrolment2: Enrolment = Enrolment(
-      "HMRC-PPT-ORG",
-      "Activated",
-      "Frank Wright",
-      Seq(Identifier("EtmpRegistrationNumber", "XAPPT0000012345"))
-    )
-    val enrolment3: Enrolment =
-      Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CGTPDRef", "XMCGTP123456789")))
+    val client1: Client = Client("HMRC-MTD-VAT~VRN~101747641", "John Innes")
+    val client2: Client = Client("HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345", "Frank Wright")
+    val client3: Client = Client("HMRC-CGT-PD~CgtRef~XMCGTP123456789", "George Candy")
 
     val accessGroup: AccessGroup =
       AccessGroup(
@@ -59,7 +52,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
         agent,
         agent,
         Some(Set(agent, user1, user2)),
-        Some(Set(enrolment1, enrolment2, enrolment3))
+        Some(Set(client1, client2, client3))
       )
 
     def now: LocalDateTime = LocalDateTime.now()

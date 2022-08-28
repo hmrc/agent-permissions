@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import org.scalamock.handlers.CallHandler4
 import play.api.libs.json.{JsObject, Json}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier}
+import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
@@ -33,19 +33,19 @@ class GroupClientsRemoverSpec extends BaseSpec {
     "removal enrolments contain some that exist in access group" should {
       "remove only those matching enrolments of access group" in new TestScope {
         val accessGroup: AccessGroup =
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(enrolmentVat, enrolmentPpt, enrolmentCgt)))
+          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
 
-        val removalEnrolments: Set[Enrolment] = Set(enrolmentPpt, enrolmentCgt, enrolmentTrust)
+        val removalEnrolmentKeys: Set[String] = Set(clientPpt, clientCgt, clientTrust).map(_.enrolmentKey)
 
         mockAuditConnectorSendExplicitAudit(
           "AccessGroupClientsRemoval",
-          buildAuditDetailForClientsRemoval(accessGroup, Set(enrolmentPpt, enrolmentCgt))
+          buildAuditDetailForClientsRemoval(accessGroup, Set(clientPpt, clientCgt))
         )
 
         val accessGroupWithClientsRemoved: AccessGroup =
-          groupClientsRemover.removeClientsFromGroup(accessGroup, removalEnrolments, agentUser1)
+          groupClientsRemover.removeClientsFromGroup(accessGroup, removalEnrolmentKeys, agentUser1)
 
-        accessGroupWithClientsRemoved.clients shouldBe Some(Set(enrolmentVat))
+        accessGroupWithClientsRemoved.clients shouldBe Some(Set(clientVat))
         accessGroupWithClientsRemoved.teamMembers shouldBe accessGroup.teamMembers
       }
     }
@@ -53,12 +53,12 @@ class GroupClientsRemoverSpec extends BaseSpec {
     "removal enrolments do not contain any that exist in access group" should {
       "not remove any enrolments of access group" in new TestScope {
         val accessGroup: AccessGroup =
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(enrolmentVat, enrolmentPpt, enrolmentCgt)))
+          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
 
-        val removalEnrolments: Set[Enrolment] = Set(enrolmentTrust)
+        val removalEnrolmentKeys: Set[String] = Set(clientTrust).map(_.enrolmentKey)
 
         val accessGroupWithClientsRemoved: AccessGroup =
-          groupClientsRemover.removeClientsFromGroup(accessGroup, removalEnrolments, agentUser1)
+          groupClientsRemover.removeClientsFromGroup(accessGroup, removalEnrolmentKeys, agentUser1)
 
         accessGroupWithClientsRemoved.clients shouldBe accessGroup.clients
         accessGroupWithClientsRemoved.teamMembers shouldBe accessGroup.teamMembers
@@ -77,33 +77,34 @@ class GroupClientsRemoverSpec extends BaseSpec {
     val agentUser1: AgentUser = AgentUser("userId1", "userName")
     val now: LocalDateTime = LocalDateTime.now()
 
-    val enrolmentVat: Enrolment =
-      Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
+    val clientVat: Client = Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "John Innes")
 
-    val enrolmentPpt: Enrolment = Enrolment(
-      "HMRC-PPT-ORG",
-      "Activated",
-      "Frank Wright",
-      Seq(Identifier("EtmpRegistrationNumber", "XAPPT0000012345"))
-    )
+    val clientPpt: Client = Client(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", "Frank Wright")
 
-    val enrolmentCgt: Enrolment =
-      Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CGTPDRef", "XMCGTP123456789")))
+    val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
 
-    val enrolmentTrust: Enrolment =
-      Enrolment("HMRC-TERS-ORG", "Activated", "Trust Client", Seq(Identifier("SAUTR", "0123456789")))
+    val clientTrust: Client = Client(s"$serviceTrust~$serviceIdentifierKeyTrust~0123456789", "Trust Client")
 
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Enrolment]]): AccessGroup =
-      AccessGroup(arn, groupName, now, now, agentUser1, agentUser1, teamMembers, clients)
+    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): AccessGroup =
+      AccessGroup(
+        arn,
+        groupName,
+        now,
+        now,
+        agentUser1,
+        agentUser1,
+        teamMembers,
+        clients
+      )
 
-    def buildAuditDetailForClientsRemoval(accessGroup: AccessGroup, enrolments: Set[Enrolment]): JsObject =
+    def buildAuditDetailForClientsRemoval(accessGroup: AccessGroup, clients: Set[Client]): JsObject =
       Json.obj(
         "accessGroupId"   -> s"${accessGroup._id}",
         "accessGroupName" -> s"${accessGroup.groupName}",
-        "clientsRemoved"  -> enrolments
+        "clientsRemoved"  -> clients
       )
 
     def mockAuditConnectorSendExplicitAudit(

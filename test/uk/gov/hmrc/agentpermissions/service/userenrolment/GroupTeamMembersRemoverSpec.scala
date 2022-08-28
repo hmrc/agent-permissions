@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import org.scalamock.handlers.CallHandler4
 import play.api.libs.json.{JsObject, Json}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
@@ -33,7 +33,7 @@ class GroupTeamMembersRemoverSpec extends BaseSpec {
     "removal user ids contain some that exist in access group" should {
       "remove only those matching user ids of access group" in new TestScope {
         val accessGroup: AccessGroup =
-          buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(enrolmentVat)))
+          buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat)))
 
         val removalUserIds: Set[String] = Set(agentUser2.id)
 
@@ -53,7 +53,7 @@ class GroupTeamMembersRemoverSpec extends BaseSpec {
     "removal user ids do not contain any that exist in access group" should {
       "not remove any user ids of access group" in new TestScope {
         val accessGroup: AccessGroup =
-          buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(enrolmentVat)))
+          buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat)))
 
         val removalUserIds: Set[String] = Set("unknown")
 
@@ -78,14 +78,22 @@ class GroupTeamMembersRemoverSpec extends BaseSpec {
     val agentUser2: AgentUser = AgentUser("userId2", "userName2")
     val now: LocalDateTime = LocalDateTime.now()
 
-    val enrolmentVat: Enrolment =
-      Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
+    val clientVat: Client = Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "John Innes")
 
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Enrolment]]): AccessGroup =
-      AccessGroup(arn, groupName, now, now, agentUser1, agentUser1, teamMembers, clients)
+    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): AccessGroup =
+      AccessGroup(
+        arn,
+        groupName,
+        now,
+        now,
+        agentUser1,
+        agentUser1,
+        teamMembers,
+        clients
+      )
 
     def buildAuditDetailForTeamMembersRemoval(accessGroup: AccessGroup, teamMembers: Set[AgentUser]): JsObject =
       Json.obj(

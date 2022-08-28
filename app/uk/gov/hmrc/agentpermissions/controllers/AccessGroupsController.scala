@@ -289,7 +289,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
 case class CreateAccessGroupRequest(
   groupName: String,
   teamMembers: Option[Set[AgentUser]],
-  clients: Option[Set[Enrolment]]
+  clients: Option[Set[Client]]
 ) {
   def buildAccessGroup(
     arn: Arn,
@@ -317,7 +317,7 @@ object CreateAccessGroupRequest {
 case class UpdateAccessGroupRequest(
   groupName: Option[String],
   teamMembers: Option[Set[AgentUser]],
-  clients: Option[Set[Enrolment]]
+  clients: Option[Set[Client]]
 ) {
 
   def merge(existingAccessGroup: AccessGroup): AccessGroup = {
@@ -333,7 +333,7 @@ object UpdateAccessGroupRequest {
   implicit val format: OFormat[UpdateAccessGroupRequest] = Json.format[UpdateAccessGroupRequest]
 }
 
-case class AddMembersToAccessGroupRequest(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Enrolment]])
+case class AddMembersToAccessGroupRequest(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]])
 
 object AddMembersToAccessGroupRequest {
   implicit val format: OFormat[AddMembersToAccessGroupRequest] = Json.format[AddMembersToAccessGroupRequest]

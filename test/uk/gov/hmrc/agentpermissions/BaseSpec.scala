@@ -21,4 +21,16 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
-abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures with MockFactory {}
+abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures with MockFactory {
+  val serviceVat = "HMRC-MTD-VAT"
+  val servicePpt = "HMRC-PPT-ORG"
+  val serviceCgt = "HMRC-CGT-PD"
+  val serviceMtdit = "HMRC-MTD-IT"
+  val serviceTrust = "HMRC-TERS-ORG"
+
+  val serviceIdentifierKeyVat = "VRN"
+  val serviceIdentifierKeyPpt = "EtmpRegistrationNumber"
+  val serviceIdentifierKeyCgt = "CgtRef"
+  val serviceIdentifierKeyMtdit = "MTDITID"
+  val serviceIdentifierKeyTrust = "SAUTR"
+}

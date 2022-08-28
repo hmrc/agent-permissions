@@ -135,7 +135,7 @@ class AccessGroupsServiceImpl @Inject() (
       .get(arn)
       .map(accessGroups =>
         accessGroups
-          .filter(_.clients.fold(false)(_.map(toKey(_)).contains(enrolmentKey)))
+          .filter(_.clients.fold(false)(_.map(_.enrolmentKey).contains(enrolmentKey)))
           .map(AccessGroupSummary.convert)
       )
 
@@ -221,7 +221,7 @@ class AccessGroupsServiceImpl @Inject() (
     for {
       clients      <- userClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
       accessGroups <- if (clients.nonEmpty) accessGroupsRepository.get(arn) else Future.successful(Seq.empty)
-      assignedEnrolmentKeys = accessGroups.flatMap(_.clients).flatten.toSet.flatMap(EnrolmentKey.enrolmentKeys)
+      assignedEnrolmentKeys = accessGroups.flatMap(_.clients).toSet.flatten.map(_.enrolmentKey)
     } yield clients.foldLeft(ClientList(Set.empty, Set.empty)) { (clientList, client) =>
       if (assignedEnrolmentKeys.contains(client.enrolmentKey)) {
         clientList.copy(assigned = clientList.assigned + client)
@@ -260,15 +260,6 @@ class AccessGroupsServiceImpl @Inject() (
         }
     } yield updateStatuses
 
-  private val toKey: Enrolment => String = (enrolment: Enrolment) => {
-    val service = enrolment.service
-    val identifier = enrolment.identifiers.headOption match {
-      case Some(identifier) => s"${identifier.key}~${identifier.value}"
-      case None             => throw new NullPointerException(s"identifier missing from enrolment")
-    }
-    s"$service~$identifier"
-  }
-
   private def pushAssignments(
     maybeCalculatedAssignments: Option[UserEnrolmentAssignments],
     arn: Arn
@@ -304,26 +295,27 @@ class AccessGroupsServiceImpl @Inject() (
       Json.obj("value" -> maybeCalculatedAssignments)
     )
 
-  private def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup = {
-    val nameRemover: Enrolment => Enrolment = (e: Enrolment) => e.copy(friendlyName = "")
-    accessGroup.copy(clients = accessGroup.clients.map(_.map(nameRemover)))
-  }
+  private def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup =
+    accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = ""))))
 
   private def withClientNames(
     accessGroup: Option[AccessGroup]
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[AccessGroup]] =
     accessGroup.fold(Future successful Option.empty[AccessGroup])(ag =>
-      userClientDetailsConnector.getClients(ag.arn).map { case Some(clients) =>
-        Option.apply(ag.copy(clients = copyNamesToEnrolments(ag.clients)(clients)))
+      userClientDetailsConnector.getClients(ag.arn).map {
+        case None          => None
+        case Some(clients) => Option.apply(ag.copy(clients = copyNamesToEnrolments(ag.clients)(clients)))
       }
     )
 
-  private def copyNamesToEnrolments(enrolments: Option[Set[Enrolment]])(clients: Seq[Client]): Option[Set[Enrolment]] =
-    enrolments
+  private def copyNamesToEnrolments(
+    maybeAccessGroupClients: Option[Set[Client]]
+  )(backendClients: Seq[Client]): Option[Set[Client]] =
+    maybeAccessGroupClients
       .map(
-        _.map(enrolment =>
-          enrolment.copy(friendlyName =
-            clients.find(_.enrolmentKey == EnrolmentKey.enrolmentKeys(enrolment).head) match {
+        _.map(accessGroupClient =>
+          accessGroupClient.copy(friendlyName =
+            backendClients.find(_.enrolmentKey == accessGroupClient.enrolmentKey) match {
               case Some(client) => client.friendlyName
               case None         => ""
             }
@@ -337,10 +329,12 @@ class AccessGroupsServiceImpl @Inject() (
     accessGroups match {
       case Nil => Future successful accessGroups
       case accessGroups =>
-        userClientDetailsConnector.getClients(accessGroups.head.arn).map { case Some(clients) =>
-          accessGroups.map(accessGroup =>
-            accessGroup.copy(clients = copyNamesToEnrolments(accessGroup.clients)(clients))
-          )
+        userClientDetailsConnector.getClients(accessGroups.head.arn).map {
+          case None => accessGroups
+          case Some(backendClients) =>
+            accessGroups.map(accessGroup =>
+              accessGroup.copy(clients = copyNamesToEnrolments(accessGroup.clients)(backendClients))
+            )
         }
     }
 }

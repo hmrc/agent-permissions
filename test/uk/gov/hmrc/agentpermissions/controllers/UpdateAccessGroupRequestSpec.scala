@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Enrolment, Identifier}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 
 import java.time.LocalDateTime
@@ -29,13 +29,11 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
   lazy val now: LocalDateTime = LocalDateTime.now()
   val user1: AgentUser = AgentUser("user1", "User 1")
   val user2: AgentUser = AgentUser("user2", "User 2")
-  val enrolment1: Enrolment =
-    Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
-  val enrolment2: Enrolment =
-    Enrolment("HMRC-PPT-ORG", "Activated", "Frank Wright", Seq(Identifier("EtmpRegistrationNumber", "XAPPT0000012345")))
+  val client1: Client = Client("HMRC-MTD-VAT~VRN~101747641", "John Innes")
+  val client2: Client = Client("HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345", "Frank Wright")
   val groupNameToUpdate = "name to update"
   val teamMembersToUpdate: Set[AgentUser] = Set(user1, user2)
-  val clientsToUpdate: Set[Enrolment] = Set(enrolment1, enrolment2)
+  val clientsToUpdate: Set[Client] = Set(client1, client2)
   val accessGroup: AccessGroup = AccessGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
 
   "Merge" when {
@@ -44,7 +42,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
       "return existing access group" in {
         val maybeGroupNameToUpdate: Option[String] = None
         val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
-        val maybeClientsToUpdate: Option[Set[Enrolment]] = None
+        val maybeClientsToUpdate: Option[Set[Client]] = None
 
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
@@ -57,7 +55,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
       "return merged access group" in {
         val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
         val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
-        val maybeClientsToUpdate: Option[Set[Enrolment]] = None
+        val maybeClientsToUpdate: Option[Set[Client]] = None
 
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
@@ -70,7 +68,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
       "return merged access group" in {
         val maybeGroupNameToUpdate: Option[String] = None
         val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
-        val maybeClientsToUpdate: Option[Set[Enrolment]] = None
+        val maybeClientsToUpdate: Option[Set[Client]] = None
 
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
@@ -83,7 +81,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
       "return merged access group" in {
         val maybeGroupNameToUpdate: Option[String] = None
         val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
-        val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
+        val maybeClientsToUpdate: Option[Set[Client]] = Some(clientsToUpdate)
 
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
@@ -96,7 +94,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
       "return merged access group" in {
         val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
         val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
-        val maybeClientsToUpdate: Option[Set[Enrolment]] = None
+        val maybeClientsToUpdate: Option[Set[Client]] = None
 
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
@@ -110,7 +108,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
       "return merged access group" in {
         val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
         val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = None
-        val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
+        val maybeClientsToUpdate: Option[Set[Client]] = Some(clientsToUpdate)
 
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
@@ -124,7 +122,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
       "return merged access group" in {
         val maybeGroupNameToUpdate: Option[String] = None
         val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
-        val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
+        val maybeClientsToUpdate: Option[Set[Client]] = Some(clientsToUpdate)
 
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
@@ -138,7 +136,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
       "return merged access group" in {
         val maybeGroupNameToUpdate: Option[String] = Some(groupNameToUpdate)
         val maybeTeamMembersToUpdate: Option[Set[AgentUser]] = Some(teamMembersToUpdate)
-        val maybeClientsToUpdate: Option[Set[Enrolment]] = Some(clientsToUpdate)
+        val maybeClientsToUpdate: Option[Set[Client]] = Some(clientsToUpdate)
 
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)

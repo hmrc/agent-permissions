@@ -152,14 +152,14 @@ class AccessGroupsServiceSpec extends BaseSpec {
         "return corresponding summaries" in new TestScope {
 
           val ag1: AccessGroup = accessGroup
-          val ag2: AccessGroup = accessGroup.copy(groupName = "group 2", clients = Some(Set(enrolment1)))
+          val ag2: AccessGroup = accessGroup.copy(groupName = "group 2", clients = Some(Set(clientVat)))
 
           mockAccessGroupsRepositoryGetAll(
             Seq(withClientNamesRemoved(ag1), withClientNamesRemoved(ag2))
           )
 
           accessGroupsService
-            .getGroupSummariesForClient(arn, "HMRC-CGT-PD~CGTPDRef~XMCGTP123456789")
+            .getGroupSummariesForClient(arn, s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789")
             .futureValue shouldBe
             Seq(AccessGroupSummary(ag1._id.toHexString, "some group", 3, 3))
         }
@@ -324,13 +324,13 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
           "no access groups exist" should {
             "return correct clients" in new TestScope {
-              val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client")
+              val backendClient1: Client = clientVat.copy(friendlyName = "existing client")
 
-              mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
+              mockUserClientDetailsConnectorGetClients(Some(Seq(backendClient1)))
               mockAccessGroupsRepositoryGetAll(Seq.empty)
 
               accessGroupsService.getAllClients(arn).futureValue shouldBe
-                ClientList(Set.empty, Set(client1))
+                ClientList(Set.empty, Set(backendClient1))
             }
           }
 
@@ -338,23 +338,23 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
             "access group exists whose assigned clients match those returned by AUCD connector" should {
               "return correct clients" in new TestScope {
-                val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client")
-                mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
+                val backendClient1: Client = clientVat.copy(friendlyName = "existing client")
+                mockUserClientDetailsConnectorGetClients(Some(Seq(backendClient1)))
                 mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
 
                 accessGroupsService.getAllClients(arn).futureValue shouldBe
-                  ClientList(Set(client1), Set.empty)
+                  ClientList(Set(backendClient1), Set.empty)
               }
             }
 
             "access group exists whose assigned clients do not match those returned by AUCD connector" should {
               "return correct clients" in new TestScope {
-                val client1: Client = Client("unmatchedEnrolmentKey", "existing client")
-                mockUserClientDetailsConnectorGetClients(Some(Seq(client1)))
+                val backendClient1: Client = Client("unmatchedEnrolmentKey", "existing client")
+                mockUserClientDetailsConnectorGetClients(Some(Seq(backendClient1)))
                 mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
 
                 accessGroupsService.getAllClients(arn).futureValue shouldBe
-                  ClientList(Set.empty, Set(client1))
+                  ClientList(Set.empty, Set(backendClient1))
               }
             }
           }
@@ -365,13 +365,13 @@ class AccessGroupsServiceSpec extends BaseSpec {
     "Fetching assigned clients" when {
       "access group exists whose assigned clients match some of those returned by AUCD connector" should {
         "return correct assigned clients" in new TestScope {
-          val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client1")
-          val client2: Client = Client("unmatchedEnrolmentKey", "existing client2")
-          mockUserClientDetailsConnectorGetClients(Some(Seq(client1, client2)))
+          val backendClient1: Client = clientVat.copy(friendlyName = "existing client")
+          val backendClient2: Client = Client("unmatchedEnrolmentKey", "existing client2")
+          mockUserClientDetailsConnectorGetClients(Some(Seq(backendClient1, backendClient2)))
           mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
 
           accessGroupsService.getAssignedClients(arn).futureValue shouldBe
-            Set(client1)
+            Set(backendClient1)
         }
       }
     }
@@ -379,13 +379,13 @@ class AccessGroupsServiceSpec extends BaseSpec {
     "Fetching unassigned clients" when {
       "access group exists whose assigned clients match some of those returned by AUCD connector" should {
         "return correct unassigned clients" in new TestScope {
-          val client1: Client = Client(EnrolmentKey.enrolmentKeys(enrolment1).head, "existing client1")
-          val client2: Client = Client("unmatchedEnrolmentKey", "existing client2")
-          mockUserClientDetailsConnectorGetClients(Some(Seq(client1, client2)))
+          val backendClient1: Client = clientVat.copy(friendlyName = "existing client")
+          val backendClient2: Client = Client("unmatchedEnrolmentKey", "existing client2")
+          mockUserClientDetailsConnectorGetClients(Some(Seq(backendClient1, backendClient2)))
           mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
 
           accessGroupsService.getUnassignedClients(arn).futureValue shouldBe
-            Set(client2)
+            Set(backendClient2)
         }
       }
     }
@@ -449,16 +449,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
     val user1: AgentUser = AgentUser("user1", "User 1")
     val user2: AgentUser = AgentUser("user2", "User 2")
     val user3: AgentUser = AgentUser("user3", "User 3")
-    val enrolment1: Enrolment =
-      Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
-    val enrolment2: Enrolment = Enrolment(
-      "HMRC-PPT-ORG",
-      "Activated",
-      "Frank Wright",
-      Seq(Identifier("EtmpRegistrationNumber", "XAPPT0000012345"))
-    )
-    val enrolment3: Enrolment =
-      Enrolment("HMRC-CGT-PD", "Activated", "George Candy", Seq(Identifier("CGTPDRef", "XMCGTP123456789")))
+    val clientVat: Client = Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "John Innes")
+    val clientPpt: Client = Client(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", "Frank Wright")
+    val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
 
     val groupId: GroupId = GroupId(arn, groupName)
     val dbId: String = new ObjectId().toHexString
@@ -471,10 +464,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
       user,
       user,
       Some(Set(user, user1, user2)),
-      Some(Set(enrolment1, enrolment2, enrolment3))
+      Some(Set(clientVat, clientPpt, clientCgt))
     )
 
-    val clients = Seq(enrolment1, enrolment2, enrolment3).map(Client.fromEnrolment)
+    val clients = Seq(clientVat, clientPpt, clientCgt)
 
     val accessGroupInMongo = withClientNamesRemoved(accessGroup)
 
@@ -627,9 +620,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .expects(eventType, *, *, *)
         .returning(())
 
-    def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup = {
-      val nameRemover: Enrolment => Enrolment = (e: Enrolment) => e.copy(friendlyName = "")
-      accessGroup.copy(clients = accessGroup.clients.map(_.map(nameRemover)))
-    }
+    def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup =
+      accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = ""))))
   }
 }

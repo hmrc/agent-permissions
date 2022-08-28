@@ -63,16 +63,15 @@ class ArnAllowListControllerSpec extends BaseSpec {
     val controller = new ArnAllowListController(mockAuthAction)
 
     def mockAuthActionGetAuthorisedAgent(
-                                          maybeAuthorisedAgent: Option[AuthorisedAgent]
-                                        ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+      maybeAuthorisedAgent: Option[AuthorisedAgent]
+    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
       (mockAuthAction
         .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
         .expects(*, *)
         .returning(Future.successful(maybeAuthorisedAgent))
   }
 
-  def buildRequest: FakeRequest[AnyContentAsEmpty.type] = {
+  def buildRequest: FakeRequest[AnyContentAsEmpty.type] =
     FakeRequest("GET", routes.ArnAllowListController.isArnAllowed.url)
-  }
 
 }

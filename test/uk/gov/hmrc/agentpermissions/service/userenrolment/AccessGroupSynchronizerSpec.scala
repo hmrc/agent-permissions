@@ -33,12 +33,12 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
     "synchronization happens successfully" should {
       "indicate access groups were updated" in new TestScope {
         val accessGroup1: AccessGroup =
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(enrolmentVat, enrolmentPpt, enrolmentCgt)))
+          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
 
         val accessGroups: Seq[AccessGroup] = Seq(accessGroup1)
 
         mockAccessGroupsRepositoryGetAll(accessGroups)
-        mockRemoveClientsFromGroup(accessGroup1, Set(enrolmentPpt, enrolmentCgt), agentUser1)
+        mockRemoveClientsFromGroup(accessGroup1, Set(clientPpt, clientCgt).map(_.enrolmentKey), agentUser1)
         mockRemoveTeamMembersFromGroup(accessGroup1, Set.empty, agentUser1)
         mockAccessGroupsRepositoryUpdate(Some(1))
 
@@ -46,7 +46,9 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
           .syncWithEacd(
             arn,
             GroupDelegatedEnrolments(
-              Seq(AssignedClient(enrolmentVat.service, enrolmentVat.identifiers, None, agentUser1.id))
+              Seq(
+                AssignedClient(serviceVat, Seq(Identifier(serviceIdentifierKeyVat, "101747641")), None, agentUser1.id)
+              )
             ),
             agentUser1
           )
@@ -60,21 +62,26 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
     "GroupDelegatedEnrolments contains mismatched enrolments than in access group" should {
       "calculate removals correctly" in new TestScope {
         val accessGroups: Seq[AccessGroup] = Seq(
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(enrolmentVat, enrolmentPpt, enrolmentCgt))),
-          buildAccessGroup(Some(Set(agentUser2)), Some(Set(enrolmentPpt, enrolmentTrust)))
+          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt))),
+          buildAccessGroup(Some(Set(agentUser2)), Some(Set(clientPpt, clientTrust)))
         )
 
         val groupDelegatedEnrolments: GroupDelegatedEnrolments = GroupDelegatedEnrolments(
           Seq(
-            AssignedClient(enrolmentVat.service, enrolmentVat.identifiers, None, agentUser1.id),
-            AssignedClient(enrolmentPpt.service, enrolmentPpt.identifiers, None, "someOtherUser")
+            AssignedClient(serviceVat, Seq(Identifier(serviceIdentifierKeyVat, "101747641")), None, agentUser1.id),
+            AssignedClient(
+              servicePpt,
+              Seq(Identifier(serviceIdentifierKeyPpt, "XAPPT0000012345")),
+              None,
+              "someOtherUser"
+            )
           )
         )
         val removalSet: RemovalSet = accessGroupSynchronizer.calculateRemovalSet(accessGroups, groupDelegatedEnrolments)
 
         removalSet.enrolmentKeysToRemove shouldBe Set(
-          buildEnrolmentKey(enrolmentCgt),
-          buildEnrolmentKey(enrolmentTrust)
+          clientCgt.enrolmentKey,
+          clientTrust.enrolmentKey
         )
         removalSet.userIdsToRemove shouldBe Set(agentUser2.id)
       }
@@ -86,20 +93,20 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
     "removal set contains fewer enrolments than in access groups" should {
       "have corresponding enrolments and users removed" in new TestScope {
         val accessGroup1: AccessGroup =
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(enrolmentVat, enrolmentPpt, enrolmentCgt)))
+          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
         val accessGroup2: AccessGroup =
-          buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(enrolmentPpt, enrolmentTrust)))
+          buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientPpt, clientTrust)))
 
         val accessGroups: Seq[AccessGroup] = Seq(accessGroup1, accessGroup2)
 
         val removalSet: RemovalSet = RemovalSet(
-          Set(buildEnrolmentKey(enrolmentPpt), buildEnrolmentKey(enrolmentTrust)),
+          Set(clientPpt.enrolmentKey, clientTrust.enrolmentKey),
           Set(agentUser2.id)
         )
 
-        mockRemoveClientsFromGroup(accessGroup1, Set(enrolmentPpt, enrolmentTrust), agentUser1)
+        mockRemoveClientsFromGroup(accessGroup1, Set(clientPpt, clientTrust).map(_.enrolmentKey), agentUser1)
         mockRemoveTeamMembersFromGroup(accessGroup1, Set(agentUser2.id), agentUser1)
-        mockRemoveClientsFromGroup(accessGroup2, Set(enrolmentPpt, enrolmentTrust), agentUser1)
+        mockRemoveClientsFromGroup(accessGroup2, Set(clientPpt, clientTrust).map(_.enrolmentKey), agentUser1)
         mockRemoveTeamMembersFromGroup(accessGroup2, Set(agentUser2.id), agentUser1)
 
         accessGroupSynchronizer.applyRemovalsOnAccessGroups(accessGroups, removalSet, agentUser1).futureValue
@@ -112,10 +119,10 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
         val removalSet: RemovalSet = RemovalSet(Set("unknown"), Set.empty)
 
         val accessGroup1: AccessGroup =
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(enrolmentVat, enrolmentPpt, enrolmentCgt)))
+          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
         val accessGroups: Seq[AccessGroup] = Seq(accessGroup1)
 
-        mockRemoveClientsFromGroup(accessGroup1, Set.empty, agentUser1)
+        mockRemoveClientsFromGroup(accessGroup1, Set("unknown"), agentUser1)
         mockRemoveTeamMembersFromGroup(accessGroup1, Set.empty, agentUser1)
 
         accessGroupSynchronizer.applyRemovalsOnAccessGroups(accessGroups, removalSet, agentUser1).futureValue
@@ -127,7 +134,7 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
         val removalSet: RemovalSet = RemovalSet(Set.empty, Set("unknown"))
 
         val accessGroup1: AccessGroup =
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(enrolmentVat, enrolmentPpt, enrolmentCgt)))
+          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
 
         val accessGroups: Seq[AccessGroup] = Seq(accessGroup1)
 
@@ -144,7 +151,7 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
     "update returns nothing" should {
       s"return $AccessGroupNotUpdated" in new TestScope {
         val accessGroups: Seq[AccessGroup] = Seq(
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(enrolmentVat, enrolmentPpt, enrolmentCgt)))
+          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
         )
 
         mockAccessGroupsRepositoryUpdate(None)
@@ -156,7 +163,7 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
     "update indicates one record was updated in DB" should {
       s"return $AccessGroupUpdated" in new TestScope {
         val accessGroups: Seq[AccessGroup] = Seq(
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(enrolmentVat, enrolmentPpt, enrolmentCgt)))
+          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
         )
 
         mockAccessGroupsRepositoryUpdate(Some(1))
@@ -168,7 +175,7 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
     "update indicates no record was updated in DB" should {
       s"return $AccessGroupNotUpdated" in new TestScope {
         val accessGroups: Seq[AccessGroup] = Seq(
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(enrolmentVat, enrolmentPpt, enrolmentCgt)))
+          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
         )
 
         mockAccessGroupsRepositoryUpdate(Some(0))
@@ -185,16 +192,15 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
     val agentUser2: AgentUser = AgentUser("userId2", "userName")
     val now: LocalDateTime = LocalDateTime.now()
 
-    val enrolmentVat: Enrolment = Enrolment("HMRC-MTD-VAT", "", "", Seq(Identifier("VRN", "101747641")))
+    val clientVat: Client = Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "John Innes")
 
-    val enrolmentPpt: Enrolment =
-      Enrolment("HMRC-PPT-ORG", "", "", Seq(Identifier("EtmpRegistrationNumber", "XAPPT0000012345")))
+    val clientPpt: Client = Client(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", "Frank Wright")
 
-    val enrolmentCgt: Enrolment = Enrolment("HMRC-CGT-PD", "", "", Seq(Identifier("CGTPDRef", "XMCGTP123456789")))
+    val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
 
-    val enrolmentMtdit: Enrolment = Enrolment("HMRC-MTD-IT", "", "", Seq(Identifier("MTDITID", "236216873678126")))
+    val clientMtdit: Client = Client(s"$serviceMtdit~$serviceIdentifierKeyMtdit~236216873678126", "Jane Doe")
 
-    val enrolmentTrust: Enrolment = Enrolment("HMRC-TERS-ORG", "", "", Seq(Identifier("SAUTR", "0123456789")))
+    val clientTrust: Client = Client(s"$serviceTrust~$serviceIdentifierKeyTrust~0123456789", "Trust Client")
 
     val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
     val mockGroupClientsRemover: GroupClientsRemover = mock[GroupClientsRemover]
@@ -206,11 +212,17 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
     val accessGroupSynchronizer =
       new AccessGroupSynchronizerImpl(mockAccessGroupsRepository, mockGroupClientsRemover, mockGroupTeamMembersRemover)
 
-    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Enrolment]]): AccessGroup =
-      AccessGroup(arn, groupName, now, now, agentUser1, agentUser1, teamMembers, clients)
-
-    def buildEnrolmentKey(enrolment: Enrolment) =
-      s"${enrolment.service}~${enrolment.identifiers.head.key}~${enrolment.identifiers.head.value}"
+    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): AccessGroup =
+      AccessGroup(
+        arn,
+        groupName,
+        now,
+        now,
+        agentUser1,
+        agentUser1,
+        teamMembers,
+        clients
+      )
 
     def mockAccessGroupsRepositoryGetAll(
       accessGroups: Seq[AccessGroup]
@@ -230,12 +242,12 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
     def mockRemoveClientsFromGroup(
       accessGroup: AccessGroup,
-      removalEnrolments: Set[Enrolment],
+      removalEnrolmentKeys: Set[String],
       whoIsUpdating: AgentUser
-    ): CallHandler5[AccessGroup, Set[Enrolment], AgentUser, HeaderCarrier, ExecutionContext, AccessGroup] =
+    ): CallHandler5[AccessGroup, Set[String], AgentUser, HeaderCarrier, ExecutionContext, AccessGroup] =
       (mockGroupClientsRemover
-        .removeClientsFromGroup(_: AccessGroup, _: Set[Enrolment], _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(accessGroup, removalEnrolments, whoIsUpdating, *, *)
+        .removeClientsFromGroup(_: AccessGroup, _: Set[String], _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(accessGroup, removalEnrolmentKeys, whoIsUpdating, *, *)
         .returning(accessGroup)
 
     def mockRemoveTeamMembersFromGroup(

@@ -25,7 +25,6 @@ import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
 
 case class RemovalSet(enrolmentKeysToRemove: Set[String], userIdsToRemove: Set[String])
 
@@ -88,11 +87,11 @@ class AccessGroupSynchronizerImpl @Inject() (
     ec: ExecutionContext
   ): Future[Seq[AccessGroup]] = {
 
-    val removalEnrolments: Set[Enrolment] = buildEnrolmentsFromKeys(removalSet.enrolmentKeysToRemove).flatten
+    val removalEnrolmentKeys: Set[String] = removalSet.enrolmentKeysToRemove
     val removalUserIds: Set[String] = removalSet.userIdsToRemove
 
     Future successful existingAccessGroups
-      .map(groupClientsRemover.removeClientsFromGroup(_, removalEnrolments, whoIsUpdating))
+      .map(groupClientsRemover.removeClientsFromGroup(_, removalEnrolmentKeys, whoIsUpdating))
       .map(groupTeamMembersRemover.removeTeamMembersFromGroup(_, removalUserIds, whoIsUpdating))
   }
 
@@ -118,10 +117,9 @@ class AccessGroupSynchronizerImpl @Inject() (
   private def userEnrolmentsOf(accessGroups: Seq[AccessGroup]): Set[UserEnrolment] =
     (for {
       accessGroup <- accessGroups
-      enrolment   <- accessGroup.clients.toSeq.flatten
-      identifier  <- enrolment.identifiers
+      client      <- accessGroup.clients.toSet.flatten
       agentUser   <- accessGroup.teamMembers.toSeq.flatten
-    } yield UserEnrolment(agentUser.id, EnrolmentKey.enrolmentKey(enrolment.service, identifier.value))).toSet
+    } yield UserEnrolment(agentUser.id, client.enrolmentKey)).toSet
 
   private def userEnrolmentsOf(groupDelegatedEnrolments: GroupDelegatedEnrolments): Set[UserEnrolment] =
     (for {
@@ -131,18 +129,5 @@ class AccessGroupSynchronizerImpl @Inject() (
       assignedClient.assignedTo,
       EnrolmentKey.enrolmentKey(assignedClient.serviceName, identifier.value)
     )).toSet
-
-  private def buildEnrolmentsFromKeys(enrolmentKeysToRemove: Set[String]): Set[Option[Enrolment]] =
-    enrolmentKeysToRemove.map { enrolmentKeyToRemove =>
-      Try {
-        val parts = enrolmentKeyToRemove.split("~")
-        Enrolment(parts(0), "", "", Seq(Identifier(parts(1), parts(2))))
-      } match {
-        case Success(enrolment) => Some(enrolment)
-        case Failure(ex) =>
-          logger.error(s"Unable to parse enrolment '$enrolmentKeyToRemove': ${ex.getMessage}")
-          None
-      }
-    }
 
 }
