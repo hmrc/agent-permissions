@@ -45,14 +45,9 @@ class AccessGroupsControllerSpec extends BaseSpec {
   val user1: AgentUser = AgentUser("user1", "User 1")
   val user2: AgentUser = AgentUser("user2", "User 2")
   val dbId: ObjectId = new ObjectId()
-  val enrolment1: Enrolment =
-    Enrolment("HMRC-MTD-VAT", "Activated", "John Innes", Seq(Identifier("VRN", "101747641")))
-  val enrolment2: Enrolment = Enrolment(
-    "HMRC-PPT-ORG",
-    "Activated",
-    "Frank Wright",
-    Seq(Identifier("EtmpRegistrationNumber", "XAPPT0000012345"))
-  )
+  val clientVat: Client = Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "John Innes")
+
+  val clientPpt: Client = Client(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", "Frank Wright")
 
   "Call to create access group" when {
 
@@ -864,7 +859,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
             val group = accessGroup.copy(
               teamMembers = Some(Set(AgentUser("1", "existing"))),
-              clients = Some(Set(Enrolment("whatever", "state", "friendly", Seq.empty)))
+              clients = Some(Set(Client("whatever", "friendly")))
             )
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
             mockAccessGroupsServiceGetGroupById(Some(group))
@@ -880,7 +875,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
           s"return $OK" in new TestScope {
             val group = accessGroup.copy(
               teamMembers = Some(Set(AgentUser("1", "existing"))),
-              clients = Some(Set(Enrolment("whatever", "state", "friendly", Seq.empty)))
+              clients = Some(Set(Client("whatever", "friendly")))
             )
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
             mockAccessGroupsServiceGetGroupById(Some(group))
@@ -1077,7 +1072,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
   def jsonPayloadForCreateGroup(groupName: String): JsValue =
     Json.parse(s"""{
                   |    "groupName": "$groupName",
-                  |    "clients": ${Json.toJson(Seq(enrolment1, enrolment2))},
+                  |    "clients": ${Json.toJson(Seq(clientVat, clientPpt))},
                   |    "teamMembers": ${Json.toJson(Seq(user1, user2))}
                   |}""".stripMargin)
 
@@ -1096,15 +1091,8 @@ class AccessGroupsControllerSpec extends BaseSpec {
                   |    ],
                   |    "clients": [
                   |        {
-                  |            "service": "HMRC-PPT-ORG",
-                  |            "state": "Activated",
-                  |            "friendlyName": "Frank Wright",
-                  |            "identifiers": [
-                  |                {
-                  |                    "key": "EtmpRegistrationNumber",
-                  |                    "value": "XAPPT0000012345"
-                  |                }
-                  |            ]
+                  |            "enrolmentKey": "HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345",
+                  |            "friendlyName": "Frank Wright"
                   |        }
                   |    ]
                   |}""".stripMargin)
@@ -1123,15 +1111,8 @@ class AccessGroupsControllerSpec extends BaseSpec {
                   |    ],
                   |    "clients": [
                   |        {
-                  |            "service": "HMRC-PPT-ORG",
-                  |            "state": "Activated",
-                  |            "friendlyName": "Frank Wright",
-                  |            "identifiers": [
-                  |                {
-                  |                    "key": "EtmpRegistrationNumber",
-                  |                    "value": "XAPPT0000012345"
-                  |                }
-                  |            ]
+                  |            "enrolmentKey": "HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345",
+                  |            "friendlyName": "Frank Wright"
                   |        }
                   |    ]
                   |}""".stripMargin)

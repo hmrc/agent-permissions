@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, EnrolmentKey, UserEnrolment, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, UserEnrolment, UserEnrolmentAssignments}
 
 import javax.inject.Singleton
 
@@ -84,7 +84,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
 
   private def explodeUserEnrolments(accessGroup: AccessGroup): Set[UserEnrolment] = for {
     userId       <- accessGroup.teamMembers.toSet.flatten.map(_.id);
-    enrolmentKey <- accessGroup.clients.toSet.flatten.flatMap(EnrolmentKey.enrolmentKeys)
+    enrolmentKey <- accessGroup.clients.toSet.flatten.map(_.enrolmentKey)
   } yield UserEnrolment(userId, enrolmentKey)
 
   private def optimiseUserEnrolmentAssignments(

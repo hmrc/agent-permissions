@@ -23,18 +23,18 @@ import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 
-class ArnAllowListController @Inject()(authAction: AuthAction)
-                                      (implicit cc: ControllerComponents, ec: ExecutionContext)
-  extends BackendController(cc) with Logging {
+class ArnAllowListController @Inject() (authAction: AuthAction)(implicit cc: ControllerComponents, ec: ExecutionContext)
+    extends BackendController(cc) with Logging {
 
   def isArnAllowed: Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { _ =>
-        Future successful Ok
+      Future successful Ok
     }
   }
 
-  private def withAuthorisedAgent[T](body: AuthorisedAgent => Future[Result])
-                                    (implicit request: Request[T], ec: ExecutionContext): Future[Result] =
+  private def withAuthorisedAgent[T](
+    body: AuthorisedAgent => Future[Result]
+  )(implicit request: Request[T], ec: ExecutionContext): Future[Result] =
     authAction
       .getAuthorisedAgent()
       .flatMap {

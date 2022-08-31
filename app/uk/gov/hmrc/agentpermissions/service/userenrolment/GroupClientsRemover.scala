@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import play.api.libs.json.Json
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Enrolment}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Client}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
@@ -32,7 +32,7 @@ trait GroupClientsRemover {
 
   def removeClientsFromGroup(
     accessGroup: AccessGroup,
-    removalEnrolments: Set[Enrolment],
+    removalEnrolmentKeys: Set[String],
     whoIsUpdating: AgentUser
   )(implicit
     hc: HeaderCarrier,
@@ -45,21 +45,21 @@ class GroupClientsRemoverImpl @Inject() (auditConnector: AuditConnector) extends
 
   override def removeClientsFromGroup(
     accessGroup: AccessGroup,
-    removalEnrolments: Set[Enrolment],
+    removalEnrolmentKeys: Set[String],
     whoIsUpdating: AgentUser
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): AccessGroup =
     accessGroup.clients match {
       case None =>
         accessGroup
-      case Some(enrolmentsOfAccessGroup) =>
-        val enrolmentsToRemoveFromAccessGroup =
-          findEnrolmentsToRemoveFromAccessGroup(enrolmentsOfAccessGroup, removalEnrolments)
+      case Some(clientsOfAccessGroup) =>
+        val clientsToRemoveFromAccessGroup =
+          findClientsToRemoveFromAccessGroup(clientsOfAccessGroup, removalEnrolmentKeys)
 
-        if (enrolmentsToRemoveFromAccessGroup.nonEmpty) {
+        if (clientsToRemoveFromAccessGroup.nonEmpty) {
           modifyAccessGroupWithClientsRemoved(
             accessGroup,
-            enrolmentsOfAccessGroup,
-            enrolmentsToRemoveFromAccessGroup,
+            clientsOfAccessGroup,
+            clientsToRemoveFromAccessGroup,
             whoIsUpdating
           )
         } else {
@@ -67,43 +67,39 @@ class GroupClientsRemoverImpl @Inject() (auditConnector: AuditConnector) extends
         }
     }
 
-  private def findEnrolmentsToRemoveFromAccessGroup(
-    enrolmentsOfAccessGroup: Set[Enrolment],
-    removalEnrolments: Set[Enrolment]
-  ): Set[Enrolment] =
-    enrolmentsOfAccessGroup.foldLeft(Set.empty[Enrolment]) { (acc, enrolmentOfAccessGroup) =>
-      removalEnrolments.find(removalEnrolment =>
-        removalEnrolment.service == enrolmentOfAccessGroup.service && removalEnrolment.identifiers == enrolmentOfAccessGroup.identifiers
-      ) match {
-        case None        => acc
-        case Some(found) => acc + found
+  private def findClientsToRemoveFromAccessGroup(
+    clientsOfAccessGroup: Set[Client],
+    removalEnrolmentKeys: Set[String]
+  ): Set[Client] =
+    clientsOfAccessGroup.foldLeft(Set.empty[Client]) { (acc, clientOfAccessGroup) =>
+      removalEnrolmentKeys.find(_ == clientOfAccessGroup.enrolmentKey) match {
+        case None    => acc
+        case Some(_) => acc + clientOfAccessGroup
       }
     }
 
   private def modifyAccessGroupWithClientsRemoved(
     accessGroup: AccessGroup,
-    enrolmentsOfAccessGroup: Set[Enrolment],
-    enrolmentsToRemoveFromAccessGroup: Set[Enrolment],
+    clientsOfAccessGroup: Set[Client],
+    clientsToRemoveFromAccessGroup: Set[Client],
     whoIsUpdating: AgentUser
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): AccessGroup = {
 
-    val (enrolmentsToRemove, enrolmentsToKeep): (Set[Enrolment], Set[Enrolment]) =
-      enrolmentsOfAccessGroup.partition(enrolment =>
-        enrolmentsToRemoveFromAccessGroup.exists(enrolmentToRemove =>
-          enrolmentToRemove.service == enrolment.service && enrolmentToRemove.identifiers == enrolment.identifiers
-        )
+    val (clientsToRemove, clientsToKeep): (Set[Client], Set[Client]) =
+      clientsOfAccessGroup.partition(client =>
+        clientsToRemoveFromAccessGroup.exists(clientToRemove => client.enrolmentKey == clientToRemove.enrolmentKey)
       )
 
-    auditAccessGroupClientsRemoval(accessGroup, enrolmentsToRemove)
+    auditAccessGroupClientsRemoval(accessGroup, clientsToRemove)
 
     accessGroup.copy(
       lastUpdated = LocalDateTime.now(),
       lastUpdatedBy = whoIsUpdating,
-      clients = Some(enrolmentsToKeep)
+      clients = Some(clientsToKeep)
     )
   }
 
-  private def auditAccessGroupClientsRemoval(accessGroup: AccessGroup, enrolmentsToRemove: Set[Enrolment])(implicit
+  private def auditAccessGroupClientsRemoval(accessGroup: AccessGroup, clientsToRemove: Set[Client])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit =
@@ -112,7 +108,7 @@ class GroupClientsRemoverImpl @Inject() (auditConnector: AuditConnector) extends
       Json.obj(
         "accessGroupId"   -> s"${accessGroup._id}",
         "accessGroupName" -> s"${accessGroup.groupName}",
-        "clientsRemoved"  -> enrolmentsToRemove
+        "clientsRemoved"  -> clientsToRemove
       )
     )
 }
