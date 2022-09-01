@@ -63,11 +63,11 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
         "assignments get pushed" should {
           s"return $AccessGroupCreated" in new TestScope {
-            mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(maybeUserEnrolmentAssignments)
             mockAccessGroupsRepositoryGet(None)
+            mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(maybeUserEnrolmentAssignments)
             mockAccessGroupsRepositoryInsert(accessGroupInMongo, Some(insertedId))
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
-            mockAuditConnectorSendExplicitAudit("GranularPermissionsES11AssignmentsUnassignmentsPushed")
+            mockAuditConnectorSendExplicitAudit("GranularPermissionsESAssignmentsUnassignmentsPushed")
             mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupCreated")
 
             accessGroupsService
@@ -226,7 +226,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
               mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
               mockAccessGroupsRepositoryDelete(Some(1L))
               mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
-              mockAuditConnectorSendExplicitAudit("GranularPermissionsES11AssignmentsUnassignmentsPushed")
+              mockAuditConnectorSendExplicitAudit("GranularPermissionsESAssignmentsUnassignmentsPushed")
               mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted")
 
               accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupDeleted
@@ -275,7 +275,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
             mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
             mockAccessGroupsRepositoryUpdate(Some(1))
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
-            mockAuditConnectorSendExplicitAudit("GranularPermissionsES11AssignmentsUnassignmentsPushed")
+            mockAuditConnectorSendExplicitAudit("GranularPermissionsESAssignmentsUnassignmentsPushed")
             mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated")
 
             accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupUpdated
@@ -491,7 +491,11 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockAuditConnector
       )
 
-    val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)
+    val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(
+      assign = Set(UserEnrolment(user.id, clientVat.enrolmentKey)),
+      unassign = Set.empty,
+      arn = arn
+    )
     val maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments] = Some(userEnrolmentAssignments)
 
     lazy val now: LocalDateTime = LocalDateTime.now()

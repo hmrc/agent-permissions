@@ -99,6 +99,7 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
       (mockUserClientDetailsConnector
         .pushAssignments(_: UserEnrolmentAssignments)(_: HeaderCarrier, _: ExecutionContext))
         .expects(userEnrolmentAssignments, *, *)
+        .anyNumberOfTimes()
         .returning(Future successful pushStatus)
   }
 
