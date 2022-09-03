@@ -87,11 +87,9 @@ class AuthAction @Inject() (
       identifier  <- enrolment.getIdentifier(agentReferenceNumberIdentifier)
       credentials <- maybeCredentials
       name        <- maybeName
-    } yield (
-      AuthorisedAgent(
-        Arn(identifier.value),
-        AgentUser(credentials.providerId, name.name.getOrElse("") + " " + name.lastName.getOrElse(""))
-      )
+    } yield AuthorisedAgent(
+      Arn(identifier.value),
+      AgentUser(credentials.providerId, (name.name.getOrElse("") + " " + name.lastName.getOrElse("")).trim)
     )
 
   private def failureHandler(triedResult: Try[Option[AuthorisedAgent]]): Future[Option[AuthorisedAgent]] =

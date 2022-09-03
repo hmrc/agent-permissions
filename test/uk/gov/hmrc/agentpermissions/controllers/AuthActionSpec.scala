@@ -55,8 +55,20 @@ class AuthActionSpec extends BaseSpec with AuthorisationMockSupport {
 
     "auth response indicates request is authorised" when {
 
-      "check for Arn Allow List is false" should {
-        "return an authorised agent" in new TestScope {
+      "check for Arn Allow List is false" when {
+
+        "auth response indicates empty username" should {
+          "return an authorised agent with an empty name" in new TestScope {
+            mockAuthResponseWithoutException(buildAuthorisedResponseHavingEmptyUsername)
+            mockAppConfigCheckArnAllowList(toCheckArnAllowList = false)
+
+            authAction.getAuthorisedAgent().futureValue shouldBe Some(
+              AuthorisedAgent(Arn("KARN0762398"), AgentUser("user1", ""))
+            )
+          }
+        }
+
+        "return a valid authorised agent" in new TestScope {
           mockAuthResponseWithoutException(buildAuthorisedResponse)
           mockAppConfigCheckArnAllowList(toCheckArnAllowList = false)
 

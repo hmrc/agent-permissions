@@ -18,10 +18,9 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import play.api.libs.json.Json
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Client}
+import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
 import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
@@ -41,7 +40,7 @@ trait GroupClientsRemover {
 }
 
 @Singleton
-class GroupClientsRemoverImpl @Inject() (auditConnector: AuditConnector) extends GroupClientsRemover with Logging {
+class GroupClientsRemoverImpl @Inject() (auditService: AuditService) extends GroupClientsRemover with Logging {
 
   override def removeClientsFromGroup(
     accessGroup: AccessGroup,
@@ -90,7 +89,7 @@ class GroupClientsRemoverImpl @Inject() (auditConnector: AuditConnector) extends
         clientsToRemoveFromAccessGroup.exists(clientToRemove => client.enrolmentKey == clientToRemove.enrolmentKey)
       )
 
-    auditAccessGroupClientsRemoval(accessGroup, clientsToRemove)
+    auditService.auditAccessGroupClientsRemoval(accessGroup, clientsToRemove)
 
     accessGroup.copy(
       lastUpdated = LocalDateTime.now(),
@@ -99,16 +98,4 @@ class GroupClientsRemoverImpl @Inject() (auditConnector: AuditConnector) extends
     )
   }
 
-  private def auditAccessGroupClientsRemoval(accessGroup: AccessGroup, clientsToRemove: Set[Client])(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): Unit =
-    auditConnector.sendExplicitAudit(
-      "AccessGroupClientsRemoval",
-      Json.obj(
-        "accessGroupId"   -> s"${accessGroup._id}",
-        "accessGroupName" -> s"${accessGroup.groupName}",
-        "clientsRemoved"  -> clientsToRemove
-      )
-    )
 }

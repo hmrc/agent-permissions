@@ -35,6 +35,7 @@ trait AuthorisationMockSupport extends MockFactory {
   val agentEnrolment = "HMRC-AS-AGENT"
 
   val name: Name = Name(Some("Jane"), Some("Doe"))
+  val emptyName: Name = Name(None, None)
 
   val ggCredentials: Credentials = Credentials("user1", "GovernmentGateway")
 
@@ -62,6 +63,12 @@ trait AuthorisationMockSupport extends MockFactory {
     Enrolments(enrolments) and
       Some(User) and
       None and
+      Some(ggCredentials)
+
+  def buildAuthorisedResponseHavingEmptyUsername: GrantAccess =
+    Enrolments(enrolments) and
+      Some(User) and
+      Some(emptyName) and
       Some(ggCredentials)
 
   def buildUnauthorisedResponseHavingIncorrectCredentials: GrantAccess =

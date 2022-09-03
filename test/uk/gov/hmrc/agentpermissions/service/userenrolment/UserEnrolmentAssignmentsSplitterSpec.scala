@@ -29,7 +29,10 @@ class UserEnrolmentAssignmentsSplitterSpec extends BaseSpec {
 
     "both assigns and unassigns are empty" should {
       "return empty list" in {
-        UserEnrolmentAssignmentsSplitter.split(UserEnrolmentAssignments(Set.empty, Set.empty, arn)) shouldBe Seq.empty
+        UserEnrolmentAssignmentsSplitter.split(
+          UserEnrolmentAssignments(Set.empty, Set.empty, arn),
+          1000
+        ) shouldBe Seq.empty
       }
     }
 
