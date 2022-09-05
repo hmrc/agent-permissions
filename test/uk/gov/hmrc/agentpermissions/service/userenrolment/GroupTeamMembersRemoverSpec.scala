@@ -17,11 +17,10 @@
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import org.scalamock.handlers.CallHandler4
-import play.api.libs.json.{JsObject, Json}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client}
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
 import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext
@@ -37,10 +36,7 @@ class GroupTeamMembersRemoverSpec extends BaseSpec {
 
         val removalUserIds: Set[String] = Set(agentUser2.id)
 
-        mockAuditConnectorSendExplicitAudit(
-          "AccessGroupTeamMembersRemoval",
-          buildAuditDetailForTeamMembersRemoval(accessGroup, Set(agentUser2))
-        )
+        mockAuditServiceAuditAccessGroupTeamMembersRemoval()
 
         val accessGroupWithClientsRemoved: AccessGroup =
           groupTeamMembersRemover.removeTeamMembersFromGroup(accessGroup, removalUserIds, agentUser1)
@@ -68,9 +64,9 @@ class GroupTeamMembersRemoverSpec extends BaseSpec {
 
   trait TestScope {
 
-    val mockAuditConnector: AuditConnector = mock[AuditConnector]
+    val mockAuditService: AuditService = mock[AuditService]
 
-    val groupTeamMembersRemover = new GroupTeamMembersRemoverImpl(mockAuditConnector)
+    val groupTeamMembersRemover = new GroupTeamMembersRemoverImpl(mockAuditService)
 
     val arn: Arn = Arn("KARN1234567")
     val groupName: String = "groupName"
@@ -95,21 +91,13 @@ class GroupTeamMembersRemoverSpec extends BaseSpec {
         clients
       )
 
-    def buildAuditDetailForTeamMembersRemoval(accessGroup: AccessGroup, teamMembers: Set[AgentUser]): JsObject =
-      Json.obj(
-        "accessGroupId"      -> s"${accessGroup._id}",
-        "accessGroupName"    -> s"${accessGroup.groupName}",
-        "teamMembersRemoved" -> teamMembers
-      )
-
-    def mockAuditConnectorSendExplicitAudit(
-      auditType: String,
-      detail: JsObject
-    ): CallHandler4[String, JsObject, HeaderCarrier, ExecutionContext, Unit] =
-      (mockAuditConnector
-        .sendExplicitAudit(_: String, _: JsObject)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(auditType, detail, *, *)
+    def mockAuditServiceAuditAccessGroupTeamMembersRemoval()
+      : CallHandler4[AccessGroup, Set[AgentUser], HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditService
+        .auditAccessGroupTeamMembersRemoval(_: AccessGroup, _: Set[AgentUser])(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
         .returning(())
+
   }
 
 }

@@ -26,10 +26,12 @@ import javax.inject.{Inject, Singleton}
 trait AppConfig {
   def agentUserClientDetailsBaseUrl: String
   def agentSizeMaxClientCountAllowed: Int
-
   def checkArnAllowList: Boolean
-
   def allowedArns: Seq[String]
+  def clientsRemovalChunkSize: Int
+  def teamMembersRemovalChunkSize: Int
+  def accessGroupChunkSize: Int
+  def useEnrolmentAssignmentsChunkSize: Int
 }
 
 @Singleton
@@ -38,4 +40,9 @@ class AppConfigImpl @Inject() (servicesConfig: ServicesConfig, configuration: Co
   override lazy val agentSizeMaxClientCountAllowed: Int = servicesConfig.getInt("agentsize.maxClientCountAllowed")
   override lazy val checkArnAllowList: Boolean = servicesConfig.getBoolean("features.check-arn-allow-list")
   override lazy val allowedArns: Seq[String] = configuration.get[Seq[String]]("allowed.arns")
+  override lazy val clientsRemovalChunkSize: Int = servicesConfig.getInt("audit.clients-removal-chunk-size")
+  override lazy val teamMembersRemovalChunkSize: Int = servicesConfig.getInt("audit.team-members-removal-chunk-size")
+  override lazy val accessGroupChunkSize: Int = servicesConfig.getInt("audit.access-group-chunk-size")
+  override lazy val useEnrolmentAssignmentsChunkSize: Int =
+    servicesConfig.getInt("audit.user-enrolment-assignments-chunk-size")
 }

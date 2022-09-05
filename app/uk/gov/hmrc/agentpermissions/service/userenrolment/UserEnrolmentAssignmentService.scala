@@ -101,7 +101,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
         Future
           .sequence(
             UserEnrolmentAssignmentsSplitter
-              .split(userEnrolmentAssignments)
+              .split(userEnrolmentAssignments, 500)
               .map(userClientDetailsConnector.pushAssignments(_))
           )
           .map(pushStatuses =>

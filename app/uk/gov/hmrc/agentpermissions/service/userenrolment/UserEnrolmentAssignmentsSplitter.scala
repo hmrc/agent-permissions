@@ -22,7 +22,7 @@ object UserEnrolmentAssignmentsSplitter {
 
   def split(
     userEnrolmentAssignments: UserEnrolmentAssignments,
-    chunkSize: Int = 1000
+    chunkSize: Int
   ): Seq[UserEnrolmentAssignments] = {
     val assignsChunks = userEnrolmentAssignments.assign
       .grouped(chunkSize)

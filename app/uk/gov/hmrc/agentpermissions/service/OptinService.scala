@@ -18,12 +18,11 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import play.api.libs.json.Json
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, RecordInserted, RecordUpdated, UpsertType}
+import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
@@ -53,26 +52,32 @@ class OptinServiceImpl @Inject() (
   optedInStatusHandler: OptedInStatusHandler,
   notOptedInStatusHandler: NotOptedInStatusHandler,
   userClientDetailsConnector: UserClientDetailsConnector,
-  auditConnector: AuditConnector
+  auditService: AuditService
 ) extends OptinService with Logging {
 
   override def optin(arn: Arn, user: AgentUser)(implicit
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[OptinRequestStatus]] =
-    handleOptinOptout(arn, user, OptedIn).map(_.map {
+    for {
+      maybeUpsertType <- handleOptinOptout(arn, user, OptedIn)
+      _               <- Future successful auditService.auditOptInEvent(arn, user)
+    } yield maybeUpsertType.map {
       case RecordInserted(_) => OptinCreated
       case RecordUpdated     => OptinUpdated
-    })
+    }
 
   override def optout(arn: Arn, user: AgentUser)(implicit
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[OptoutRequestStatus]] =
-    handleOptinOptout(arn, user, OptedOut).map(_.map {
+    for {
+      maybeUpsertType <- handleOptinOptout(arn, user, OptedOut)
+      _               <- Future successful auditService.auditOptOutEvent(arn, user)
+    } yield maybeUpsertType.map {
       case RecordInserted(_) => OptoutCreated
       case RecordUpdated     => OptoutUpdated
-    })
+    }
 
   override def optinStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
     for {
@@ -102,22 +107,11 @@ class OptinServiceImpl @Inject() (
                              case None =>
                                Future.successful(None)
                              case Some(optinRecordToUpdate) =>
-                               for {
-                                 maybeUpsertType <- optinRepository.upsert(optinRecordToUpdate)
-                                 _ <- Future successful auditOptinOptout(optinRecordToUpdate, optinEventType, agentUser)
-                               } yield maybeUpsertType
+                               optinRepository.upsert(optinRecordToUpdate)
                            }
       _ <- userClientDetailsConnector.getClientListStatus(arn)
     } yield maybeUpsertResult
 
-  private def auditOptinOptout(optinRecord: OptinRecord, optinEventType: OptinEventType, agentUser: AgentUser)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): Unit =
-    auditConnector.sendExplicitAudit(
-      auditType = s"GranularPermissions${optinEventType.value}",
-      Json.obj("arn" -> s"${optinRecord.arn.value}", "user" -> agentUser)
-    )
 }
 
 sealed trait OptinRequestStatus
