@@ -44,7 +44,10 @@ trait UserClientDetailsConnector {
   def outstandingAssignmentsWorkItemsExist(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]]
-  def getClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Seq[Client]]]
+  def getClients(arn: Arn, sendEmail: Boolean = false, lang: Option[String] = None)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Option[Seq[Client]]]
 
   def pushAssignments(
     assignments: UserEnrolmentAssignments
@@ -143,14 +146,19 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
     }
   }
 
-  override def getClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Seq[Client]]] = {
-    val url = aucdBaseUrl + s"/agent-user-client-details/arn/${arn.value}/client-list"
-
-    def buildHeaders: Seq[(String, String)] =
-      Seq("PLAY_LANG" -> hc.otherHeaders.toMap.getOrElse("PLAY_LANG", ""))
+  override def getClients(arn: Arn, sendEmail: Boolean = false, lang: Option[String] = None)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Option[Seq[Client]]] = {
+    val url =
+      aucdBaseUrl + s"/agent-user-client-details/arn/${arn.value}/client-list" + (if (sendEmail)
+                                                                                    "?sendEmail=true" + lang.fold("")(
+                                                                                      "&lang=" + _
+                                                                                    )
+                                                                                  else "")
 
     monitor("ConsumedAPI-AgentUserClientDetails-ClientList-GET") {
-      http.GET[HttpResponse](url, queryParams = Seq.empty[(String, String)], headers = buildHeaders).map { response =>
+      http.GET[HttpResponse](url, queryParams = Seq.empty[(String, String)]).map { response =>
         response.status match {
           case ACCEPTED | OK =>
             response.json.asOpt[Seq[Client]]

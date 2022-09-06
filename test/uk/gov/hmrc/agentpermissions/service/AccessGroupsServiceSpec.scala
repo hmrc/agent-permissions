@@ -573,10 +573,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     def mockUserClientDetailsConnectorGetClients(
       maybeClients: Option[Seq[Client]]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Seq[Client]]]] =
+    ): CallHandler5[Arn, Boolean, Option[String], HeaderCarrier, ExecutionContext, Future[Option[Seq[Client]]]] =
       (mockUserClientDetailsConnector
-        .getClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *)
+        .getClients(_: Arn, _: Boolean, _: Option[String])(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *, *, *)
         .returning(Future successful maybeClients)
 
     def mockUserEnrolmentAssignmentServicePushCalculatedAssignments(
