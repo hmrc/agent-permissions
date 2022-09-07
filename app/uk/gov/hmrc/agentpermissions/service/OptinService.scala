@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
 @ImplementedBy(classOf[OptinServiceImpl])
 trait OptinService {
 
-  def optin(arn: Arn, user: AgentUser)(implicit
+  def optin(arn: Arn, user: AgentUser, lang: Option[String])(implicit
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[OptinRequestStatus]]
@@ -55,12 +55,12 @@ class OptinServiceImpl @Inject() (
   auditService: AuditService
 ) extends OptinService with Logging {
 
-  override def optin(arn: Arn, user: AgentUser)(implicit
+  override def optin(arn: Arn, user: AgentUser, lang: Option[String])(implicit
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[OptinRequestStatus]] =
     for {
-      maybeUpsertType <- handleOptinOptout(arn, user, OptedIn)
+      maybeUpsertType <- handleOptinOptout(arn, user, OptedIn, lang)
       _               <- Future successful auditService.auditOptInEvent(arn, user)
     } yield maybeUpsertType.map {
       case RecordInserted(_) => OptinCreated
@@ -72,7 +72,7 @@ class OptinServiceImpl @Inject() (
     headerCarrier: HeaderCarrier
   ): Future[Option[OptoutRequestStatus]] =
     for {
-      maybeUpsertType <- handleOptinOptout(arn, user, OptedOut)
+      maybeUpsertType <- handleOptinOptout(arn, user, OptedOut, lang = None)
       _               <- Future successful auditService.auditOptOutEvent(arn, user)
     } yield maybeUpsertType.map {
       case RecordInserted(_) => OptoutCreated
@@ -95,7 +95,8 @@ class OptinServiceImpl @Inject() (
       maybeOptinRecord <- optinRepository.get(arn)
     } yield maybeOptinRecord.fold(false)(_.status == OptedIn)
 
-  private def handleOptinOptout(arn: Arn, agentUser: AgentUser, optinEventType: OptinEventType)(implicit
+  private def handleOptinOptout(arn: Arn, agentUser: AgentUser, optinEventType: OptinEventType, lang: Option[String])(
+    implicit
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[UpsertType]] =
@@ -109,7 +110,7 @@ class OptinServiceImpl @Inject() (
                              case Some(optinRecordToUpdate) =>
                                optinRepository.upsert(optinRecordToUpdate)
                            }
-      _ <- userClientDetailsConnector.getClientListStatus(arn)
+      _ <- userClientDetailsConnector.getClients(arn, sendEmail = optinEventType == OptedIn, lang = lang)
     } yield maybeUpsertResult
 
 }

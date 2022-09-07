@@ -16,8 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import org.scalamock.handlers.{CallHandler1, CallHandler3, CallHandler4}
-import play.api.http.Status.OK
+import org.scalamock.handlers.{CallHandler1, CallHandler3, CallHandler4, CallHandler5}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
@@ -112,6 +111,15 @@ class OptinServiceSpec extends BaseSpec {
         .auditOptOutEvent(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(())
+
+    def mockUserClientDetailsConnectorGetClients(
+      sendEmail: Boolean,
+      returnValue: Option[Seq[Client]]
+    ): CallHandler5[Arn, Boolean, Option[String], HeaderCarrier, ExecutionContext, Future[Option[Seq[Client]]]] =
+      (mockUserClientDetailsConnector
+        .getClients(_: Arn, _: Boolean, _: Option[String])(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, sendEmail, *, headerCarrier, executionContext)
+        .returning(Future successful returnValue)
   }
 
   s"Calling optin" when {
@@ -125,10 +133,10 @@ class OptinServiceSpec extends BaseSpec {
           Some(OptinRecord(arn, List(OptinEvent(OptedIn, user, LocalDateTime.now()))))
         mockOptinRecordBuilderForUpdating(None, maybeOptinRecordToUpdate, OptedIn)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordInserted(insertedId)))
-        mockUserClientDetailsConnectorGetClientListStatus(Some(OK))
         mockAuditServiceAuditOptInEvent()
+        mockUserClientDetailsConnectorGetClients(sendEmail = true, returnValue = Some(Seq.empty))
 
-        whenReady(optinService.optin(arn, user)) { maybeOptinRequestStatus =>
+        whenReady(optinService.optin(arn, user, None)) { maybeOptinRequestStatus =>
           maybeOptinRequestStatus.get shouldBe OptinCreated
         }
       }
@@ -142,10 +150,10 @@ class OptinServiceSpec extends BaseSpec {
           Some(OptinRecord(arn, List(OptinEvent(OptedIn, user, LocalDateTime.now()))))
         mockOptinRepositoryGet(maybeExistingOptinRecord)
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, None, OptedIn)
-        mockUserClientDetailsConnectorGetClientListStatus(Some(OK))
         mockAuditServiceAuditOptInEvent()
+        mockUserClientDetailsConnectorGetClients(sendEmail = true, returnValue = Some(Seq.empty))
 
-        whenReady(optinService.optin(arn, user)) { maybeOptinRequestStatus =>
+        whenReady(optinService.optin(arn, user, None)) { maybeOptinRequestStatus =>
           maybeOptinRequestStatus shouldBe None
         }
       }
@@ -163,10 +171,10 @@ class OptinServiceSpec extends BaseSpec {
         )
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, maybeOptinRecordToUpdate, OptedIn)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordUpdated))
-        mockUserClientDetailsConnectorGetClientListStatus(Some(OK))
         mockAuditServiceAuditOptInEvent()
+        mockUserClientDetailsConnectorGetClients(sendEmail = true, returnValue = Some(Seq.empty))
 
-        whenReady(optinService.optin(arn, user)) { maybeOptinRequestStatus =>
+        whenReady(optinService.optin(arn, user, None)) { maybeOptinRequestStatus =>
           maybeOptinRequestStatus.get shouldBe OptinUpdated
         }
       }
@@ -184,8 +192,8 @@ class OptinServiceSpec extends BaseSpec {
           Some(OptinRecord(arn, List(OptinEvent(OptedOut, user, LocalDateTime.now()))))
         mockOptinRecordBuilderForUpdating(None, maybeOptinRecordToUpdate, OptedOut)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordInserted(insertedId)))
-        mockUserClientDetailsConnectorGetClientListStatus(Some(OK))
         mockAuditServiceAuditOptOutEvent()
+        mockUserClientDetailsConnectorGetClients(sendEmail = false, returnValue = Some(Seq.empty))
 
         whenReady(optinService.optout(arn, user)) { maybeOptoutRequestStatus =>
           maybeOptoutRequestStatus.get shouldBe OptoutCreated
@@ -201,8 +209,8 @@ class OptinServiceSpec extends BaseSpec {
           Some(OptinRecord(arn, List(OptinEvent(OptedOut, user, LocalDateTime.now()))))
         mockOptinRepositoryGet(maybeExistingOptinRecord)
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, None, OptedOut)
-        mockUserClientDetailsConnectorGetClientListStatus(Some(OK))
         mockAuditServiceAuditOptOutEvent()
+        mockUserClientDetailsConnectorGetClients(sendEmail = false, returnValue = Some(Seq.empty))
 
         whenReady(optinService.optout(arn, user)) { maybeOptoutRequestStatus =>
           maybeOptoutRequestStatus shouldBe None
@@ -222,8 +230,8 @@ class OptinServiceSpec extends BaseSpec {
         )
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, maybeOptinRecordToUpdate, OptedOut)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordUpdated))
-        mockUserClientDetailsConnectorGetClientListStatus(Some(OK))
         mockAuditServiceAuditOptOutEvent()
+        mockUserClientDetailsConnectorGetClients(sendEmail = false, returnValue = Some(Seq.empty))
 
         whenReady(optinService.optout(arn, user)) { maybeOptoutRequestStatus =>
           maybeOptoutRequestStatus.get shouldBe OptoutUpdated

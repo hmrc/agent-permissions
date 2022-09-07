@@ -35,10 +35,10 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
   val ec: ExecutionContext
 ) extends BackendController(cc) with Logging {
 
-  def optin(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def optin(arn: Arn, lang: Option[String] = None): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
       withMatchedArn(arn, authorisedAgent) {
-        optinService.optin(authorisedAgent.arn, authorisedAgent.agentUser) flatMap {
+        optinService.optin(authorisedAgent.arn, authorisedAgent.agentUser, lang) flatMap {
           case None =>
             logger.info(s"Already has $OptedIn")
             Future.successful(Conflict)
