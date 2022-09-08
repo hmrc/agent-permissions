@@ -185,9 +185,14 @@ class AccessGroupsServiceImpl @Inject() (
           .update(groupId.arn, groupId.groupName, withClientNamesRemoved(accessGroupWithWhoIsUpdating))
       accessGroupUpdateStatus <- maybeUpdatedCount match {
                                    case None =>
+                                     logger.info(s"Access group '${accessGroup.groupName}' not updated")
                                      Future.successful(AccessGroupNotUpdated)
                                    case Some(updatedCount) =>
                                      if (updatedCount == 1L) {
+                                       logger.info(
+                                         s"Access group '${accessGroup.groupName}' maybeCalculatedAssignments: $maybeCalculatedAssignments"
+                                       )
+
                                        for {
                                          pushStatus <- pushAssignments(maybeCalculatedAssignments)
                                          _ <- Future successful auditService.auditAccessGroupUpdate(
@@ -200,6 +205,9 @@ class AccessGroupsServiceImpl @Inject() (
                                            AccessGroupUpdatedWithoutAssignmentsPushed
                                        }
                                      } else {
+                                       logger.warn(
+                                         s"Access group '${accessGroup.groupName}' update count should not have been $updatedCount"
+                                       )
                                        Future.successful(AccessGroupNotUpdated)
                                      }
                                  }
@@ -257,7 +265,10 @@ class AccessGroupsServiceImpl @Inject() (
     } yield {
       if (pushStatus == AssignmentsPushed) {
         maybeCalculatedAssignments.foreach(auditService.auditEsAssignmentUnassignments)
+      } else {
+        logger.info(s"Nothing to audit ES Assignment Unassignments as pushStatus: $pushStatus")
       }
+
       logger.info(s"Push status: $pushStatus")
       pushStatus
     }
