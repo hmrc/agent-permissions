@@ -17,6 +17,7 @@
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
+import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, UserEnrolment, UserEnrolmentAssignments}
 
 import javax.inject.Singleton
@@ -41,7 +42,7 @@ trait UserEnrolmentAssignmentCalculator {
 }
 
 @Singleton
-class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalculator {
+class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalculator with Logging {
 
   override def forGroupCreation(
     accessGroupToProcess: AccessGroup,
@@ -52,7 +53,11 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
 
     val seedUnassigns = Set.empty[UserEnrolment]
 
-    Option(optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns))
+    val userEnrolmentAssignments =
+      optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns)
+    logger.info(s"For GroupCreation, calculated: $userEnrolmentAssignments")
+
+    Option(userEnrolmentAssignments)
   }
 
   override def forGroupUpdate(
@@ -67,7 +72,11 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
         val seedUnassigns =
           explodeUserEnrolments(accessGroupToProcessPreviousVersion) -- explodeUserEnrolments(accessGroupToProcess)
 
-        optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns)
+        val userEnrolmentAssignments =
+          optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns)
+        logger.info(s"For GroupUpdate, calculated: $userEnrolmentAssignments")
+
+        userEnrolmentAssignments
     }
 
   override def forGroupDeletion(
@@ -79,7 +88,11 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
 
     val seedUnassigns = explodeUserEnrolments(accessGroupToProcess)
 
-    Option(optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns))
+    val userEnrolmentAssignments =
+      optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns)
+    logger.info(s"For GroupDeletion, calculated: $userEnrolmentAssignments")
+
+    Option(userEnrolmentAssignments)
   }
 
   private def explodeUserEnrolments(accessGroup: AccessGroup): Set[UserEnrolment] = for {
