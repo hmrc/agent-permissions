@@ -53,11 +53,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
 
     val seedUnassigns = Set.empty[UserEnrolment]
 
-    val userEnrolmentAssignments =
-      optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns)
-    logger.info(s"For GroupCreation, calculated: $userEnrolmentAssignments")
-
-    Option(userEnrolmentAssignments)
+    Option(optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns))
   }
 
   override def forGroupUpdate(
@@ -72,11 +68,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
         val seedUnassigns =
           explodeUserEnrolments(accessGroupToProcessPreviousVersion) -- explodeUserEnrolments(accessGroupToProcess)
 
-        val userEnrolmentAssignments =
-          optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns)
-        logger.info(s"For GroupUpdate, calculated: $userEnrolmentAssignments")
-
-        userEnrolmentAssignments
+        optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns)
     }
 
   override def forGroupDeletion(
@@ -88,11 +80,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
 
     val seedUnassigns = explodeUserEnrolments(accessGroupToProcess)
 
-    val userEnrolmentAssignments =
-      optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns)
-    logger.info(s"For GroupDeletion, calculated: $userEnrolmentAssignments")
-
-    Option(userEnrolmentAssignments)
+    Option(optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns))
   }
 
   private def explodeUserEnrolments(accessGroup: AccessGroup): Set[UserEnrolment] = for {
@@ -105,7 +93,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     existingAccessGroups: Seq[AccessGroup],
     seedAssigns: Set[UserEnrolment],
     seedUnassigns: Set[UserEnrolment]
-  ) =
+  ): UserEnrolmentAssignments =
     existingAccessGroups
       .filterNot(_.groupName.equalsIgnoreCase(accessGroupToProcess.groupName))
       .foldLeft(UserEnrolmentAssignments(seedAssigns, seedUnassigns, accessGroupToProcess.arn)) {

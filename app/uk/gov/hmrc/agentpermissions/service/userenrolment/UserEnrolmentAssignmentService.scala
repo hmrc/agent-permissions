@@ -93,7 +93,6 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
       case None =>
         Future.successful(AssignmentsNotPushed)
       case Some(userEnrolmentAssignments) =>
-        logger.info(s"EACD assignments calculated: ${Json.toJson(userEnrolmentAssignments)}")
         logger.info(
           s"Assign count: ${userEnrolmentAssignments.assign.size}, Unassign count: ${userEnrolmentAssignments.unassign.size}"
         )

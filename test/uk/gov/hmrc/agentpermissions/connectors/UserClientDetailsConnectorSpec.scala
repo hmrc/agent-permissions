@@ -207,6 +207,35 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
 
   "getClients" when {
 
+    s"http response has $ACCEPTED status code and to send email" should {
+      "return some value" in new TestScope {
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpGet(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list?sendEmail=true",
+          HttpResponse(ACCEPTED, "[]")
+        )
+
+        userClientDetailsConnector.getClients(arn, sendEmail = true).futureValue shouldBe Some(Seq.empty)
+      }
+    }
+
+    s"http response has $ACCEPTED status code and to send email and lang is provided" should {
+      "return some value" in new TestScope {
+        val lang = "cy"
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpGet(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list?sendEmail=true&lang=$lang",
+          HttpResponse(ACCEPTED, "[]")
+        )
+
+        userClientDetailsConnector.getClients(arn, sendEmail = true, lang = Some(lang)).futureValue shouldBe Some(
+          Seq.empty
+        )
+      }
+    }
+
     s"http response has $ACCEPTED status code" should {
       "return some value" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
