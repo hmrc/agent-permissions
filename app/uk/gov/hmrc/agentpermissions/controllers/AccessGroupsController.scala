@@ -174,12 +174,12 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
           )
           accessGroupsService.update(groupId, groupWithTeamMembersAdded, authorisedAgent.agentUser) map {
             case AccessGroupNotUpdated =>
-              logger.info("Access group was not updated")
+              logger.info(s"Access group '${groupId.groupName}' was not updated")
               NotFound
             case AccessGroupUpdated =>
               Ok
             case AccessGroupUpdatedWithoutAssignmentsPushed =>
-              logger.warn(s"Access group was updated, but assignments were not pushed")
+              logger.warn(s"Access group '${groupId.groupName}' was updated, but assignments were not pushed")
               Ok
           }
         }

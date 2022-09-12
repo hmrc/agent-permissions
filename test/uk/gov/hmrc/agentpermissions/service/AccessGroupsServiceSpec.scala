@@ -117,12 +117,22 @@ class AccessGroupsServiceSpec extends BaseSpec {
   "Fetching group" when {
 
     "group exists" should {
-      "return corresponding summaries" in new TestScope {
+      "return corresponding group" in new TestScope {
         mockAccessGroupsRepositoryGet(Some(accessGroupInMongo))
         mockUserClientDetailsConnectorGetClients(Some(clients))
 
         accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
           Some(accessGroup)
+      }
+    }
+
+    "group exists but backend does not have matching clients" should {
+      "return corresponding group with empty friendly name" in new TestScope {
+        mockAccessGroupsRepositoryGet(Some(accessGroupInMongo))
+        mockUserClientDetailsConnectorGetClients(Some(Seq.empty))
+
+        accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+          Some(accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = "")))))
       }
     }
 

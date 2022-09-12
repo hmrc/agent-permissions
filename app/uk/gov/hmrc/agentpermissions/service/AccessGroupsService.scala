@@ -83,7 +83,7 @@ class AccessGroupsServiceImpl @Inject() (
   override def getById(id: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[AccessGroup]] =
     accessGroupsRepository
       .findById(id)
-      .flatMap(withClientNames)
+      .flatMap(withClientName)
 
   override def create(
     accessGroup: AccessGroup
@@ -120,7 +120,7 @@ class AccessGroupsServiceImpl @Inject() (
   override def get(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[AccessGroup]] =
     accessGroupsRepository
       .get(groupId.arn, groupId.groupName)
-      .flatMap(withClientNames)
+      .flatMap(withClientName)
 
   override def getGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     ec: ExecutionContext
@@ -189,10 +189,6 @@ class AccessGroupsServiceImpl @Inject() (
                                      Future.successful(AccessGroupNotUpdated)
                                    case Some(updatedCount) =>
                                      if (updatedCount == 1L) {
-                                       logger.info(
-                                         s"Access group '${accessGroup.groupName}' maybeCalculatedAssignments: $maybeCalculatedAssignments"
-                                       )
-
                                        for {
                                          pushStatus <- pushAssignments(maybeCalculatedAssignments)
                                          _ <- Future successful auditService.auditAccessGroupUpdate(
@@ -276,30 +272,35 @@ class AccessGroupsServiceImpl @Inject() (
   private def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup =
     accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = ""))))
 
-  private def withClientNames(
-    accessGroup: Option[AccessGroup]
+  private def withClientName(
+    maybeAccessGroup: Option[AccessGroup]
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[AccessGroup]] =
-    accessGroup.fold(Future successful Option.empty[AccessGroup])(ag =>
-      userClientDetailsConnector.getClients(ag.arn).map {
-        case None          => None
-        case Some(clients) => Option.apply(ag.copy(clients = copyNamesToEnrolments(ag.clients)(clients)))
-      }
-    )
-
-  private def copyNamesToEnrolments(
-    maybeAccessGroupClients: Option[Set[Client]]
-  )(backendClients: Seq[Client]): Option[Set[Client]] =
-    maybeAccessGroupClients
-      .map(
-        _.map(accessGroupClient =>
-          accessGroupClient.copy(friendlyName =
-            backendClients.find(_.enrolmentKey == accessGroupClient.enrolmentKey) match {
-              case Some(client) => client.friendlyName
-              case None         => ""
-            }
+    maybeAccessGroup.fold(Future successful Option.empty[AccessGroup])(accessGroup =>
+      userClientDetailsConnector
+        .getClients(accessGroup.arn)
+        .map(
+          _.map(backendClients =>
+            accessGroup.copy(clients = copyNamesFromBackendClients(accessGroup.clients)(backendClients))
           )
         )
+    )
+
+  private def copyNamesFromBackendClients(
+    maybeAccessGroupClients: Option[Set[Client]]
+  )(backendClients: Seq[Client]): Option[Set[Client]] = {
+
+    def identifyFriendlyNameAmongBackendClients(accessGroupClient: Client): String =
+      backendClients.find(_.enrolmentKey == accessGroupClient.enrolmentKey) match {
+        case Some(matchingBackendClient) => matchingBackendClient.friendlyName
+        case None                        => ""
+      }
+
+    maybeAccessGroupClients.map(
+      _.map(accessGroupClient =>
+        accessGroupClient.copy(friendlyName = identifyFriendlyNameAmongBackendClients(accessGroupClient))
       )
+    )
+  }
 
   private def withClientNames(
     accessGroups: Seq[AccessGroup]
@@ -311,7 +312,7 @@ class AccessGroupsServiceImpl @Inject() (
           case None => accessGroups
           case Some(backendClients) =>
             accessGroups.map(accessGroup =>
-              accessGroup.copy(clients = copyNamesToEnrolments(accessGroup.clients)(backendClients))
+              accessGroup.copy(clients = copyNamesFromBackendClients(accessGroup.clients)(backendClients))
             )
         }
     }

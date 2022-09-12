@@ -879,11 +879,27 @@ class AccessGroupsControllerSpec extends BaseSpec {
             )
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
             mockAccessGroupsServiceGetGroupById(Some(group))
-            mockAccessGroupsServiceUpdate(AccessGroupUpdated)
+            mockAccessGroupsServiceUpdate(AccessGroupUpdatedWithoutAssignmentsPushed)
 
             val result = controller.addUnassignedMembers(dbId.toHexString)(request)
 
             status(result) shouldBe OK
+          }
+        }
+
+        s"access groups service returns $AccessGroupNotUpdated" should {
+          s"return $NOT_FOUND" in new TestScope {
+            val group = accessGroup.copy(
+              teamMembers = Some(Set(AgentUser("1", "existing"))),
+              clients = Some(Set(Client("whatever", "friendly")))
+            )
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceGetGroupById(Some(group))
+            mockAccessGroupsServiceUpdate(AccessGroupNotUpdated)
+
+            val result = controller.addUnassignedMembers(dbId.toHexString)(request)
+
+            status(result) shouldBe NOT_FOUND
           }
         }
 
