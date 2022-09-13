@@ -20,6 +20,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter, SymmetricCryptoFactory}
 
 abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures with MockFactory {
   val serviceVat = "HMRC-MTD-VAT"
@@ -33,4 +34,8 @@ abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures 
   val serviceIdentifierKeyCgt = "CgtRef"
   val serviceIdentifierKeyMtdit = "MTDITID"
   val serviceIdentifierKeyTrust = "SAUTR"
+
+  // Note: This is simply a randomly-chosen secret key to run tests
+  val aesGcmCrypto: Encrypter with Decrypter =
+    SymmetricCryptoFactory.aesGcmCrypto(secretKey = "hWmZq3t6w9zrCeF5JiNcRfUjXn2r5u7x")
 }

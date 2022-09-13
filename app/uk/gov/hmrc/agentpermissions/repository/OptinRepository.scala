@@ -23,6 +23,8 @@ import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.Indexes.ascending
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptinRecord}
+import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
@@ -35,24 +37,28 @@ trait OptinRepository {
   def upsert(optinRecord: OptinRecord): Future[Option[UpsertType]]
 }
 
+/** Note: This implementation stores some fields encrypted in mongo. (APB-6461)
+  */
 @Singleton
 class OptinRepositoryImpl @Inject() (
-  mongoComponent: MongoComponent
+  mongoComponent: MongoComponent,
+  crypto: Encrypter with Decrypter
 )(implicit ec: ExecutionContext)
-    extends PlayMongoRepository[OptinRecord](
+    extends PlayMongoRepository[SensitiveOptinRecord](
       collectionName = "optin",
-      domainFormat = OptinRecord.formatOptinRecord,
+      domainFormat = SensitiveOptinRecord.format(crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true))
       )
     ) with OptinRepository with Logging {
 
-  def get(arn: Arn): Future[Option[OptinRecord]] = collection.find(equal("arn", arn.value)).headOption()
+  def get(arn: Arn): Future[Option[OptinRecord]] =
+    collection.find(equal("arn", arn.value)).headOption().map(_.map(_.decryptedValue))
 
   def upsert(optinRecord: OptinRecord): Future[Option[UpsertType]] =
     collection
-      .replaceOne(equal("arn", optinRecord.arn.value), optinRecord, upsertOptions)
+      .replaceOne(equal("arn", optinRecord.arn.value), SensitiveOptinRecord(optinRecord), upsertOptions)
       .headOption()
       .map(
         _.map(result =>

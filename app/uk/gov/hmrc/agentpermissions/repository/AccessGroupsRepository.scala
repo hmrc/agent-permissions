@@ -25,7 +25,9 @@ import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
 import org.mongodb.scala.model.{DeleteOptions, IndexModel, ReplaceOptions}
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, Arn}
+import uk.gov.hmrc.agentpermissions.model.SensitiveAccessGroup
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
@@ -44,11 +46,12 @@ trait AccessGroupsRepository {
 
 @Singleton
 class AccessGroupsRepositoryImpl @Inject() (
-  mongoComponent: MongoComponent
+  mongoComponent: MongoComponent,
+  crypto: Encrypter with Decrypter
 )(implicit ec: ExecutionContext)
-    extends PlayMongoRepository[AccessGroup](
+    extends PlayMongoRepository[SensitiveAccessGroup](
       collectionName = "access-groups",
-      domainFormat = AccessGroup.formatAccessGroup,
+      domainFormat = SensitiveAccessGroup.format(crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending(FIELD_ARN), new IndexOptions().name("arnIdx").unique(false)),
@@ -66,6 +69,7 @@ class AccessGroupsRepositoryImpl @Inject() (
     collection
       .find(new BasicDBObject("_id", id))
       .headOption()
+      .map(_.map(_.decryptedValue))
 
   override def get(arn: Arn): Future[Seq[AccessGroup]] =
     collection
@@ -73,16 +77,18 @@ class AccessGroupsRepositoryImpl @Inject() (
       .collation(caseInsensitiveCollation)
       .collect()
       .toFuture()
+      .map(_.map(_.decryptedValue))
 
   override def get(arn: Arn, groupName: String): Future[Option[AccessGroup]] =
     collection
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)))
       .collation(caseInsensitiveCollation)
       .headOption()
+      .map(_.map(_.decryptedValue))
 
   override def insert(accessGroup: AccessGroup): Future[Option[String]] =
     collection
-      .insertOne(accessGroup)
+      .insertOne(SensitiveAccessGroup(accessGroup))
       .headOption()
       .map(_.map(result => result.getInsertedId.asString().getValue))
       .recoverWith { case e: MongoWriteException =>
@@ -102,7 +108,7 @@ class AccessGroupsRepositoryImpl @Inject() (
     collection
       .replaceOne(
         and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),
-        accessGroup,
+        SensitiveAccessGroup(accessGroup),
         replaceOptions
       )
       .headOption()

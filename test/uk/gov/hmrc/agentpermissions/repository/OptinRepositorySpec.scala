@@ -16,16 +16,18 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
+import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 
 import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext
 
-class OptinRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[OptinRecord] {
+class OptinRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[SensitiveOptinRecord] {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
@@ -39,19 +41,37 @@ class OptinRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySuppor
       )
     )
 
-    val optinRepository: OptinRepositoryImpl = repository.asInstanceOf[OptinRepositoryImpl]
+    val optinRepositoryImpl: OptinRepositoryImpl = repository.asInstanceOf[OptinRepositoryImpl]
+    val optinRepository: OptinRepository = optinRepositoryImpl // trying to use trait interface as much as possible
   }
 
   "OptinRepository" when {
 
     "set up" should {
       "have correct indexes" in new TestScope {
-        optinRepository.collectionName shouldBe "optin"
-        optinRepository.indexes.size shouldBe 1
-        val indexModel: IndexModel = optinRepository.indexes.head
+        optinRepositoryImpl.collectionName shouldBe "optin"
+        optinRepositoryImpl.indexes.size shouldBe 1
+        val indexModel: IndexModel = optinRepositoryImpl.indexes.head
         assert(indexModel.getKeys.toBsonDocument.containsKey("arn"))
         indexModel.getOptions.getName shouldBe "arnIdx"
         assert(indexModel.getOptions.isUnique)
+      }
+    }
+
+    "inserting a record" should {
+      "store the record with field-level encryption" in new TestScope {
+        optinRepository.upsert(optinRecord).futureValue
+        // checking at the raw Document level that the relevant fields have been encrypted
+        val document = optinRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
+        document.toString should include(
+          optinRecord.status.value
+        ) // the opt-in/opt-out status string should be in plaintext
+        // But the agent user ids and names should be encrypted
+        optinRecord.history.map(_.user).foreach { agentUser =>
+          document.toString should not include agentUser.id
+          document.toString should not include agentUser.name
+        }
+
       }
     }
 
@@ -77,5 +97,6 @@ class OptinRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySuppor
 
   }
 
-  override protected def repository: PlayMongoRepository[OptinRecord] = new OptinRepositoryImpl(mongoComponent)
+  override protected def repository: PlayMongoRepository[SensitiveOptinRecord] =
+    new OptinRepositoryImpl(mongoComponent, aesGcmCrypto)
 }
