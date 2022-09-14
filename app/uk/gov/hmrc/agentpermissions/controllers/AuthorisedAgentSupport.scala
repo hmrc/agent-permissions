@@ -16,19 +16,24 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import play.api.mvc._
-import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
+import play.api.Logging
+import play.api.mvc.Results.Forbidden
+import play.api.mvc.{Request, Result}
 
-import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 
-class ArnAllowListController @Inject() (implicit authAction: AuthAction, cc: ControllerComponents, ec: ExecutionContext)
-    extends BackendController(cc) with AuthorisedAgentSupport {
+trait AuthorisedAgentSupport extends Logging {
 
-  def isArnAllowed: Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { _ =>
-      Future successful Ok
-    }
-  }
-
+  def withAuthorisedAgent[T](
+    body: AuthorisedAgent => Future[Result]
+  )(implicit authAction: AuthAction, request: Request[T], ec: ExecutionContext): Future[Result] =
+    authAction
+      .getAuthorisedAgent()
+      .flatMap {
+        case None =>
+          logger.info("Could not identify authorised agent")
+          Future.successful(Forbidden)
+        case Some(authorisedAgent: AuthorisedAgent) =>
+          body(authorisedAgent)
+      }
 }

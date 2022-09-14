@@ -397,6 +397,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
   "Call to get groups summaries for client" should {
 
     "return only groups that the client is in" in new TestScope {
+      mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
       mockAccessGroupsServiceGetGroupsForClient(Seq(AccessGroupSummary(dbId.toHexString, groupName, 3, 3)))
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
@@ -410,6 +411,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
 
     "return Not Found if there are no groups for the client" in new TestScope {
+      mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
       mockAccessGroupsServiceGetGroupsForClient(Seq.empty)
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
@@ -418,6 +420,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
 
     s"return $INTERNAL_SERVER_ERROR if there was some exception" in new TestScope {
+      mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
       mockAccessGroupsServiceGetGroupsForClientWithException(new NullPointerException("bad"))
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
@@ -430,6 +433,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
   "Call to get groups summaries for a team member" should {
 
     "return only groups that the team member is in" in new TestScope {
+      mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
       mockAccessGroupsServiceGetGroupsForTeamMember(Seq(AccessGroupSummary(dbId.toHexString, groupName, 3, 3)))
 
       val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
@@ -443,6 +447,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
 
     "return Not Found if there are no groups for the team member" in new TestScope {
+      mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
       mockAccessGroupsServiceGetGroupsForTeamMember(Seq.empty)
 
       val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
@@ -451,6 +456,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
 
     s"return $INTERNAL_SERVER_ERROR if there was some exception" in new TestScope {
+      mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
       mockAccessGroupsServiceGetGroupsForTeamMemberWithException(new NullPointerException("bad"))
 
       val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
@@ -923,13 +929,13 @@ class AccessGroupsControllerSpec extends BaseSpec {
     val accessGroup: AccessGroup =
       AccessGroup(dbId, arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
     val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
-    val mockAuthAction: AuthAction = mock[AuthAction]
+    implicit val mockAuthAction: AuthAction = mock[AuthAction]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
     implicit val actorSystem: ActorSystem = ActorSystem()
 
-    val controller = new AccessGroupsController(mockAccessGroupsService, mockAuthAction)
+    val controller = new AccessGroupsController(mockAccessGroupsService)
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]

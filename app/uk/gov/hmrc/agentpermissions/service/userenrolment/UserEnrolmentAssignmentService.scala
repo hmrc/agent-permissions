@@ -18,7 +18,6 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import play.api.libs.json.Json
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, GroupId, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository

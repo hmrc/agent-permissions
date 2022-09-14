@@ -1,20 +1,21 @@
-# microservice specific routes
 
-POST    /arn/:arn/optin                     uk.gov.hmrc.agentpermissions.controllers.OptinController.optin(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, lang: Option[String])
-POST    /arn/:arn/optout                    uk.gov.hmrc.agentpermissions.controllers.OptinController.optout(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/optin-status              uk.gov.hmrc.agentpermissions.controllers.OptinController.optinStatus(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/optin-record-exists       uk.gov.hmrc.agentpermissions.controllers.OptinController.optinRecordExists(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+# Optin Optout
+POST    /arn/:arn/optin                         uk.gov.hmrc.agentpermissions.controllers.OptinController.optin(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, lang: Option[String])
+POST    /arn/:arn/optout                        uk.gov.hmrc.agentpermissions.controllers.OptinController.optout(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/optin-status                  uk.gov.hmrc.agentpermissions.controllers.OptinController.optinStatus(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/optin-record-exists           uk.gov.hmrc.agentpermissions.controllers.OptinController.optinRecordExists(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 
-POST    /arn/:arn/groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupsSummaries(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
-DELETE  /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
-PATCH   /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
-PUT     /groups/:gid/add-unassigned           uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: String)
-GET    /arn/:arn/access-group-name-check   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupNameCheck(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, name: String)
-PATCH   /arn/:arn/sync                      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/client/:enrolmentKey/groups uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForClient(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, enrolmentKey)
-GET     /arn/:arn/team-member/:userId/groups  uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForTeamMember(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, userId: String)
+# Access Groups
+POST    /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupsSummaries(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
+DELETE  /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
+PATCH   /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
+PUT     /groups/:gid/add-unassigned             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: String)
+GET     /arn/:arn/access-group-name-check       uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupNameCheck(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, name: String)
+PATCH   /arn/:arn/sync                          uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/client/:enrolmentKey/groups   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForClient(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, enrolmentKey)
+GET     /arn/:arn/team-member/:userId/groups    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForTeamMember(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, userId: String)
 
 # ARN Allow List
-GET     /arn-allowed                        uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.isArnAllowed
+GET     /arn-allowed                            uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.isArnAllowed

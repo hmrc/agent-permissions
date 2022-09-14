@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import play.api.Logging
 import play.api.libs.json.JsString
 import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptedIn, OptedOut}
@@ -29,11 +28,12 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 @Singleton()
-class OptinController @Inject() (optinService: OptinService, authAction: AuthAction)(implicit
+class OptinController @Inject() (optinService: OptinService)(implicit
+  authAction: AuthAction,
   val appConfig: AppConfig,
   cc: ControllerComponents,
   val ec: ExecutionContext
-) extends BackendController(cc) with Logging {
+) extends BackendController(cc) with AuthorisedAgentSupport {
 
   def optin(arn: Arn, lang: Option[String] = None): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent { authorisedAgent =>
@@ -66,36 +66,27 @@ class OptinController @Inject() (optinService: OptinService, authAction: AuthAct
   }
 
   def optinStatus(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    optinService
-      .optinStatus(arn)
-      .map(_.map(_.value))
-      .map {
-        case None              => NotFound
-        case Some(optinStatus) => Ok(JsString(optinStatus))
-      } transformWith failureHandler
+    withAuthorisedAgent { _ =>
+      optinService
+        .optinStatus(arn)
+        .map(_.map(_.value))
+        .map {
+          case None              => NotFound
+          case Some(optinStatus) => Ok(JsString(optinStatus))
+        }
+    } transformWith failureHandler
   }
 
   def optinRecordExists(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    optinService
-      .optinRecordExists(arn)
-      .map {
-        case true  => NoContent
-        case false => NotFound
-      } transformWith failureHandler
+    withAuthorisedAgent { _ =>
+      optinService
+        .optinRecordExists(arn)
+        .map {
+          case true  => NoContent
+          case false => NotFound
+        }
+    } transformWith failureHandler
   }
-
-  private def withAuthorisedAgent[T](
-    body: AuthorisedAgent => Future[Result]
-  )(implicit request: Request[T], ec: ExecutionContext): Future[Result] =
-    authAction
-      .getAuthorisedAgent()
-      .flatMap {
-        case None =>
-          logger.info("Could not identify authorised agent")
-          Future.successful(Forbidden)
-        case Some(authorisedAgent: AuthorisedAgent) =>
-          body(authorisedAgent)
-      }
 
   private def withMatchedArn(providedArn: Arn, authorisedAgent: AuthorisedAgent)(
     body: => Future[Result]
