@@ -60,7 +60,7 @@ class ArnAllowListControllerSpec extends BaseSpec {
 
     implicit val mockAuthAction: AuthAction = mock[AuthAction]
 
-    val controller = new ArnAllowListController(mockAuthAction)
+    val controller = new ArnAllowListController()
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]

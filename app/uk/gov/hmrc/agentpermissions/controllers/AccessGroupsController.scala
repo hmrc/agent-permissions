@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import play.api.Logging
 import play.api.libs.json._
 import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model._
@@ -31,10 +30,11 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 @Singleton()
-class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService, authAction: AuthAction)(implicit
+class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService)(implicit
+  authAction: AuthAction,
   cc: ControllerComponents,
   val ec: ExecutionContext
-) extends BackendController(cc) with Logging {
+) extends BackendController(cc) with AuthorisedAgentSupport {
 
   private val MAX_LENGTH_GROUP_NAME = 32
 
@@ -103,15 +103,16 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
-    {
-      accessGroupsService
-        .getGroupSummariesForClient(arn, enrolmentKey)
-        .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
-    } transformWith failureHandler
+    implicit request =>
+      withAuthorisedAgent { _ =>
+        accessGroupsService
+          .getGroupSummariesForClient(arn, enrolmentKey)
+          .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
+      } transformWith failureHandler
   }
 
-  def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async {
-    {
+  def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent { _ =>
       accessGroupsService
         .getGroupSummariesForTeamMember(arn, userId)
         .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
@@ -209,19 +210,6 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
       }
     } transformWith failureHandler
   }
-
-  private def withAuthorisedAgent[T](
-    body: AuthorisedAgent => Future[Result]
-  )(implicit request: Request[T], ec: ExecutionContext): Future[Result] =
-    authAction
-      .getAuthorisedAgent()
-      .flatMap {
-        case None =>
-          logger.info("Could not identify authorised agent")
-          Future.successful(Forbidden)
-        case Some(authorisedAgent: AuthorisedAgent) =>
-          body(authorisedAgent)
-      }
 
   private def withGroupId(gid: String, authorisedArn: Arn)(
     body: (GroupId, AccessGroup) => Future[Result]

@@ -34,13 +34,13 @@ class OptinControllerSpec extends BaseSpec {
     val arn: Arn = Arn("KARN1234567")
     val user: AgentUser = AgentUser("userId", "userName")
     val optinService: OptinService = mock[OptinService]
-    val authAction: AuthAction = mock[AuthAction]
+    implicit val authAction: AuthAction = mock[AuthAction]
     implicit val appConfig: AppConfig = mock[AppConfig]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val request: FakeRequest[AnyContentAsEmpty.type] = fakeRequest
 
-    val controller = new OptinController(optinService, authAction)
+    val controller = new OptinController(optinService)
 
     def fakeRequest: FakeRequest[AnyContentAsEmpty.type] = FakeRequest()
 
@@ -237,6 +237,7 @@ class OptinControllerSpec extends BaseSpec {
 
     "optin service does not return an optin status record" should {
       s"return $NOT_FOUND" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         mockOptinServiceOptinStatusWithoutException(None)
 
         val result = controller.optinStatus(arn)(request)
@@ -246,6 +247,7 @@ class OptinControllerSpec extends BaseSpec {
 
     "optin service does return an optin status record" should {
       s"return $OK" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         mockOptinServiceOptinStatusWithoutException(Some(OptedOutEligible))
 
         val result = controller.optinStatus(arn)(request)
@@ -256,6 +258,7 @@ class OptinControllerSpec extends BaseSpec {
 
     "optin service throws exception" should {
       s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         mockOptinServiceOptinStatusWithException(new RuntimeException("boo boo"))
 
         val result = controller.optinStatus(arn)(request)
@@ -269,6 +272,7 @@ class OptinControllerSpec extends BaseSpec {
 
     "optin record exists" should {
       s"return $NO_CONTENT" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         mockOptinRecordExistsWithoutException(true)
         val result = controller.optinRecordExists(arn)(request)
         status(result) shouldBe NO_CONTENT
@@ -277,6 +281,7 @@ class OptinControllerSpec extends BaseSpec {
 
     "optin record does not exist" should {
       s"return $NOT_FOUND" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         mockOptinRecordExistsWithoutException(false)
         val result = controller.optinRecordExists(arn)(request)
         status(result) shouldBe NOT_FOUND
@@ -285,6 +290,7 @@ class OptinControllerSpec extends BaseSpec {
 
     "optin service throws exception" should {
       s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         mockOptinRecordExistsWithException(new RuntimeException("boo boo"))
 
         val result = controller.optinRecordExists(arn)(request)
