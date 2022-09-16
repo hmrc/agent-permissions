@@ -17,8 +17,10 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import org.bson.types.ObjectId
+import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentpermissions.model.SensitiveAccessGroup
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
@@ -26,7 +28,7 @@ import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext
 
-class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[AccessGroup] {
+class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[SensitiveAccessGroup] {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
@@ -57,17 +59,19 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
     def now: LocalDateTime = LocalDateTime.now()
 
-    val accessGroupsRepository: AccessGroupsRepositoryImpl = repository.asInstanceOf[AccessGroupsRepositoryImpl]
+    val accessGroupsRepositoryImpl: AccessGroupsRepositoryImpl = repository.asInstanceOf[AccessGroupsRepositoryImpl]
+    val accessGroupsRepository: AccessGroupsRepository =
+      accessGroupsRepositoryImpl // trying to use trait interface as much as possible
   }
 
   "AccessGroupsRepository" when {
 
     "set up" should {
       "have correct indexes" in new TestScope {
-        accessGroupsRepository.collectionName shouldBe "access-groups"
+        accessGroupsRepositoryImpl.collectionName shouldBe "access-groups"
 
-        accessGroupsRepository.indexes.size shouldBe 2
-        val collectionIndexes: Seq[IndexModel] = accessGroupsRepository.indexes
+        accessGroupsRepositoryImpl.indexes.size shouldBe 2
+        val collectionIndexes: Seq[IndexModel] = accessGroupsRepositoryImpl.indexes
 
         val arnIndexModel: IndexModel = collectionIndexes.head
         assert(arnIndexModel.getKeys.toBsonDocument.containsKey("arn"))
@@ -115,6 +119,17 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
       "inserting a non-existing access group" should {
         s"return an id" in new TestScope {
           accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+        }
+        s"store the access group with field-level-encryption" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue
+          // checking at the raw Document level that the relevant fields have been encrypted
+          val document = accessGroupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
+          document.toString should include(accessGroup.groupName) // the group name should be in plaintext
+          // But the agent user ids and names should be encrypted
+          (accessGroup.teamMembers.get ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>
+            document.toString should not include agentUser.id
+            document.toString should not include agentUser.name
+          }
         }
       }
 
@@ -165,5 +180,6 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
     }
   }
 
-  override protected def repository: PlayMongoRepository[AccessGroup] = new AccessGroupsRepositoryImpl(mongoComponent)
+  override protected def repository: PlayMongoRepository[SensitiveAccessGroup] =
+    new AccessGroupsRepositoryImpl(mongoComponent, aesGcmCrypto)
 }

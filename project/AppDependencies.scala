@@ -9,7 +9,9 @@ object AppDependencies {
     "uk.gov.hmrc"             %% "bootstrap-backend-play-28"  % "7.3.0",
     "uk.gov.hmrc.mongo"       %% "hmrc-mongo-play-28"         % "0.72.0",
     "uk.gov.hmrc"             %% "agent-mtd-identifiers"      % "0.47.0-play-28",
-    "uk.gov.hmrc"             %% "agent-kenshoo-monitoring"   % "4.8.0-play-28"
+    "uk.gov.hmrc"             %% "agent-kenshoo-monitoring"   % "4.8.0-play-28",
+    "uk.gov.hmrc"             %% "crypto"                     % "7.2.0",
+    "uk.gov.hmrc"             %% "crypto-json-play-28"        % "7.2.0"
   )
 
   val test = Seq(
