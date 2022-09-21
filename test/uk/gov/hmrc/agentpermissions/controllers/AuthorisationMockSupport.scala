@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import org.scalamock.scalatest.MockFactory
-import uk.gov.hmrc.auth.core.{AuthConnector, CredentialRole, Enrolment, EnrolmentIdentifier, Enrolments, User}
+import uk.gov.hmrc.auth.core.{Assistant, AuthConnector, CredentialRole, Enrolment, EnrolmentIdentifier, Enrolments, User}
 import uk.gov.hmrc.auth.core.authorise.Predicate
 import uk.gov.hmrc.auth.core.retrieve.{Credentials, Name, Retrieval, ~}
 import uk.gov.hmrc.auth.core.syntax.retrieved.authSyntaxForRetrieved
@@ -69,6 +69,12 @@ trait AuthorisationMockSupport extends MockFactory {
     Enrolments(enrolments) and
       Some(User) and
       Some(emptyName) and
+      Some(ggCredentials)
+
+  def buildAuthorisedResponseHavingAssistantCredentialRole: GrantAccess =
+    Enrolments(enrolments) and
+      Some(Assistant) and
+      Some(name) and
       Some(ggCredentials)
 
   def buildUnauthorisedResponseHavingIncorrectCredentials: GrantAccess =

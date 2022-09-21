@@ -36,7 +36,7 @@ class OptinController @Inject() (optinService: OptinService)(implicit
 ) extends BackendController(cc) with AuthorisedAgentSupport {
 
   def optin(arn: Arn, lang: Option[String] = None): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
+    withAuthorisedAgent() { authorisedAgent =>
       withMatchedArn(arn, authorisedAgent) {
         optinService.optin(authorisedAgent.arn, authorisedAgent.agentUser, lang) flatMap {
           case None =>
@@ -51,7 +51,7 @@ class OptinController @Inject() (optinService: OptinService)(implicit
   }
 
   def optout(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
+    withAuthorisedAgent() { authorisedAgent =>
       withMatchedArn(arn, authorisedAgent) {
         optinService.optout(authorisedAgent.arn, authorisedAgent.agentUser) flatMap {
           case None =>
@@ -66,7 +66,7 @@ class OptinController @Inject() (optinService: OptinService)(implicit
   }
 
   def optinStatus(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { _ =>
+    withAuthorisedAgent() { _ =>
       optinService
         .optinStatus(arn)
         .map(_.map(_.value))
@@ -78,7 +78,7 @@ class OptinController @Inject() (optinService: OptinService)(implicit
   }
 
   def optinRecordExists(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { _ =>
+    withAuthorisedAgent() { _ =>
       optinService
         .optinRecordExists(arn)
         .map {

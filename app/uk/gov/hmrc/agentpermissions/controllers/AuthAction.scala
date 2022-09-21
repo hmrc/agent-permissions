@@ -43,7 +43,7 @@ class AuthAction @Inject() (
   private val agentEnrolment = "HMRC-AS-AGENT"
   private val agentReferenceNumberIdentifier = "AgentReferenceNumber"
 
-  def getAuthorisedAgent()(implicit
+  def getAuthorisedAgent(allowStandardUser: Boolean = false)(implicit
     ec: ExecutionContext,
     request: Request[_]
   ): Future[Option[AuthorisedAgent]] = {
@@ -55,20 +55,21 @@ class AuthAction @Inject() (
         case enrols ~ credRole ~ name ~ credentials =>
           getArnAndAgentUser(enrols, name, credentials) match {
             case Some(authorisedAgent) =>
-              credRole match {
-                case Some(User) | Some(Admin) =>
-                  if (appConfig.checkArnAllowList) {
-                    if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
-                      Future successful Option(authorisedAgent)
-                    } else {
-                      Future successful None
-                    }
-                  } else {
+              if (
+                credRole.contains(User) | credRole.contains(Admin) | (credRole.contains(Assistant) & allowStandardUser)
+              ) {
+                if (appConfig.checkArnAllowList) {
+                  if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
                     Future successful Option(authorisedAgent)
+                  } else {
+                    Future successful None
                   }
-                case _ =>
-                  logger.warn("Invalid credential role")
-                  Future.successful(None)
+                } else {
+                  Future successful Option(authorisedAgent)
+                }
+              } else {
+                logger.warn("Invalid credential role")
+                Future.successful(None)
               }
             case None =>
               logger.warn("No " + agentReferenceNumberIdentifier + " in enrolment")

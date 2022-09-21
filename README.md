@@ -9,9 +9,10 @@ Backend service to store opt-in status and any agent-permissions-specific struct
 
 | **Method** | **Path**                       | **Description**                           |
 |------------|--------------------------------|-------------------------------------------|
-| GET   | /arn/:arn/optin-status     | Gets the opt in status for an ARN              |
+| GET   | /arn/:arn/optin-status     | Gets the opt in status for an ARN including if any work items remain outstanding             |
 | POST  | /arn/:arn/optin            | Opt-in an agent to use agent permissions feature  |
 | POST  | /arn/:arn/optout           | Opt-out an agent from using agent permissions feature  |
+| GET  | /arn/:arn/optin-record-exists           | Returns 204 if the ARN has opted-in otherwise returns 404  |
 
 ### Create or Manage access group
 | **Method** | **Path**                       | **Description**                           |
@@ -22,13 +23,12 @@ Backend service to store opt-in status and any agent-permissions-specific struct
 | GET   | /groups/:groupId            |  Gets access group based on groupId                |
 | PATCH | /groups/:groupId             |  Updates a group (name, clients, team members) from their groupId             |
 | DELETE | /groups/:groupId             |  Deletes a group from their groupId             |
-| PUT   | /groups/:groupId/add-unassigned   |  Add unassigned clients or team members to a group from groupId    |
 
 ### Manage clients/team members
 | **Method** | **Path**                       | **Description**                           |
 |------------|--------------------------------|-------------------------------------------|
 | GET   | /arn/:arn/client/:enrolmentKey/groups   |   Gets group summaries that contain a given client   |
-| GET   | /arn/:arn/team-member/:TBC/groups   |   Gets group summaries that contain a given team member (not implemented) |
+| GET   | /arn/:arn/team-member/:userId/groups   |   Gets group summaries that contain a given team member  |
 
 
 ## Running the tests
