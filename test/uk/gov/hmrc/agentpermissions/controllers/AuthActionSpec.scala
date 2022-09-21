@@ -76,6 +76,23 @@ class AuthActionSpec extends BaseSpec with AuthorisationMockSupport {
             AuthorisedAgent(Arn("KARN0762398"), AgentUser("user1", "Jane Doe"))
           )
         }
+
+        "auth response indicates credential role is Assistant" should {
+          "return a valid authorised agent when assistant credential role is allowed" in new TestScope {
+            mockAuthResponseWithoutException(buildAuthorisedResponseHavingAssistantCredentialRole)
+            mockAppConfigCheckArnAllowList(toCheckArnAllowList = false)
+
+            authAction.getAuthorisedAgent(true).futureValue shouldBe Some(
+              AuthorisedAgent(Arn("KARN0762398"), AgentUser("user1", "Jane Doe"))
+            )
+
+          }
+
+          "not return an authorised agent when assistant credential role is not allowed" in new TestScope {
+            mockAuthResponseWithoutException(buildAuthorisedResponseHavingAssistantCredentialRole)
+            authAction.getAuthorisedAgent().futureValue shouldBe None
+          }
+        }
       }
 
       "check for Arn Allow List is true" when {

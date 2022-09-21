@@ -26,7 +26,7 @@ class ArnAllowListController @Inject() (implicit authAction: AuthAction, cc: Con
     extends BackendController(cc) with AuthorisedAgentSupport {
 
   def isArnAllowed: Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { _ =>
+    withAuthorisedAgent() { _ =>
       Future successful Ok
     }
   }

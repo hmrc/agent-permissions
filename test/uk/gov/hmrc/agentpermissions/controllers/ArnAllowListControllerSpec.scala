@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import org.scalamock.handlers.CallHandler2
+import org.scalamock.handlers.CallHandler3
 import play.api.http.Status.{FORBIDDEN, OK}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
@@ -64,10 +64,10 @@ class ArnAllowListControllerSpec extends BaseSpec {
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
-    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+    ): CallHandler3[Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
       (mockAuthAction
-        .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
-        .expects(*, *)
+        .getAuthorisedAgent(_: Boolean)(_: ExecutionContext, _: Request[_]))
+        .expects(*, *, *)
         .returning(Future.successful(maybeAuthorisedAgent))
   }
 

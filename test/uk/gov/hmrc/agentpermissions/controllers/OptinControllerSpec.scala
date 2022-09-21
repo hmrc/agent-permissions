@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import org.scalamock.handlers.{CallHandler2, CallHandler3, CallHandler4, CallHandler5}
+import org.scalamock.handlers.{CallHandler3, CallHandler4, CallHandler5}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
@@ -46,9 +46,9 @@ class OptinControllerSpec extends BaseSpec {
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
-    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] = (authAction
-      .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
-      .expects(*, *)
+    ): CallHandler3[Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] = (authAction
+      .getAuthorisedAgent(_: Boolean)(_: ExecutionContext, _: Request[_]))
+      .expects(*, *, *)
       .returning(Future.successful(maybeAuthorisedAgent))
 
     def mockOptinServiceOptinWithoutException(

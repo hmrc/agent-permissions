@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import akka.actor.ActorSystem
 import org.bson.types.ObjectId
-import org.scalamock.handlers.{CallHandler2, CallHandler3, CallHandler4, CallHandler5}
+import org.scalamock.handlers.{CallHandler3, CallHandler4, CallHandler5}
 import play.api.libs.json.{JsArray, JsString, JsValue, Json}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
@@ -62,7 +62,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "auth throws exception" should {
       s"return $FORBIDDEN" in new TestScope {
-        mockAuthActionGetAuthorisedAgentWithExceptiom(new InvalidBearerToken("auth failed"))
+        mockAuthActionGetAuthorisedAgentWithException(new InvalidBearerToken("auth failed"))
 
         val result = controller.createGroup(arn)(baseRequest.withBody(jsonPayloadForCreateGroup(groupName)))
         status(result) shouldBe FORBIDDEN
@@ -939,18 +939,18 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
-    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+    ): CallHandler3[Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
       (mockAuthAction
-        .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
-        .expects(*, *)
+        .getAuthorisedAgent(_: Boolean)(_: ExecutionContext, _: Request[_]))
+        .expects(*, *, *)
         .returning(Future.successful(maybeAuthorisedAgent))
 
-    def mockAuthActionGetAuthorisedAgentWithExceptiom(
+    def mockAuthActionGetAuthorisedAgentWithException(
       ex: Exception
-    ): CallHandler2[ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+    ): CallHandler3[Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
       (mockAuthAction
-        .getAuthorisedAgent()(_: ExecutionContext, _: Request[_]))
-        .expects(*, *)
+        .getAuthorisedAgent(_: Boolean)(_: ExecutionContext, _: Request[_]))
+        .expects(*, *, *)
         .returning(Future.failed(ex))
 
     def mockAccessGroupsServiceCreate(

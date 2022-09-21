@@ -39,7 +39,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   private val MAX_LENGTH_GROUP_NAME = 32
 
   def createGroup(arn: Arn): Action[JsValue] = Action.async(parse.json) { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
+    withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         withJsonParsed[CreateAccessGroupRequest] { createAccessGroupRequest =>
           if (createAccessGroupRequest.groupName.length > MAX_LENGTH_GROUP_NAME) {
@@ -70,7 +70,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def groupsSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
+    withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
           groups            <- accessGroupsService.getAllGroups(matchedArn)
@@ -87,7 +87,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def getGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
+    withAuthorisedAgent() { authorisedAgent =>
       accessGroupsService.getById(gid) map {
         case None =>
           NotFound
@@ -104,7 +104,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
 
   def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
     implicit request =>
-      withAuthorisedAgent { _ =>
+      withAuthorisedAgent() { _ =>
         accessGroupsService
           .getGroupSummariesForClient(arn, enrolmentKey)
           .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
@@ -112,7 +112,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { _ =>
+    withAuthorisedAgent(true) { _ =>
       accessGroupsService
         .getGroupSummariesForTeamMember(arn, userId)
         .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
@@ -120,7 +120,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
+    withAuthorisedAgent() { authorisedAgent =>
       withGroupId(gid, authorisedAgent.arn) { (groupId, _) =>
         for {
           groupDeletionStatus <- accessGroupsService.delete(groupId, authorisedAgent.agentUser)
@@ -139,7 +139,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def updateGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
+    withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[UpdateAccessGroupRequest] { updateAccessGroupRequest =>
         withGroupId(gid, authorisedAgent.arn) { (groupId, existingAccessGroup) =>
           val mergedAccessGroup = updateAccessGroupRequest.merge(existingAccessGroup)
@@ -164,7 +164,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def addUnassignedMembers(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
+    withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddMembersToAccessGroupRequest] { updateAccessGroupRequest =>
         withGroupId(gid, authorisedAgent.arn) { (groupId, group) =>
           val groupWithClientsAdded = updateAccessGroupRequest.clients.fold(group)(enrolments =>
@@ -189,7 +189,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
+    withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
           existingGroups <- accessGroupsService.getAllGroups(matchedArn)
@@ -204,7 +204,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def syncWithEacd(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent { authorisedAgent =>
+    withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         accessGroupsService.syncWithEacd(matchedArn, authorisedAgent.agentUser).map(_ => Ok)
       }
