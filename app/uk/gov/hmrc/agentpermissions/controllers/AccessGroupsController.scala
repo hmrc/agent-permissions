@@ -112,7 +112,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent(true) { _ =>
+    withAuthorisedAgent(allowStandardUser = true) { _ =>
       accessGroupsService
         .getGroupSummariesForTeamMember(arn, userId)
         .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
