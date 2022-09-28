@@ -66,7 +66,7 @@ class OptinController @Inject() (optinService: OptinService)(implicit
   }
 
   def optinStatus(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent() { _ =>
+    withAuthorisedAgent(allowStandardUser = true) { _ =>
       optinService
         .optinStatus(arn)
         .map(_.map(_.value))

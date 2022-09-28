@@ -69,8 +69,12 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
+  /*
+   * TODO refactor into two methods, so standard users only access unassigned client list?
+   *  currently never used that way in APFE but we probably shouldn't allow it
+   */
   def groupsSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent() { authorisedAgent =>
+    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
           groups            <- accessGroupsService.getAllGroups(matchedArn)
@@ -87,7 +91,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def getGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent() { authorisedAgent =>
+    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       accessGroupsService.getById(gid) map {
         case None =>
           NotFound

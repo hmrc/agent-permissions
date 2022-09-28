@@ -68,7 +68,7 @@ class AuthAction @Inject() (
                   Future successful Option(authorisedAgent)
                 }
               } else {
-                logger.warn("Invalid credential role")
+                logger.warn(s"Invalid credential role $credRole")
                 Future.successful(None)
               }
             case None =>
