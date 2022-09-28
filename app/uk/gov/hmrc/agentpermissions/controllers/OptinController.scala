@@ -78,7 +78,7 @@ class OptinController @Inject() (optinService: OptinService)(implicit
   }
 
   def optinRecordExists(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent() { _ =>
+    withAuthorisedAgent(true) { _ =>
       optinService
         .optinRecordExists(arn)
         .map {
