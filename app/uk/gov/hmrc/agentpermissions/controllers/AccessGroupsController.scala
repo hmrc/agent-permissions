@@ -70,7 +70,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
   }
 
   def groupsSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent() { authorisedAgent =>
+    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
           groups            <- accessGroupsService.getAllGroups(matchedArn)
