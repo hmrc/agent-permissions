@@ -12,7 +12,7 @@ Backend service to store opt-in status and any agent-permissions-specific struct
 | GET   | /arn/:arn/optin-status     | Gets the opt in status for an ARN including if any work items remain outstanding             | true |
 | POST  | /arn/:arn/optin            | Opt-in an agent to use agent permissions feature  | false |
 | POST  | /arn/:arn/optout           | Opt-out an agent from using agent permissions feature  | false |
-| GET  | /arn/:arn/optin-record-exists           | Returns 204 if the ARN has opted-in otherwise returns 404  | false |
+| GET  | /arn/:arn/optin-record-exists           | Returns 204 if the ARN has opted-in otherwise returns 404  | true |
 
 ### Create or Manage access group
 | **Method** | **Path**                       | **Description**                           |Allows Assistant user|
