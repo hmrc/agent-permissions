@@ -20,13 +20,19 @@ import org.bson.types.ObjectId
 import play.api.libs.json.{JsString, Json, Writes}
 import uk.gov.hmrc.agentmtdidentifiers.model.AgentUser
 
-case class AccessGroupTeamMembersRemoval(accessGroupId: ObjectId, accessGroupName: String, teamMembers: Set[AgentUser])
+case class AccessGroupTeamMembersRemoval(
+  agentReferenceNumber: String,
+  accessGroupId: ObjectId,
+  accessGroupName: String,
+  teamMembers: Set[AgentUser]
+)
 
 object AccessGroupTeamMembersRemoval {
   implicit val objectIdWrites: Writes[ObjectId] = Writes[ObjectId]((o: ObjectId) => JsString(o.toHexString))
   implicit val writes: Writes[AccessGroupTeamMembersRemoval] = Json.writes[AccessGroupTeamMembersRemoval]
 
   def split(
+    agentReferenceNumber: String,
     accessGroupId: ObjectId,
     groupName: String,
     teamMembersToRemove: Set[AgentUser],
@@ -35,7 +41,7 @@ object AccessGroupTeamMembersRemoval {
     teamMembersToRemove
       .grouped(chunkSize)
       .map { chunkedTeamMembers =>
-        AccessGroupTeamMembersRemoval(accessGroupId, groupName, chunkedTeamMembers)
+        AccessGroupTeamMembersRemoval(agentReferenceNumber, accessGroupId, groupName, chunkedTeamMembers)
       }
       .toSeq
 }
