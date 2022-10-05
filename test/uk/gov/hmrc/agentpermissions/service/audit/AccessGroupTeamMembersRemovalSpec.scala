@@ -28,7 +28,13 @@ class AccessGroupTeamMembersRemovalSpec extends BaseSpec with AuditTestSupport {
       val chunkSize = 10
 
       val accessGroupTeamMembersRemovals =
-        AccessGroupTeamMembersRemoval.split(accessGroupId, groupName, (1 to 49).map(_ => teamMember()).toSet, chunkSize)
+        AccessGroupTeamMembersRemoval.split(
+          "KARN1234567",
+          accessGroupId,
+          groupName,
+          (1 to 49).map(_ => teamMember()).toSet,
+          chunkSize
+        )
 
       accessGroupTeamMembersRemovals.size shouldBe 5
       accessGroupTeamMembersRemovals.foreach { accessGroupClientsRemoval =>
