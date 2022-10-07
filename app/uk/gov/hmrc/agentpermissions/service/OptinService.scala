@@ -61,7 +61,7 @@ class OptinServiceImpl @Inject() (
   ): Future[Option[OptinRequestStatus]] =
     for {
       maybeUpsertType <- handleOptinOptout(arn, user, OptedIn, lang)
-      _               <- Future successful auditService.auditOptInEvent(arn, user)
+      _               <- Future successful maybeUpsertType.foreach(_ => auditService.auditOptInEvent(arn, user))
     } yield maybeUpsertType.map {
       case RecordInserted(_) => OptinCreated
       case RecordUpdated     => OptinUpdated
@@ -73,7 +73,7 @@ class OptinServiceImpl @Inject() (
   ): Future[Option[OptoutRequestStatus]] =
     for {
       maybeUpsertType <- handleOptinOptout(arn, user, OptedOut, lang = None)
-      _               <- Future successful auditService.auditOptOutEvent(arn, user)
+      _               <- Future successful maybeUpsertType.foreach(_ => auditService.auditOptOutEvent(arn, user))
     } yield maybeUpsertType.map {
       case RecordInserted(_) => OptoutCreated
       case RecordUpdated     => OptoutUpdated

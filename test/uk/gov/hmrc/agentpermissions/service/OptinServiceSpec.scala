@@ -150,7 +150,6 @@ class OptinServiceSpec extends BaseSpec {
           Some(OptinRecord(arn, List(OptinEvent(OptedIn, user, LocalDateTime.now()))))
         mockOptinRepositoryGet(maybeExistingOptinRecord)
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, None, OptedIn)
-        mockAuditServiceAuditOptInEvent()
         mockUserClientDetailsConnectorGetClients(sendEmail = true, returnValue = Some(Seq.empty))
 
         whenReady(optinService.optin(arn, user, None)) { maybeOptinRequestStatus =>
@@ -209,7 +208,6 @@ class OptinServiceSpec extends BaseSpec {
           Some(OptinRecord(arn, List(OptinEvent(OptedOut, user, LocalDateTime.now()))))
         mockOptinRepositoryGet(maybeExistingOptinRecord)
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, None, OptedOut)
-        mockAuditServiceAuditOptOutEvent()
         mockUserClientDetailsConnectorGetClients(sendEmail = false, returnValue = Some(Seq.empty))
 
         whenReady(optinService.optout(arn, user)) { maybeOptoutRequestStatus =>
