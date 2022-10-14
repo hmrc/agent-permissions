@@ -311,6 +311,162 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
   }
 
+  "Call to fetch groups" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.groups(arn)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "provided arn is not valid" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.groups(invalidArn)(baseRequest)
+
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "provided arn is valid" when {
+
+      "provided arn does not match that identified by auth" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          val result = controller.groups(nonMatchingArn)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "calls to fetch groups returns empty collections" should {
+        s"return $NOT_FOUND" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroups(Seq.empty)
+
+          val result = controller.groups(arn)(baseRequest)
+
+          status(result) shouldBe OK
+        }
+      }
+
+      "calls to fetch groups returns data collections" should {
+
+        s"return $OK" in new TestScope {
+          val enrolmentKey = "key"
+          val friendlyName = "friendly name"
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+
+          val result = controller.groups(arn)(baseRequest)
+
+          status(result) shouldBe OK
+          contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
+            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, 0, 0)
+          )
+        }
+      }
+
+      "call to fetch access groups throws exception" should {
+        s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupsWithException(new RuntimeException("boo boo"))
+
+          val result = controller.groups(arn)(baseRequest)
+
+          status(result) shouldBe INTERNAL_SERVER_ERROR
+        }
+      }
+
+    }
+  }
+
+  "Call to fetch clients" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.unassignedClients(arn)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "provided arn is not valid" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.unassignedClients(invalidArn)(baseRequest)
+
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "provided arn is valid" when {
+
+      "provided arn does not match that identified by auth" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          val result = controller.unassignedClients(nonMatchingArn)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "calls to fetch clients returns empty collections" should {
+        s"return $NOT_FOUND" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetUnassignedClients(Set.empty)
+
+          val result = controller.unassignedClients(arn)(baseRequest)
+
+          status(result) shouldBe OK
+          contentAsJson(result).as[Seq[Client]] shouldBe Seq.empty
+
+        }
+      }
+
+      "calls to fetch clients returns data collections" should {
+
+        s"return $OK" in new TestScope {
+          val enrolmentKey = "key"
+          val friendlyName = "friendly name"
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetUnassignedClients(Set(Client(enrolmentKey, friendlyName)))
+
+          val result = controller.unassignedClients(arn)(baseRequest)
+
+          status(result) shouldBe OK
+          contentAsJson(result).as[Seq[Client]] shouldBe Seq(Client(enrolmentKey, friendlyName))
+        }
+      }
+
+      "call to fetch clients throws exception" should {
+        s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetUnassignedClientsWithException(new RuntimeException("boo boo"))
+
+          val result = controller.unassignedClients(arn)(baseRequest)
+
+          status(result) shouldBe INTERNAL_SERVER_ERROR
+        }
+      }
+
+    }
+  }
+
   "Call to fetch group" when {
 
     "authorised agent is not identified by auth" should {
@@ -1048,6 +1204,14 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful unassignedClients)
+
+    def mockAccessGroupsServiceGetUnassignedClientsWithException(
+      ex: Exception
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Set[Client]]] =
+      (mockAccessGroupsService
+        .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.failed(ex))
 
     def mockAccessGroupsServiceSyncWithEacd(
       accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
