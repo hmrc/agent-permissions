@@ -8,7 +8,6 @@ GET     /arn/:arn/optin-record-exists           uk.gov.hmrc.agentpermissions.con
 # Access Groups
 POST    /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/groupsOnly                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 
 GET     /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
 DELETE  /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
