@@ -69,24 +69,6 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
-  /* TODO remove this once the 2 separate methods are in use */
-  def groupsSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
-      withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
-        for {
-          groups            <- accessGroupsService.getAllGroups(matchedArn)
-          unassignedClients <- accessGroupsService.getUnassignedClients(arn)
-          groupSummaries = AccessGroupSummaries(groups.map(AccessGroupSummary.convert), unassignedClients)
-        } yield
-          if (groupSummaries.groups.isEmpty && groupSummaries.unassignedClients.isEmpty) {
-            NotFound
-          } else {
-            Ok(Json.toJson(groupSummaries))
-          }
-      }
-    } transformWith failureHandler
-  }
-
   def unassignedClients(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>

@@ -7,9 +7,9 @@ GET     /arn/:arn/optin-record-exists           uk.gov.hmrc.agentpermissions.con
 
 # Access Groups
 POST    /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupsSummaries(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/groupsOnly                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/unassigned-clients           uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.unassignedClients(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+
 GET     /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
 DELETE  /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
 PATCH   /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
@@ -18,6 +18,8 @@ GET     /arn/:arn/access-group-name-check       uk.gov.hmrc.agentpermissions.con
 PATCH   /arn/:arn/sync                          uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/client/:enrolmentKey/groups   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForClient(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, enrolmentKey)
 GET     /arn/:arn/team-member/:userId/groups    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForTeamMember(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, userId: String)
+
+GET     /arn/:arn/unassigned-clients            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.unassignedClients(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 
 # ARN Allow List
 GET     /arn-allowed                            uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.isArnAllowed

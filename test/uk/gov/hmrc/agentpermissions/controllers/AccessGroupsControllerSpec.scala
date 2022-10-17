@@ -191,126 +191,6 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
   }
 
-  "Call to fetch group summaries" when {
-
-    "authorised agent is not identified by auth" should {
-      s"return $FORBIDDEN" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(None)
-
-        val result = controller.groupsSummaries(arn)(baseRequest)
-        status(result) shouldBe FORBIDDEN
-      }
-    }
-
-    "provided arn is not valid" should {
-      s"return $BAD_REQUEST" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-
-        val result = controller.groupsSummaries(invalidArn)(baseRequest)
-
-        status(result) shouldBe BAD_REQUEST
-      }
-    }
-
-    "provided arn is valid" when {
-
-      "provided arn does not match that identified by auth" should {
-        s"return $BAD_REQUEST" in new TestScope {
-          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-
-          val nonMatchingArn: Arn = Arn("FARN3782960")
-
-          val result = controller.groupsSummaries(nonMatchingArn)(baseRequest)
-
-          status(result) shouldBe BAD_REQUEST
-        }
-      }
-
-      "calls to fetch both access groups and unassigned clients return empty collections" should {
-        s"return $NOT_FOUND" in new TestScope {
-          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroups(Seq.empty)
-          mockAccessGroupsServiceGetUnassignedClients(Set.empty)
-
-          val result = controller.groupsSummaries(arn)(baseRequest)
-
-          status(result) shouldBe NOT_FOUND
-        }
-      }
-
-      "not both calls to fetch access groups and unassigned clients return empty collections" when {
-
-        "call to fetch unassigned clients returns empty collection" when {
-
-          "access group clients and users are nothing" should {
-            s"return $OK" in new TestScope {
-              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-
-              val groupWithEmptyClientsAndUsers: AccessGroup = accessGroup.copy(clients = None, teamMembers = None)
-              mockAccessGroupsServiceGetGroups(Seq(groupWithEmptyClientsAndUsers))
-              mockAccessGroupsServiceGetUnassignedClients(Set.empty)
-
-              val result = controller.groupsSummaries(arn)(baseRequest)
-
-              status(result) shouldBe OK
-              contentAsJson(result) shouldBe Json.parse(
-                s"""{"groups":[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[]}"""
-              )
-            }
-          }
-
-          "access group clients and users are not nothing" should {
-            s"return $OK" in new TestScope {
-              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockAccessGroupsServiceGetGroups(Seq(accessGroup))
-              mockAccessGroupsServiceGetUnassignedClients(Set.empty)
-
-              val result = controller.groupsSummaries(arn)(baseRequest)
-
-              status(result) shouldBe OK
-              contentAsJson(result) shouldBe Json.parse(
-                s"""{"groups":[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[]}"""
-              )
-            }
-          }
-        }
-
-        "call to fetch unassigned clients returns non-empty collection" when {
-
-          "access group clients and users are not nothing" should {
-            s"return $OK" in new TestScope {
-              val enrolmentKey = "key"
-              val friendlyName = "friendly name"
-
-              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockAccessGroupsServiceGetGroups(Seq(accessGroup))
-              mockAccessGroupsServiceGetUnassignedClients(Set(Client(enrolmentKey, friendlyName)))
-
-              val result = controller.groupsSummaries(arn)(baseRequest)
-
-              status(result) shouldBe OK
-              contentAsJson(result) shouldBe Json.parse(
-                s"""{"groups":[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":0,"teamMemberCount":0}],"unassignedClients":[{"enrolmentKey":"$enrolmentKey","friendlyName":"$friendlyName"}]}"""
-              )
-            }
-          }
-        }
-      }
-
-      "call to fetch access groups throws exception" should {
-        s"return $INTERNAL_SERVER_ERROR" in new TestScope {
-          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroupsWithException(new RuntimeException("boo boo"))
-
-          val result = controller.groupsSummaries(arn)(baseRequest)
-
-          status(result) shouldBe INTERNAL_SERVER_ERROR
-        }
-      }
-
-    }
-  }
-
   "Call to fetch groups" when {
 
     "authorised agent is not identified by auth" should {
@@ -360,8 +240,6 @@ class AccessGroupsControllerSpec extends BaseSpec {
       "calls to fetch groups returns data collections" should {
 
         s"return $OK" in new TestScope {
-          val enrolmentKey = "key"
-          val friendlyName = "friendly name"
 
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetGroups(Seq(accessGroup))
