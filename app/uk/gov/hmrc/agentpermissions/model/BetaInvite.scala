@@ -16,13 +16,12 @@
 
 package uk.gov.hmrc.agentpermissions.model
 
-import play.api.libs.json.{Format, JsError, JsResult, JsString, JsSuccess, JsValue, Json, Reads, Writes}
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptinRecord}
+import play.api.libs.json.{Format, Json, Reads, Writes}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.crypto.{Crypted, Decrypter, Encrypter, PlainText, Sensitive}
-import uk.gov.hmrc.domain.AgentUserId
 
 case class BetaInviteRecord(
-  agentUserId: AgentUserId,
+  agentUserId: String,
   arn: Arn,
   hideBetaInvite: Boolean = false
 )

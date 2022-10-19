@@ -20,9 +20,7 @@ import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
-import uk.gov.hmrc.agentpermissions.repository.{BetaInviteRepository, RecordInserted, RecordUpdated, UpsertType}
-import uk.gov.hmrc.agentpermissions.service.audit.AuditService
-import uk.gov.hmrc.domain.AgentUserId
+import uk.gov.hmrc.agentpermissions.repository.{BetaInviteRepository, UpsertType}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
@@ -83,7 +81,7 @@ class BetaInviteRecordBuilder {
   ): Option[BetaInviteRecord] =
     maybeExistingRecord match {
       case None =>
-        Option(BetaInviteRecord(AgentUserId(user.id), arn, hideBetaInvite = true))
+        Option(BetaInviteRecord(user.id, arn, hideBetaInvite = true))
       case Some(_) =>
         None
     }
