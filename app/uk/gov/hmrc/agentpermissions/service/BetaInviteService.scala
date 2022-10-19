@@ -19,105 +19,72 @@ package uk.gov.hmrc.agentpermissions.service
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
-import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, RecordInserted, RecordUpdated, UpsertType}
+import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
+import uk.gov.hmrc.agentpermissions.repository.{BetaInviteRepository, RecordInserted, RecordUpdated, UpsertType}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
+import uk.gov.hmrc.domain.AgentUserId
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
-@ImplementedBy(classOf[OptinServiceImpl])
-trait OptinService {
+@ImplementedBy(classOf[BetaInviteServiceImpl])
+trait BetaInviteService {
 
-  def optin(arn: Arn, user: AgentUser, lang: Option[String])(implicit
+  def hideBetaInvite(arn: Arn, user: AgentUser)(implicit
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
-  ): Future[Option[OptinRequestStatus]]
+  ): Future[Option[UpsertType]]
 
-  def optout(arn: Arn, user: AgentUser)(implicit
-    ec: ExecutionContext,
-    headerCarrier: HeaderCarrier
-  ): Future[Option[OptoutRequestStatus]]
-
-  def optinStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]]
-
-  def optinRecordExists(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean]
+  def hideBetaInviteCheck(arn: Arn, user: AgentUser)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean]
 }
 
 @Singleton
-class OptinServiceImpl @Inject() (
-  optinRepository: OptinRepository,
-  optinRecordBuilder: OptinRecordBuilder,
-  optedInStatusHandler: OptedInStatusHandler,
-  notOptedInStatusHandler: NotOptedInStatusHandler,
-  auditService: AuditService
-) extends OptinService with Logging {
+class BetaInviteServiceImpl @Inject() (
+  betaInviteRepository: BetaInviteRepository,
+  betaInviteRecordBuilder: BetaInviteRecordBuilder
+) extends BetaInviteService with Logging {
 
-//  override def accept(arn: Arn, user: AgentUser)(implicit
-//    ec: ExecutionContext,
-//    headerCarrier: HeaderCarrier
-//  ): Future[Option[OptinRequestStatus]] =
-//    for {
-//      maybeUpsertType <- handleOptinOptout(arn, user, OptedIn)
-//      _               <- Future successful maybeUpsertType.foreach(_ => auditService.auditOptInEvent(arn, user))
-//    } yield maybeUpsertType.map {
-//      case RecordInserted(_) => OptinCreated
-//      case RecordUpdated     => OptinUpdated
-//    }
-
-  override def decline(arn: Arn, user: AgentUser)(implicit
-    ec: ExecutionContext,
-    headerCarrier: HeaderCarrier
-  ): Future[Option[OptoutRequestStatus]] =
-    for {
-      maybeUpsertType <- handleOptinOptout(arn, user, OptedOut, lang = None)
-      _               <- Future successful maybeUpsertType.foreach(_ => auditService.auditOptOutEvent(arn, user))
-    } yield maybeUpsertType.map {
-      case RecordInserted(_) => OptoutCreated
-      case RecordUpdated     => OptoutUpdated
-    }
-
-  override def optinStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
-    for {
-      maybeOptinRecord <- optinRepository.get(arn)
-      maybeOptinStatus <- maybeOptinRecord match {
-                            case Some(optinRecord) if optinRecord.status == OptedIn =>
-                              optedInStatusHandler.identifyStatus(arn)
-                            case _ =>
-                              notOptedInStatusHandler.identifyStatus(arn)
-                          }
-    } yield maybeOptinStatus
-
-  override def optinRecordExists(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean] =
-    for {
-      maybeOptinRecord <- optinRepository.get(arn)
-    } yield maybeOptinRecord.fold(false)(_.status == OptedIn)
-
-  private def handleOptinOptout(arn: Arn, agentUser: AgentUser, optinEventType: OptinEventType, lang: Option[String])(
-    implicit
+  override def hideBetaInvite(arn: Arn, user: AgentUser)(implicit
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[UpsertType]] =
     for {
-      maybeExistingOptinRecord <- optinRepository.get(arn)
-      maybeUpdateOptinRecord <-
-        Future.successful(optinRecordBuilder.forUpdating(arn, agentUser, maybeExistingOptinRecord, optinEventType))
-      maybeUpsertResult <- maybeUpdateOptinRecord match {
+      maybeExistingBetaInviteRecord <- betaInviteRepository.get(user)
+      maybeUpdateBetaInviteRecord <-
+        Future.successful(betaInviteRecordBuilder.forUpdating(arn, user, maybeExistingBetaInviteRecord))
+      maybeUpsertResult <- maybeUpdateBetaInviteRecord match {
                              case None =>
+                               // record already exists
                                Future.successful(None)
-                             case Some(optinRecordToUpdate) =>
-                               optinRepository.upsert(optinRecordToUpdate)
+                             case Some(recordToUpdate) =>
+                               betaInviteRepository.upsert(recordToUpdate)
                            }
-      _ <- userClientDetailsConnector.getClients(arn, sendEmail = optinEventType == OptedIn, lang = lang)
+
     } yield maybeUpsertResult
+
+  override def hideBetaInviteCheck(arn: Arn, user: AgentUser)(implicit
+    ec: ExecutionContext,
+    hc: HeaderCarrier
+  ): Future[Boolean] =
+    for {
+      maybeBetaInviteRecord <- betaInviteRepository.get(user)
+    } yield maybeBetaInviteRecord.fold(false)(_.hideBetaInvite)
 
 }
 
-sealed trait OptinRequestStatus
-case object OptinCreated extends OptinRequestStatus
-case object OptinUpdated extends OptinRequestStatus
+@Singleton
+class BetaInviteRecordBuilder {
 
-sealed trait OptoutRequestStatus
-case object OptoutCreated extends OptoutRequestStatus
-case object OptoutUpdated extends OptoutRequestStatus
+  def forUpdating(
+    arn: Arn,
+    user: AgentUser,
+    maybeExistingRecord: Option[BetaInviteRecord]
+  ): Option[BetaInviteRecord] =
+    maybeExistingRecord match {
+      case None =>
+        Option(BetaInviteRecord(AgentUserId(user.id), arn, hideBetaInvite = true))
+      case Some(_) =>
+        None
+    }
+}

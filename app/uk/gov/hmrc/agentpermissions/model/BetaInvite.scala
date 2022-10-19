@@ -18,24 +18,26 @@ package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.{Format, JsError, JsString, JsSuccess, Json, Reads, Writes}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.domain.AgentUserId
+
+case class BetaInviteRecord(
+  agentUserId: AgentUserId,
+  arn: Arn,
+  hideBetaInvite: Boolean = false
+)
 
 class BetaInvite {
 
-//  sealed trait BetaInviteStatus {
-//    val value: String
-//  }
-//
-//  object BetaInviteStatus {
-//
-//    implicit val reads: Reads[BetaInviteStatus] = {
-//      case JsString(DeclinedBetaInvite.value)        => JsSuccess(DeclinedBetaInvite)
-//      case JsString(AcceptedBetaInvite.value)         => JsSuccess(AcceptedBetaInvite)
-//      case JsString(BetaInvitePending.value)        => JsSuccess(BetaInvitePending)
-//      case invalid                                  => JsError(s"Invalid OptedIn value found: $invalid")
-//    }
-//
-//    implicit val writes: Writes[BetaInviteStatus] = (o: BetaInviteStatus) => JsString(o.value)
-//  }
+  sealed trait BetaInviteStatus {
+    val value: Boolean
+  }
+
+  case object HideBetaInvite extends BetaInviteStatus {
+    override val value = true
+  }
+  case object ShowBetaInvite extends BetaInviteStatus {
+    override val value = false
+  }
 
   object BetaInviteRecord {
 
@@ -44,23 +46,12 @@ class BetaInvite {
     implicit val writesBetaInviteRecord: Writes[BetaInviteRecord] = (betaInviteRecord: BetaInviteRecord) =>
       Json.obj(
         fields = "arn" -> betaInviteRecord.arn,
-        "hideBetaInvite"  -> betaInviteRecord.hideBetaInvite,
-        "numberOfClients" -> betaInviteRecord.numberOfClients,
-        "name"            -> betaInviteRecord.name,
-        "email"           -> betaInviteRecord.email,
-        "phone"           -> betaInviteRecord.phone
+        "agentUserId"    -> betaInviteRecord.agentUserId,
+        "hideBetaInvite" -> betaInviteRecord.hideBetaInvite
       )
 
     implicit val formatBetaInviteRecord: Format[BetaInviteRecord] =
       Format(readsBetaInviteRecord, writesBetaInviteRecord)
   }
 
-  case class BetaInviteRecord(
-    arn: Arn,
-    hideBetaInvite: Boolean = false,
-    numberOfClients: Option[Int],
-    name: Option[String],
-    email: Option[String],
-    phone: Option[String]
-  ) {}
 }

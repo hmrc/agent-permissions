@@ -18,6 +18,7 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.mvc._
 import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.service.BetaInviteService
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import javax.inject.Inject
@@ -25,6 +26,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class ArnAllowListController @Inject() (implicit
   appConfig: AppConfig,
+  betaInviteService: BetaInviteService,
   authAction: AuthAction,
   cc: ControllerComponents,
   ec: ExecutionContext
@@ -42,9 +44,8 @@ class ArnAllowListController @Inject() (implicit
         if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
           Future successful Ok
         } else {
-          // check if record in mongo flagged & repeat below
           for {
-            hideBetaInvite <- betaInviteService.getHideBetaInvite
+            hideBetaInvite <- betaInviteService.hideBetaInviteCheck(authorisedAgent.arn, authorisedAgent.agentUser)
           } yield
             if (hideBetaInvite) {
               Ok
@@ -54,7 +55,7 @@ class ArnAllowListController @Inject() (implicit
         }
       } else {
         for {
-          hideBetaInvite <- betaInviteService.getHideBetaInvite
+          hideBetaInvite <- betaInviteService.hideBetaInviteCheck(authorisedAgent.arn, authorisedAgent.agentUser)
         } yield
           if (hideBetaInvite) {
             Ok
@@ -67,7 +68,13 @@ class ArnAllowListController @Inject() (implicit
 
   def hideBetaInvite: Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true, allowlistEnabled = false) { authorisedAgent =>
-      Future successful Created
+        betaInviteService.hideBetaInvite(authorisedAgent.arn, authorisedAgent.agentUser).map(x =>
+          if (x.isDefined) {
+            Created
+          } else {
+            Conflict
+          }
+        )
     }
   }
 

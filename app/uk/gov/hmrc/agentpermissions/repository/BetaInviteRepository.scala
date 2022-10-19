@@ -22,18 +22,18 @@ import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.Indexes.ascending
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
-import uk.gov.hmrc.agentpermissions.model.BetaInvite
+import uk.gov.hmrc.agentpermissions.model.{BetaInvite, BetaInviteRecord}
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[OptinRepositoryImpl])
 trait BetaInviteRepository {
-  def get(arn: Arn): Future[Option[BetaInviteRecord]]
+  def get(agentUser: AgentUser): Future[Option[BetaInviteRecord]]
   def upsert(betaInviteRecord: BetaInviteRecord): Future[Option[UpsertType]]
 }
 
@@ -53,12 +53,12 @@ class BetaInviteRepositoryImpl @Inject() (
       )
     ) with BetaInviteRepository with Logging {
 
-  def get(arn: Arn): Future[Option[BetaInviteRecord]] =
-    collection.find(equal("arn", arn.value)).headOption().map(_.map(_.decryptedValue))
+  def get(agentUser: AgentUser): Future[Option[BetaInviteRecord]] =
+    collection.find(equal("agentUserId", agentUser.id)).headOption().map(_.map(_.decryptedValue))
 
   def upsert(betaInviteRecord: BetaInviteRecord): Future[Option[UpsertType]] =
     collection
-      .replaceOne(equal("arn", betaInviteRecord.arn.value), betaInviteRecord, upsertOptions)
+      .replaceOne(equal("agentUserId", betaInviteRecord.agentUserId), betaInviteRecord, upsertOptions)
       .headOption()
       .map(
         _.map(result =>
