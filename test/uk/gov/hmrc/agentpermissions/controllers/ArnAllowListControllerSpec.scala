@@ -23,6 +23,8 @@ import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn}
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.service.BetaInviteService
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -56,8 +58,10 @@ class ArnAllowListControllerSpec extends BaseSpec {
 
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    implicit val appConfig: AppConfig = mock[AppConfig]
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
+    implicit val mockBetaInviteService: BetaInviteService = mock[BetaInviteService]
     implicit val mockAuthAction: AuthAction = mock[AuthAction]
 
     val controller = new ArnAllowListController()
