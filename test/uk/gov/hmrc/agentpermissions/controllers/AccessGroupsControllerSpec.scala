@@ -973,18 +973,18 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
-    ): CallHandler3[Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+    ): CallHandler4[Boolean, Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
       (mockAuthAction
-        .getAuthorisedAgent(_: Boolean)(_: ExecutionContext, _: Request[_]))
-        .expects(*, *, *)
+        .getAuthorisedAgent(_: Boolean, _: Boolean)(_: ExecutionContext, _: Request[_]))
+        .expects(*, *, *, *)
         .returning(Future.successful(maybeAuthorisedAgent))
 
     def mockAuthActionGetAuthorisedAgentWithException(
       ex: Exception
-    ): CallHandler3[Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+    ): CallHandler4[Boolean, Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
       (mockAuthAction
-        .getAuthorisedAgent(_: Boolean)(_: ExecutionContext, _: Request[_]))
-        .expects(*, *, *)
+        .getAuthorisedAgent(_: Boolean, _: Boolean)(_: ExecutionContext, _: Request[_]))
+        .expects(*, *, *, *)
         .returning(Future.failed(ex))
 
     def mockAccessGroupsServiceCreate(

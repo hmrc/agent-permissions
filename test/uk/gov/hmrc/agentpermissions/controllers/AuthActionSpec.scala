@@ -82,7 +82,7 @@ class AuthActionSpec extends BaseSpec with AuthorisationMockSupport {
             mockAuthResponseWithoutException(buildAuthorisedResponseHavingAssistantCredentialRole)
             mockAppConfigCheckArnAllowList(toCheckArnAllowList = false)
 
-            authAction.getAuthorisedAgent(true).futureValue shouldBe Some(
+            authAction.getAuthorisedAgent(allowStandardUser = true).futureValue shouldBe Some(
               AuthorisedAgent(Arn("KARN0762398"), AgentUser("user1", "Jane Doe"))
             )
 

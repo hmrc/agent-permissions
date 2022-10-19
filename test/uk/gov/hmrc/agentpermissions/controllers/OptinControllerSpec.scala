@@ -46,9 +46,9 @@ class OptinControllerSpec extends BaseSpec {
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
-    ): CallHandler3[Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] = (authAction
-      .getAuthorisedAgent(_: Boolean)(_: ExecutionContext, _: Request[_]))
-      .expects(*, *, *)
+    ): CallHandler4[Boolean, Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] = (authAction
+      .getAuthorisedAgent(_: Boolean, _: Boolean)(_: ExecutionContext, _: Request[_]))
+      .expects(*, *, *, *)
       .returning(Future.successful(maybeAuthorisedAgent))
 
     def mockOptinServiceOptinWithoutException(
