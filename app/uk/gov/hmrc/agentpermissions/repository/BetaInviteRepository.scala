@@ -31,13 +31,13 @@ import uk.gov.hmrc.agentpermissions.model.{BetaInvite, BetaInviteRecord}
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
-@ImplementedBy(classOf[OptinRepositoryImpl])
+@ImplementedBy(classOf[BetaInviteRepositoryImpl])
 trait BetaInviteRepository {
   def get(agentUser: AgentUser): Future[Option[BetaInviteRecord]]
   def upsert(betaInviteRecord: BetaInviteRecord): Future[Option[UpsertType]]
 }
 
-/** Note: This implementation stores some fields encrypted in mongo. (APB-6461)
+/** Note: This implementation has no encrypted fields in mongo.
   */
 @Singleton
 class BetaInviteRepositoryImpl @Inject() (
@@ -46,7 +46,7 @@ class BetaInviteRepositoryImpl @Inject() (
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[BetaInviteRecord](
       collectionName = "beta-invite",
-      domainFormat = BetaInviteRecord.format(crypto),
+      domainFormat = BetaInviteRecord.formatBetaInviteRecord,
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true))
@@ -54,7 +54,7 @@ class BetaInviteRepositoryImpl @Inject() (
     ) with BetaInviteRepository with Logging {
 
   def get(agentUser: AgentUser): Future[Option[BetaInviteRecord]] =
-    collection.find(equal("agentUserId", agentUser.id)).headOption().map(_.map(_.decryptedValue))
+    collection.find(equal("agentUserId", agentUser.id)).headOption().map(_.map(_.copy()))
 
   def upsert(betaInviteRecord: BetaInviteRecord): Future[Option[UpsertType]] =
     collection

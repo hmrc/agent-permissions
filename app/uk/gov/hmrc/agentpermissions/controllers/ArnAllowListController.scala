@@ -68,7 +68,9 @@ class ArnAllowListController @Inject() (implicit
 
   def hideBetaInvite: Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true, allowlistEnabled = false) { authorisedAgent =>
-        betaInviteService.hideBetaInvite(authorisedAgent.arn, authorisedAgent.agentUser).map(x =>
+      betaInviteService
+        .hideBetaInvite(authorisedAgent.arn, authorisedAgent.agentUser)
+        .map(x =>
           if (x.isDefined) {
             Created
           } else {

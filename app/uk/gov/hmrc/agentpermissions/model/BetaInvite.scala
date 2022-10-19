@@ -16,8 +16,9 @@
 
 package uk.gov.hmrc.agentpermissions.model
 
-import play.api.libs.json.{Format, JsError, JsString, JsSuccess, Json, Reads, Writes}
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import play.api.libs.json.{Format, JsError, JsResult, JsString, JsSuccess, JsValue, Json, Reads, Writes}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptinRecord}
+import uk.gov.hmrc.crypto.{Crypted, Decrypter, Encrypter, PlainText, Sensitive}
 import uk.gov.hmrc.domain.AgentUserId
 
 case class BetaInviteRecord(
@@ -25,6 +26,21 @@ case class BetaInviteRecord(
   arn: Arn,
   hideBetaInvite: Boolean = false
 )
+
+object BetaInviteRecord {
+
+  implicit val readsBetaInviteRecord: Reads[BetaInviteRecord] = Json.reads[BetaInviteRecord]
+
+  implicit val writesBetaInviteRecord: Writes[BetaInviteRecord] = (betaInviteRecord: BetaInviteRecord) =>
+    Json.obj(
+      fields = "arn" -> betaInviteRecord.arn,
+      "agentUserId"    -> betaInviteRecord.agentUserId,
+      "hideBetaInvite" -> betaInviteRecord.hideBetaInvite
+    )
+
+  implicit val formatBetaInviteRecord: Format[BetaInviteRecord] =
+    Format(readsBetaInviteRecord, writesBetaInviteRecord)
+}
 
 class BetaInvite {
 
@@ -37,21 +53,6 @@ class BetaInvite {
   }
   case object ShowBetaInvite extends BetaInviteStatus {
     override val value = false
-  }
-
-  object BetaInviteRecord {
-
-    implicit val readsBetaInviteRecord: Reads[BetaInviteRecord] = Json.reads[BetaInviteRecord]
-
-    implicit val writesBetaInviteRecord: Writes[BetaInviteRecord] = (betaInviteRecord: BetaInviteRecord) =>
-      Json.obj(
-        fields = "arn" -> betaInviteRecord.arn,
-        "agentUserId"    -> betaInviteRecord.agentUserId,
-        "hideBetaInvite" -> betaInviteRecord.hideBetaInvite
-      )
-
-    implicit val formatBetaInviteRecord: Format[BetaInviteRecord] =
-      Format(readsBetaInviteRecord, writesBetaInviteRecord)
   }
 
 }
