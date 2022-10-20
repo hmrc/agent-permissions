@@ -18,7 +18,6 @@ package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.{Format, Json, Reads, Writes}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
-import uk.gov.hmrc.crypto.{Crypted, Decrypter, Encrypter, PlainText, Sensitive}
 
 case class BetaInviteRecord(
   arn: Arn,
