@@ -22,3 +22,6 @@ GET     /arn/:arn/unassigned-clients            uk.gov.hmrc.agentpermissions.con
 
 # ARN Allow List
 GET     /arn-allowed                            uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.isArnAllowed
+GET     /private-beta-invite                    uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.hideBetaInviteCheck
+POST    /private-beta-invite/decline            uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.hideBetaInvite
+

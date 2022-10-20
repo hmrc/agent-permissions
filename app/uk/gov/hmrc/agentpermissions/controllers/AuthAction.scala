@@ -43,7 +43,7 @@ class AuthAction @Inject() (
   private val agentEnrolment = "HMRC-AS-AGENT"
   private val agentReferenceNumberIdentifier = "AgentReferenceNumber"
 
-  def getAuthorisedAgent(allowStandardUser: Boolean = false)(implicit
+  def getAuthorisedAgent(allowStandardUser: Boolean = false, allowlistEnabled: Boolean = true)(implicit
     ec: ExecutionContext,
     request: Request[_]
   ): Future[Option[AuthorisedAgent]] = {
@@ -58,7 +58,7 @@ class AuthAction @Inject() (
               if (
                 credRole.contains(User) | credRole.contains(Admin) | (credRole.contains(Assistant) & allowStandardUser)
               ) {
-                if (appConfig.checkArnAllowList) {
+                if (appConfig.checkArnAllowList & allowlistEnabled) {
                   if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
                     Future successful Option(authorisedAgent)
                   } else {

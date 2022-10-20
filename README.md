@@ -30,6 +30,12 @@ Backend service to store opt-in status and any agent-permissions-specific struct
 | GET   | /arn/:arn/client/:enrolmentKey/groups   |   Gets group summaries that contain a given client   | false |
 | GET   | /arn/:arn/team-member/:userId/groups   |   Gets group summaries that contain a given team member  | true |
 
+### Other
+| **Method** | **Path**                       | **Description**                           |Allows Assistant user|
+|------------|--------------------------------|-------------------------------------------|----|
+| GET   | /arn-allowed |   Allowlist to support private beta  | true |
+| GET   | /private-beta-invite   | Check to see if they're in private beta or want to hide the invite banner, returns 200 if should be hidden  | true |
+| POST  | /private-beta-invite/decline   | Agent opts out of seeing private beta invite banner | true |
 
 ## Running the tests
 
