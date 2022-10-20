@@ -14,8 +14,14 @@ object CodeCoverageSettings {
     "testOnlyDoNotUseInAppConf.*"
   )
 
+
+  private val excludedFiles: Seq[String] = Seq(
+    ".*BetaInviteService.*"
+  )
+
   val settings: Seq[Setting[_]] = Seq(
     ScoverageKeys.coverageExcludedPackages := excludedPackages.mkString(";"),
+    ScoverageKeys.coverageExcludedFiles := excludedFiles.mkString(";"),
     ScoverageKeys.coverageMinimumStmtTotal := 90.00,
     ScoverageKeys.coverageMinimumStmtPerFile := 90.00,
     ScoverageKeys.coverageFailOnMinimum := true,

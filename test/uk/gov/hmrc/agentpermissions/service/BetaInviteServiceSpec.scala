@@ -83,8 +83,8 @@ class BetaInviteServiceSpec extends BaseSpec {
         mockBetaInviteRecordBuilderForUpdating(None, maybeBetaInviteRecordToUpdate)
         mockBetaInviteRepositoryUpsert(maybeBetaInviteRecordToUpdate, Some(RecordInserted(insertedId)))
 
-        whenReady(betaInviteService.hideBetaInvite(arn, user)) { maybeBetaInviteRequestStatus =>
-          maybeBetaInviteRequestStatus.get shouldBe RecordInserted(insertedId)
+        whenReady(betaInviteService.hideBetaInvite(arn, user)) { maybeUpsertResult =>
+          maybeUpsertResult.get shouldBe RecordInserted(insertedId)
         }
       }
     }
@@ -98,8 +98,8 @@ class BetaInviteServiceSpec extends BaseSpec {
         mockBetaInviteRepositoryGet(maybeExistingBetaInviteRecord)
         mockBetaInviteRecordBuilderForUpdating(maybeExistingBetaInviteRecord, None)
 
-        whenReady(betaInviteService.hideBetaInvite(arn, user)) { maybeBetaInviteRequestStatus =>
-          maybeBetaInviteRequestStatus shouldBe None
+        whenReady(betaInviteService.hideBetaInvite(arn, user)) { maybeUpsertResult =>
+          maybeUpsertResult shouldBe None
         }
       }
     }
@@ -120,6 +120,15 @@ class BetaInviteServiceSpec extends BaseSpec {
 
       whenReady(betaInviteService.hideBetaInviteCheck(arn, user)) { hideBetaInvite =>
         hideBetaInvite shouldBe true
+      }
+    }
+
+    // Never occurs bc data never set to false, but coverage?
+    "return false when BetaInviteRecord exists" in new TestScope {
+      mockBetaInviteRepositoryGet(Some(BetaInviteRecord(arn, user.id)))
+
+      whenReady(betaInviteService.hideBetaInviteCheck(arn, user)) { hideBetaInvite =>
+        hideBetaInvite shouldBe false
       }
     }
 
