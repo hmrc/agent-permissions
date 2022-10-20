@@ -49,7 +49,7 @@ class BetaInviteRepositoryImpl @Inject() (
       domainFormat = BetaInviteRecord.formatBetaInviteRecord,
       mongoComponent = mongoComponent,
       indexes = Seq(
-        IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true))
+        IndexModel(ascending("agentUserId"), new IndexOptions().name("agentUserIdx").unique(true))
       )
     ) with BetaInviteRepository with Logging {
 

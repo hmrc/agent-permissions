@@ -81,7 +81,7 @@ class BetaInviteRecordBuilder {
   ): Option[BetaInviteRecord] =
     maybeExistingRecord match {
       case None =>
-        Option(BetaInviteRecord(user.id, arn, hideBetaInvite = true))
+        Option(BetaInviteRecord(arn, user.id, hideBetaInvite = true))
       case Some(_) =>
         None
     }

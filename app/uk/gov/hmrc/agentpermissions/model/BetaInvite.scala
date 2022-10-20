@@ -21,8 +21,8 @@ import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.crypto.{Crypted, Decrypter, Encrypter, PlainText, Sensitive}
 
 case class BetaInviteRecord(
-  agentUserId: String,
   arn: Arn,
+  agentUserId: String,
   hideBetaInvite: Boolean = false
 )
 
