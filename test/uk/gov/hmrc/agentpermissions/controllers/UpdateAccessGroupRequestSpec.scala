@@ -17,6 +17,8 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client}
+import uk.gov.hmrc.agentpermissions.model.UpdateAccessGroupRequest
+
 import uk.gov.hmrc.agentpermissions.BaseSpec
 
 import java.time.LocalDateTime

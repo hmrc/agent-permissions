@@ -248,7 +248,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
           status(result) shouldBe OK
           contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
-            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, 0, 0)
+            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(0), 0, isCustomGroup = true)
           )
         }
       }
@@ -432,14 +432,16 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "return only groups that the client is in" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForClient(Seq(AccessGroupSummary(dbId.toHexString, groupName, 3, 3)))
+      mockAccessGroupsServiceGetGroupsForClient(
+        Seq(AccessGroupSummary(dbId.toHexString, groupName, Some(3), 3, isCustomGroup = true))
+      )
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
 
       status(result) shouldBe OK
 
       contentAsJson(result) shouldBe Json.parse(
-        s"""[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":3,"teamMemberCount":3}]"""
+        s"""[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":3,"teamMemberCount":3,"isCustomGroup":true}]"""
       )
 
     }
@@ -468,14 +470,16 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "return only groups that the team member is in" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForTeamMember(Seq(AccessGroupSummary(dbId.toHexString, groupName, 3, 3)))
+      mockAccessGroupsServiceGetGroupsForTeamMember(
+        Seq(AccessGroupSummary(dbId.toHexString, groupName, Some(3), 3, isCustomGroup = true))
+      )
 
       val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
 
       status(result) shouldBe OK
 
       contentAsJson(result) shouldBe Json.parse(
-        s"""[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":3,"teamMemberCount":3}]"""
+        s"""[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":3,"teamMemberCount":3,"isCustomGroup":true}]"""
       )
 
     }

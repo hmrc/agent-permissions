@@ -85,7 +85,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         accessGroupsService
           .getAllGroups(arn)
-          .map(groups => Ok(Json.toJson(groups.map(AccessGroupSummary.convert))))
+          .map(groups => Ok(Json.toJson(groups.map(AccessGroupSummary.convertCustomGroup))))
       }
     } transformWith failureHandler
   }
@@ -281,4 +281,3 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
       Future.successful(InternalServerError)
   }
 }
-
