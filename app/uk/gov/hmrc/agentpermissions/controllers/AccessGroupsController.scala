@@ -19,12 +19,12 @@ package uk.gov.hmrc.agentpermissions.controllers
 import play.api.libs.json._
 import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentpermissions.model.{AddMembersToAccessGroupRequest, CreateAccessGroupRequest, UpdateAccessGroupRequest}
 import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.auth.core.AuthorisationException
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
-import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -79,16 +79,18 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
+  // gets access group summaries for custom groups ONLY
   def groups(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         accessGroupsService
           .getAllGroups(arn)
-          .map(groups => Ok(Json.toJson(groups.map(AccessGroupSummary.convert))))
+          .map(groups => Ok(Json.toJson(groups.map(AccessGroupSummary.convertCustomGroup))))
       }
     } transformWith failureHandler
   }
 
+  // gets a custom access group ONLY
   def getGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       accessGroupsService.getById(gid) map {
@@ -105,6 +107,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
+  // gets custom group summaries for client TODO include tax service groups
   def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
     implicit request =>
       withAuthorisedAgent() { _ =>
@@ -114,6 +117,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
       } transformWith failureHandler
   }
 
+  // gets custom group summaries for team member TODO include tax service groups
   def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { _ =>
       accessGroupsService
@@ -191,6 +195,7 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
+  // checks custom access groups names TODO include tax service groups
   def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
@@ -275,57 +280,4 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
       logger.error(s"Error processing request: ${ex.getMessage}")
       Future.successful(InternalServerError)
   }
-}
-
-case class CreateAccessGroupRequest(
-  groupName: String,
-  teamMembers: Option[Set[AgentUser]],
-  clients: Option[Set[Client]]
-) {
-  def buildAccessGroup(
-    arn: Arn,
-    agentUser: AgentUser
-  ): AccessGroup = {
-    val now = LocalDateTime.now()
-
-    AccessGroup(
-      arn,
-      Option(groupName).map(_.trim).getOrElse(""),
-      now,
-      now,
-      agentUser,
-      agentUser,
-      teamMembers,
-      clients
-    )
-  }
-}
-
-object CreateAccessGroupRequest {
-  implicit val formatCreateAccessGroupRequest: OFormat[CreateAccessGroupRequest] = Json.format[CreateAccessGroupRequest]
-}
-
-case class UpdateAccessGroupRequest(
-  groupName: Option[String],
-  teamMembers: Option[Set[AgentUser]],
-  clients: Option[Set[Client]]
-) {
-
-  def merge(existingAccessGroup: AccessGroup): AccessGroup = {
-    val withMergedGroupName = groupName.fold(existingAccessGroup)(name =>
-      existingAccessGroup.copy(groupName = Option(name).map(_.trim).getOrElse(""))
-    )
-    val withMergedClients = clients.fold(withMergedGroupName)(cls => withMergedGroupName.copy(clients = Some(cls)))
-    teamMembers.fold(withMergedClients)(members => withMergedClients.copy(teamMembers = Some(members)))
-  }
-}
-
-object UpdateAccessGroupRequest {
-  implicit val format: OFormat[UpdateAccessGroupRequest] = Json.format[UpdateAccessGroupRequest]
-}
-
-case class AddMembersToAccessGroupRequest(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]])
-
-object AddMembersToAccessGroupRequest {
-  implicit val format: OFormat[AddMembersToAccessGroupRequest] = Json.format[AddMembersToAccessGroupRequest]
 }

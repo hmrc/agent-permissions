@@ -3,6 +3,19 @@
 
 Backend service to store opt-in status and any agent-permissions-specific structures, such as groups.
 
+Custom access groups, or just access groups are created via User level assignments in EACD.
+
+Tax service access groups only exist within Agent Services as an allowlist of team members for a particular enrolment type. Only those currently supported by Agent Services Account are included. Income Record Viewer is not supported. Trusts are handled as one entity (taxable and non-taxable grouped together).
+
+**Enrolments for tax service groups**
+- HMRC-MTD-VAT
+- HMRC-MTD-IT
+- HMRC-TERS-ORG and HMRC-TERSNT-ORG (Trusts)
+- HMRC-CGT-PD
+- HMRC-PPT-ORG
+
+Even though custom access groups and tax service groups are separate, they cannot share the same name
+
 ## Endpoints
 
 ### Opt in/out
@@ -14,15 +27,30 @@ Backend service to store opt-in status and any agent-permissions-specific struct
 | POST  | /arn/:arn/optout           | Opt-out an agent from using agent permissions feature  | false |
 | GET  | /arn/:arn/optin-record-exists           | Returns 204 if the ARN has opted-in otherwise returns 404  | true |
 
-### Create or Manage access group
+### Group checks
 | **Method** | **Path**                       | **Description**                           |Allows Assistant user|
 |------------|--------------------------------|-------------------------------------------|----|
 | GET   | /arn/:arn/access-group-name-check?name=:encodedName      |    Checks if group name has already been used. Returns OK or CONFLICT  | false |
-| POST  | /arn/:arn/groups             | Creates an access group. Returns CREATED          | false |
-| GET   |  /arn/:arn/groups            | Gets summary of groups and unassigned clients     | true |
-| GET   | /groups/:groupId            |  Gets access group based on groupId                | true |
-| PATCH | /groups/:groupId             |  Updates a group (name, clients, team members) from their groupId             | false |
-| DELETE | /groups/:groupId             |  Deletes a group from their groupId             | false |
+| GET   | /arn/:arn/all-groups      | NOT IMPLEMENTED - Gets summaries of custom groups & tax service groups   | true |
+
+### Create & Manage custom access groups
+| **Method** | **Path**          | **Description**                           |Allows Assistant user|
+|------------|-------------------|-------------------------------------------|----|
+| POST   | /arn/:arn/groups      | Creates a custom access group. Returns CREATED          | false |
+| GET    | /arn/:arn/groups      | Gets summaries of custom groups ONLY   | true |
+| GET    | /groups/:groupId      | Gets custom access group based on groupId                | true |
+| PATCH  | /groups/:groupId      | Updates a group (name, clients, team members) from their groupId             | false |
+| DELETE | /groups/:groupId      | Deletes a group from their groupId             | false |
+
+### Create & Manage tax service groups (not yet implemented)
+| **Method** | **Path**          | **Description**                           |Allows Assistant user|
+|------------|-------------------|-------------------------------------------|----|
+| POST   | /arn/:arn/tax-group   | NOT IMPLEMENTED - Creates a tax service group. Returns CREATED          | false |
+| GET    | /arn/:arn/tax-groups  | NOT IMPLEMENTED - Gets summaries of tax service groups ONLY            | true |
+| GET    | /tax-group/:groupId   | NOT IMPLEMENTED - Gets tax service group based on groupId        | true |
+| GET    | /arn/:arn/tax-group/:service  | NOT IMPLEMENTED - Gets tax service group for ARN based on service             | true |
+| PATCH  | /tax-group/:groupId   | NOT IMPLEMENTED - Updates a group (name, team members, excluded clients, auto-updates) from their groupId             | false |
+| DELETE | /tax-group/:groupId   | NOT IMPLEMENTED - Deletes a group from their groupId             | false |
 
 ### Manage clients/team members
 | **Method** | **Path**                       | **Description**                           |Allows Assistant user|

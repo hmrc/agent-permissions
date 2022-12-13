@@ -130,7 +130,7 @@ class AccessGroupsServiceImpl @Inject() (
       .map(accessGroups =>
         accessGroups
           .filter(_.clients.fold(false)(_.map(_.enrolmentKey).contains(enrolmentKey)))
-          .map(AccessGroupSummary.convert)
+          .map(AccessGroupSummary.convertCustomGroup)
       )
 
   override def getGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
@@ -141,7 +141,7 @@ class AccessGroupsServiceImpl @Inject() (
       .map(accessGroups =>
         accessGroups
           .filter(_.teamMembers.fold(false)(_.map(_.id).contains(userId)))
-          .map(AccessGroupSummary.convert)
+          .map(AccessGroupSummary.convertCustomGroup)
       )
 
   override def delete(

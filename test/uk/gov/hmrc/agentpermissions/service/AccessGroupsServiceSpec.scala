@@ -171,7 +171,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         accessGroupsService
           .getGroupSummariesForClient(arn, s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789")
           .futureValue shouldBe
-          Seq(AccessGroupSummary(ag1._id.toHexString, "some group", 3, 3))
+          Seq(AccessGroupSummary(ag1._id.toHexString, "some group", Some(3), 3, isCustomGroup = true))
       }
     }
   }
@@ -189,7 +189,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         )
 
         accessGroupsService.getGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
-          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", 3, 1))
+          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", Some(3), 1, isCustomGroup = true))
       }
     }
   }
@@ -478,9 +478,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     val clients = Seq(clientVat, clientPpt, clientCgt)
 
-    val accessGroupInMongo = withClientNamesRemoved(accessGroup)
+    val accessGroupInMongo: AccessGroup = withClientNamesRemoved(accessGroup)
 
-    val assignedClient = AssignedClient("service", Seq(Identifier("key", "value")), None, "user")
+    val assignedClient: AssignedClient = AssignedClient("service", Seq(Identifier("key", "value")), None, "user")
 
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
