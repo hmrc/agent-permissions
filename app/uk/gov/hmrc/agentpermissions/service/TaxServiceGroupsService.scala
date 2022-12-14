@@ -33,7 +33,7 @@ trait TaxServiceGroupsService {
 
   def create(
     accessGroup: TaxServiceAccessGroup
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[_]
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[TaxServiceGroupCreationStatus]
 
   def getAllTaxServiceGroups(
     arn: Arn
@@ -72,7 +72,7 @@ class TaxServiceGroupsServiceImpl @Inject() (
 
   override def create(
     accessGroup: TaxServiceAccessGroup
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[_] =
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[TaxServiceGroupCreationStatus] =
     taxServiceGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
       case Some(_) =>
         Future.successful(TaxServiceGroupExistsForCreation)
@@ -81,7 +81,7 @@ class TaxServiceGroupsServiceImpl @Inject() (
           maybeCreationId <- taxServiceGroupsRepository.insert(accessGroup)
         } yield maybeCreationId match {
           case None =>
-            Future.successful(TaxServiceGroupNotCreated)
+            TaxServiceGroupNotCreated
           case Some(creationId) => // TODO add auditing via audit service
             logger.info(s"Created tax service group. DB id: '$creationId")
             TaxServiceGroupCreated(creationId)

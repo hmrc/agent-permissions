@@ -25,7 +25,7 @@ case class CreateTaxServiceGroupRequest(
   groupName: String,
   teamMembers: Option[Set[AgentUser]],
   service: String,
-  updateAutomatically: Boolean = true,
+  autoUpdate: Boolean = true,
   excludedClients: Option[Set[Client]] = None
 ) {
   def buildTaxServiceGroup(
@@ -43,7 +43,7 @@ case class CreateTaxServiceGroupRequest(
       agentUser,
       teamMembers,
       service,
-      updateAutomatically,
+      autoUpdate,
       excludedClients
     )
   }

@@ -31,6 +31,211 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class AccessGroupsServiceSpec extends BaseSpec {
 
+  trait TestScope {
+    val arn: Arn = Arn("KARN1234567")
+    val user: AgentUser = AgentUser("userId", "userName")
+    val groupName = "some group"
+    val insertedId = "insertedId"
+    val user1: AgentUser = AgentUser("user1", "User 1")
+    val user2: AgentUser = AgentUser("user2", "User 2")
+    val user3: AgentUser = AgentUser("user3", "User 3")
+    val clientVat: Client = Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "John Innes")
+    val clientPpt: Client = Client(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", "Frank Wright")
+    val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
+
+    val groupId: GroupId = GroupId(arn, groupName)
+    val dbId: String = new ObjectId().toHexString
+
+    val accessGroup: AccessGroup = AccessGroup(
+      arn,
+      groupName,
+      now,
+      now,
+      user,
+      user,
+      Some(Set(user, user1, user2)),
+      Some(Set(clientVat, clientPpt, clientCgt))
+    )
+
+    val clients = Seq(clientVat, clientPpt, clientCgt)
+
+    val accessGroupInMongo: AccessGroup = withClientNamesRemoved(accessGroup)
+
+    val assignedClient: AssignedClient = AssignedClient("service", Seq(Identifier("key", "value")), None, "user")
+
+    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+
+    val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
+    val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
+    val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
+    val mockAccessGroupSynchronizer: AccessGroupSynchronizer = mock[AccessGroupSynchronizer]
+    val mockAuditService: AuditService = mock[AuditService]
+
+    val accessGroupsService: AccessGroupsService =
+      new AccessGroupsServiceImpl(
+        mockAccessGroupsRepository,
+        mockUserEnrolmentAssignmentService,
+        mockUserClientDetailsConnector,
+        mockAccessGroupSynchronizer,
+        mockAuditService
+      )
+
+    val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(
+      assign = Set(UserEnrolment(user.id, clientVat.enrolmentKey)),
+      unassign = Set.empty,
+      arn = arn
+    )
+    val maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments] = Some(userEnrolmentAssignments)
+
+    lazy val now: LocalDateTime = LocalDateTime.now()
+
+    def mockAccessGroupsRepositoryGet(
+      maybeAccessGroup: Option[AccessGroup]
+    ): CallHandler2[Arn, String, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsRepository
+        .get(_: Arn, _: String))
+        .expects(arn, groupName)
+        .returning(Future.successful(maybeAccessGroup))
+
+    def mockAccessGroupsRepositoryGetById(
+      maybeAccessGroup: Option[AccessGroup]
+    ): CallHandler1[String, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsRepository
+        .findById(_: String))
+        .expects(dbId)
+        .returning(Future.successful(maybeAccessGroup))
+
+    def mockAccessGroupsRepositoryGetAll(
+      accessGroups: Seq[AccessGroup]
+    ): CallHandler1[Arn, Future[Seq[AccessGroup]]] =
+      (mockAccessGroupsRepository
+        .get(_: Arn))
+        .expects(arn)
+        .returning(Future.successful(accessGroups))
+
+    def mockAccessGroupsRepositoryInsert(
+      accessGroup: AccessGroup,
+      maybeCreationId: Option[String]
+    ): CallHandler1[AccessGroup, Future[Option[String]]] = (mockAccessGroupsRepository
+      .insert(_: AccessGroup))
+      .expects(accessGroup)
+      .returning(Future.successful(maybeCreationId))
+
+    def mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler2[AccessGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+      (mockUserEnrolmentAssignmentService
+        .calculateForGroupCreation(_: AccessGroup)(_: ExecutionContext))
+        .expects(accessGroup, *)
+        .returning(Future successful maybeUserEnrolmentAssignments)
+
+    def mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler2[GroupId, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+      (mockUserEnrolmentAssignmentService
+        .calculateForGroupDeletion(_: GroupId)(_: ExecutionContext))
+        .expects(groupId, *)
+        .returning(Future successful maybeUserEnrolmentAssignments)
+
+    def mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler3[GroupId, AccessGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+      (mockUserEnrolmentAssignmentService
+        .calculateForGroupUpdate(_: GroupId, _: AccessGroup)(_: ExecutionContext))
+        .expects(groupId, accessGroup, *)
+        .returning(Future successful maybeUserEnrolmentAssignments)
+
+    def mockAccessGroupsRepositoryDelete(
+      maybeDeletedCount: Option[Long]
+    ): CallHandler2[Arn, String, Future[Option[Long]]] =
+      (mockAccessGroupsRepository
+        .delete(_: Arn, _: String))
+        .expects(arn, groupName)
+        .returning(Future.successful(maybeDeletedCount))
+
+    def mockAccessGroupsRepositoryUpdate(
+      maybeModifiedCount: Option[Long]
+    ): CallHandler3[Arn, String, AccessGroup, Future[Option[Long]]] =
+      (mockAccessGroupsRepository
+        .update(_: Arn, _: String, _: AccessGroup))
+        .expects(arn, groupName, *)
+        .returning(Future.successful(maybeModifiedCount))
+
+    def mockUserClientDetailsConnectorGetClients(
+      maybeClients: Option[Seq[Client]]
+    ): CallHandler5[Arn, Boolean, Option[String], HeaderCarrier, ExecutionContext, Future[Option[Seq[Client]]]] =
+      (mockUserClientDetailsConnector
+        .getClients(_: Arn, _: Boolean, _: Option[String])(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *, *, *)
+        .returning(Future successful maybeClients)
+
+    def mockUserEnrolmentAssignmentServicePushCalculatedAssignments(
+      eacdAssignmentsPushStatus: EacdAssignmentsPushStatus
+    ): CallHandler3[Option[UserEnrolmentAssignments], HeaderCarrier, ExecutionContext, Future[
+      EacdAssignmentsPushStatus
+    ]] =
+      (mockUserEnrolmentAssignmentService
+        .pushCalculatedAssignments(_: Option[UserEnrolmentAssignments])(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future successful eacdAssignmentsPushStatus)
+
+    def mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
+      maybeGroupDelegatedEnrolments: Option[GroupDelegatedEnrolments]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[GroupDelegatedEnrolments]]] =
+      (mockUserClientDetailsConnector
+        .getClientsWithAssignedUsers(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *)
+        .returning(Future successful maybeGroupDelegatedEnrolments)
+
+    def mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(
+      maybeOutstandingAssignmentsWorkItemsExist: Option[Boolean]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
+      (mockUserClientDetailsConnector
+        .outstandingAssignmentsWorkItemsExist(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *)
+        .returning(Future successful maybeOutstandingAssignmentsWorkItemsExist)
+
+    def mockAccessGroupSynchronizerSyncWithEacd(
+      accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
+    ): CallHandler5[Arn, GroupDelegatedEnrolments, AgentUser, HeaderCarrier, ExecutionContext, Future[
+      Seq[AccessGroupUpdateStatus]
+    ]] =
+      (mockAccessGroupSynchronizer
+        .syncWithEacd(_: Arn, _: GroupDelegatedEnrolments, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *, *, *)
+        .returning(Future successful accessGroupUpdateStatuses)
+
+    def mockAuditServiceAuditEsAssignmentUnassignments()
+      : CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditService
+        .auditEsAssignmentUnassignments(_: UserEnrolmentAssignments)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(())
+
+    def mockAuditServiceAuditAccessGroupCreation(): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditService
+        .auditAccessGroupCreation(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(())
+
+    def mockAuditServiceAuditAccessGroupUpdate(): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditService
+        .auditAccessGroupUpdate(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(())
+
+    def mockAuditServiceAuditAccessGroupDeletion()
+      : CallHandler5[Arn, String, AgentUser, HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditService
+        .auditAccessGroupDeletion(_: Arn, _: String, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *, *)
+        .returning(())
+
+    def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup =
+      accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = ""))))
+  }
+
   "Calling create" when {
 
     "group of that name already exists" should {
@@ -450,208 +655,4 @@ class AccessGroupsServiceSpec extends BaseSpec {
     }
   }
 
-  trait TestScope {
-    val arn: Arn = Arn("KARN1234567")
-    val user: AgentUser = AgentUser("userId", "userName")
-    val groupName = "some group"
-    val insertedId = "insertedId"
-    val user1: AgentUser = AgentUser("user1", "User 1")
-    val user2: AgentUser = AgentUser("user2", "User 2")
-    val user3: AgentUser = AgentUser("user3", "User 3")
-    val clientVat: Client = Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "John Innes")
-    val clientPpt: Client = Client(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", "Frank Wright")
-    val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
-
-    val groupId: GroupId = GroupId(arn, groupName)
-    val dbId: String = new ObjectId().toHexString
-
-    val accessGroup: AccessGroup = AccessGroup(
-      arn,
-      groupName,
-      now,
-      now,
-      user,
-      user,
-      Some(Set(user, user1, user2)),
-      Some(Set(clientVat, clientPpt, clientCgt))
-    )
-
-    val clients = Seq(clientVat, clientPpt, clientCgt)
-
-    val accessGroupInMongo: AccessGroup = withClientNamesRemoved(accessGroup)
-
-    val assignedClient: AssignedClient = AssignedClient("service", Seq(Identifier("key", "value")), None, "user")
-
-    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
-
-    val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
-    val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
-    val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
-    val mockAccessGroupSynchronizer: AccessGroupSynchronizer = mock[AccessGroupSynchronizer]
-    val mockAuditService: AuditService = mock[AuditService]
-
-    val accessGroupsService: AccessGroupsService =
-      new AccessGroupsServiceImpl(
-        mockAccessGroupsRepository,
-        mockUserEnrolmentAssignmentService,
-        mockUserClientDetailsConnector,
-        mockAccessGroupSynchronizer,
-        mockAuditService
-      )
-
-    val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(
-      assign = Set(UserEnrolment(user.id, clientVat.enrolmentKey)),
-      unassign = Set.empty,
-      arn = arn
-    )
-    val maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments] = Some(userEnrolmentAssignments)
-
-    lazy val now: LocalDateTime = LocalDateTime.now()
-
-    def mockAccessGroupsRepositoryGet(
-      maybeAccessGroup: Option[AccessGroup]
-    ): CallHandler2[Arn, String, Future[Option[AccessGroup]]] =
-      (mockAccessGroupsRepository
-        .get(_: Arn, _: String))
-        .expects(arn, groupName)
-        .returning(Future.successful(maybeAccessGroup))
-
-    def mockAccessGroupsRepositoryGetById(
-      maybeAccessGroup: Option[AccessGroup]
-    ): CallHandler1[String, Future[Option[AccessGroup]]] =
-      (mockAccessGroupsRepository
-        .findById(_: String))
-        .expects(dbId)
-        .returning(Future.successful(maybeAccessGroup))
-
-    def mockAccessGroupsRepositoryGetAll(
-      accessGroups: Seq[AccessGroup]
-    ): CallHandler1[Arn, Future[Seq[AccessGroup]]] =
-      (mockAccessGroupsRepository
-        .get(_: Arn))
-        .expects(arn)
-        .returning(Future.successful(accessGroups))
-
-    def mockAccessGroupsRepositoryInsert(
-      accessGroup: AccessGroup,
-      maybeCreationId: Option[String]
-    ): CallHandler1[AccessGroup, Future[Option[String]]] = (mockAccessGroupsRepository
-      .insert(_: AccessGroup))
-      .expects(accessGroup)
-      .returning(Future.successful(maybeCreationId))
-
-    def mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(
-      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[AccessGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
-      (mockUserEnrolmentAssignmentService
-        .calculateForGroupCreation(_: AccessGroup)(_: ExecutionContext))
-        .expects(accessGroup, *)
-        .returning(Future successful maybeUserEnrolmentAssignments)
-
-    def mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(
-      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[GroupId, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
-      (mockUserEnrolmentAssignmentService
-        .calculateForGroupDeletion(_: GroupId)(_: ExecutionContext))
-        .expects(groupId, *)
-        .returning(Future successful maybeUserEnrolmentAssignments)
-
-    def mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(
-      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler3[GroupId, AccessGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
-      (mockUserEnrolmentAssignmentService
-        .calculateForGroupUpdate(_: GroupId, _: AccessGroup)(_: ExecutionContext))
-        .expects(groupId, accessGroup, *)
-        .returning(Future successful maybeUserEnrolmentAssignments)
-
-    def mockAccessGroupsRepositoryDelete(
-      maybeDeletedCount: Option[Long]
-    ): CallHandler2[Arn, String, Future[Option[Long]]] =
-      (mockAccessGroupsRepository
-        .delete(_: Arn, _: String))
-        .expects(arn, groupName)
-        .returning(Future.successful(maybeDeletedCount))
-
-    def mockAccessGroupsRepositoryUpdate(
-      maybeModifiedCount: Option[Long]
-    ): CallHandler3[Arn, String, AccessGroup, Future[Option[Long]]] =
-      (mockAccessGroupsRepository
-        .update(_: Arn, _: String, _: AccessGroup))
-        .expects(arn, groupName, *)
-        .returning(Future.successful(maybeModifiedCount))
-
-    def mockUserClientDetailsConnectorGetClients(
-      maybeClients: Option[Seq[Client]]
-    ): CallHandler5[Arn, Boolean, Option[String], HeaderCarrier, ExecutionContext, Future[Option[Seq[Client]]]] =
-      (mockUserClientDetailsConnector
-        .getClients(_: Arn, _: Boolean, _: Option[String])(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *, *, *)
-        .returning(Future successful maybeClients)
-
-    def mockUserEnrolmentAssignmentServicePushCalculatedAssignments(
-      eacdAssignmentsPushStatus: EacdAssignmentsPushStatus
-    ): CallHandler3[Option[UserEnrolmentAssignments], HeaderCarrier, ExecutionContext, Future[
-      EacdAssignmentsPushStatus
-    ]] =
-      (mockUserEnrolmentAssignmentService
-        .pushCalculatedAssignments(_: Option[UserEnrolmentAssignments])(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future successful eacdAssignmentsPushStatus)
-
-    def mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
-      maybeGroupDelegatedEnrolments: Option[GroupDelegatedEnrolments]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[GroupDelegatedEnrolments]]] =
-      (mockUserClientDetailsConnector
-        .getClientsWithAssignedUsers(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *)
-        .returning(Future successful maybeGroupDelegatedEnrolments)
-
-    def mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(
-      maybeOutstandingAssignmentsWorkItemsExist: Option[Boolean]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
-      (mockUserClientDetailsConnector
-        .outstandingAssignmentsWorkItemsExist(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *)
-        .returning(Future successful maybeOutstandingAssignmentsWorkItemsExist)
-
-    def mockAccessGroupSynchronizerSyncWithEacd(
-      accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
-    ): CallHandler5[Arn, GroupDelegatedEnrolments, AgentUser, HeaderCarrier, ExecutionContext, Future[
-      Seq[AccessGroupUpdateStatus]
-    ]] =
-      (mockAccessGroupSynchronizer
-        .syncWithEacd(_: Arn, _: GroupDelegatedEnrolments, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *, *, *)
-        .returning(Future successful accessGroupUpdateStatuses)
-
-    def mockAuditServiceAuditEsAssignmentUnassignments()
-      : CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Unit] =
-      (mockAuditService
-        .auditEsAssignmentUnassignments(_: UserEnrolmentAssignments)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(())
-
-    def mockAuditServiceAuditAccessGroupCreation(): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Unit] =
-      (mockAuditService
-        .auditAccessGroupCreation(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(())
-
-    def mockAuditServiceAuditAccessGroupUpdate(): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Unit] =
-      (mockAuditService
-        .auditAccessGroupUpdate(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(())
-
-    def mockAuditServiceAuditAccessGroupDeletion()
-      : CallHandler5[Arn, String, AgentUser, HeaderCarrier, ExecutionContext, Unit] =
-      (mockAuditService
-        .auditAccessGroupDeletion(_: Arn, _: String, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *, *)
-        .returning(())
-
-    def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup =
-      accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = ""))))
-  }
 }

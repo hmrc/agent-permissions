@@ -53,10 +53,10 @@ class TaxServiceGroupsController @Inject() (taxServiceGroupsService: TaxServiceG
               case TaxServiceGroupExistsForCreation =>
                 logger.info("Cannot create a group with a name that already exists")
                 Conflict
-              case AccessGroupCreated(groupId) =>
+              case TaxServiceGroupCreated(groupId) =>
                 logger.info(s"Created group for '${matchedArn.value}': '$groupId'")
                 Created(JsString(groupId))
-              case AccessGroupNotCreated =>
+              case TaxServiceGroupNotCreated =>
                 logger.warn("Unable to create access group")
                 InternalServerError
               case unknownStatus =>
