@@ -16,7 +16,8 @@ object CodeCoverageSettings {
 
 
   private val excludedFiles: Seq[String] = Seq(
-    ".*BetaInviteService.*"
+    ".*BetaInviteService.*",
+    ".*TaxServiceGroupRequests.*"
   )
 
   val settings: Seq[Setting[_]] = Seq(
