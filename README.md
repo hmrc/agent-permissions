@@ -45,12 +45,12 @@ Even though custom access groups and tax service groups are separate, they canno
 ### Create & Manage tax service groups (not yet implemented)
 | **Method** | **Path**          | **Description**                           |Allows Assistant user|
 |------------|-------------------|-------------------------------------------|----|
-| POST   | /arn/:arn/tax-group   | NOT IMPLEMENTED - Creates a tax service group. Returns CREATED          | false |
-| GET    | /arn/:arn/tax-groups  | NOT IMPLEMENTED - Gets summaries of tax service groups ONLY            | true |
-| GET    | /tax-group/:groupId   | NOT IMPLEMENTED - Gets tax service group based on groupId        | true |
+| POST   | /arn/:arn/tax-group   |  Creates a tax service group. Returns CREATED          | false |
+| GET    | /arn/:arn/tax-groups  |  Gets summaries of tax service groups ONLY            | true |
+| GET    | /tax-group/:groupId   |  Gets tax service group based on groupId        | true |
 | GET    | /arn/:arn/tax-group/:service  | NOT IMPLEMENTED - Gets tax service group for ARN based on service             | true |
-| PATCH  | /tax-group/:groupId   | NOT IMPLEMENTED - Updates a group (name, team members, excluded clients, auto-updates) from their groupId             | false |
-| DELETE | /tax-group/:groupId   | NOT IMPLEMENTED - Deletes a group from their groupId             | false |
+| PATCH  | /tax-group/:groupId   | Updates a group (name, team members, excluded clients, auto-updates) from their groupId             | false |
+| DELETE | /tax-group/:groupId   | Deletes a group from their groupId             | false |
 
 ### Manage clients/team members
 | **Method** | **Path**                       | **Description**                           |Allows Assistant user|
