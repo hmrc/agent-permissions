@@ -767,7 +767,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
                   |    "groupName": "$groupName",
                   |    "teamMembers": ${Json.toJson(Seq(user1, user2))},
                   |    "service": "$serviceVat",
-                  |    "autoUpdate": "false"
+                  |    "autoUpdate": ${JsBoolean(true)},
+                  |    "excludedClients": ${Json.toJson(Seq(clientVat))}
                   |}""".stripMargin)
 
   def jsonPayloadForUpdatingGroup(groupName: String): JsValue =
