@@ -31,7 +31,7 @@ Even though custom access groups and tax service groups are separate, they canno
 | **Method** | **Path**         | **Description**                           |Allows Assistant user|
 |------------|------------------|-------------------------------------------|----|
 | GET   | /arn/:arn/access-group-name-check?name=:encodedName      | Checks if group name has already been used. Returns OK or CONFLICT  | false |
-| GET   | /arn/:arn/all-groups      | NOT IMPLEMENTED - Gets summaries of custom groups & tax service groups   | true |
+| GET   | /arn/:arn/all-groups  |  Gets summaries of custom groups & tax service groups   | true |
 
 ### Create & Manage custom access groups
 | **Method** | **Path**          | **Description**                           |Allows Assistant user|
@@ -52,7 +52,7 @@ Even though custom access groups and tax service groups are separate, they canno
 | PATCH  | /tax-group/:groupId   | Updates a group (name, team members, excluded clients, auto-updates) from their groupId             | false |
 | DELETE | /tax-group/:groupId   | Deletes a group from their groupId             | false |
 
-### Manage clients/team members
+### Manage clients/team members (custom groups only)
 | **Method** | **Path**               | **Description**         |Allows Assistant user|
 |------------|------------------------|-------------------------|---------------------|
 | GET   | /arn/:arn/client/:enrolmentKey/groups  |   Gets group summaries that contain a given client   | false |

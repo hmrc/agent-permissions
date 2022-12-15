@@ -9,7 +9,7 @@ GET     /arn/:arn/optin-record-exists           uk.gov.hmrc.agentpermissions.con
 GET     /arn/:arn/access-group-name-check       uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupNameCheck(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, name: String)
 GET     /arn/:arn/client/:enrolmentKey/groups   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForClient(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, enrolmentKey)
 GET     /arn/:arn/team-member/:userId/groups    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForTeamMember(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, userId: String)
-
+GET     /arn/:arn/all-groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getAllGroupSummaries(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 # Custom access groups
 POST    /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
