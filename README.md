@@ -20,17 +20,17 @@ Even though custom access groups and tax service groups are separate, they canno
 
 ### Opt in/out
 
-| **Method** | **Path**                       | **Description**                           |Allows Assistant user|
-|------------|--------------------------------|-------------------------------------------|----|
-| GET   | /arn/:arn/optin-status     | Gets the opt in status for an ARN including if any work items remain outstanding             | true |
-| POST  | /arn/:arn/optin            | Opt-in an agent to use agent permissions feature  | false |
-| POST  | /arn/:arn/optout           | Opt-out an agent from using agent permissions feature  | false |
-| GET  | /arn/:arn/optin-record-exists           | Returns 204 if the ARN has opted-in otherwise returns 404  | true |
+| **Method** | **Path**              | **Description**                           |Allows Assistant user|
+|------------|-----------------------|-------------------------------------------|----|
+| GET  | /arn/:arn/optin-status     | Gets the opt in status for an ARN including if any work items remain outstanding             | true |
+| POST | /arn/:arn/optin            | Opt-in an agent to use agent permissions feature  | false |
+| POST | /arn/:arn/optout           | Opt-out an agent from using agent permissions feature  | false |
+| GET  | /arn/:arn/optin-record-exists   | Returns 204 if the ARN has opted-in otherwise returns 404  | true |
 
 ### Group checks
-| **Method** | **Path**                       | **Description**                           |Allows Assistant user|
-|------------|--------------------------------|-------------------------------------------|----|
-| GET   | /arn/:arn/access-group-name-check?name=:encodedName      |    Checks if group name has already been used. Returns OK or CONFLICT  | false |
+| **Method** | **Path**         | **Description**                           |Allows Assistant user|
+|------------|------------------|-------------------------------------------|----|
+| GET   | /arn/:arn/access-group-name-check?name=:encodedName      | Checks if group name has already been used. Returns OK or CONFLICT  | false |
 | GET   | /arn/:arn/all-groups      | NOT IMPLEMENTED - Gets summaries of custom groups & tax service groups   | true |
 
 ### Create & Manage custom access groups
@@ -42,20 +42,20 @@ Even though custom access groups and tax service groups are separate, they canno
 | PATCH  | /groups/:groupId      | Updates a group (name, clients, team members) from their groupId             | false |
 | DELETE | /groups/:groupId      | Deletes a group from their groupId             | false |
 
-### Create & Manage tax service groups (not yet implemented)
+### Create & Manage tax service groups
 | **Method** | **Path**          | **Description**                           |Allows Assistant user|
 |------------|-------------------|-------------------------------------------|----|
 | POST   | /arn/:arn/tax-group   |  Creates a tax service group. Returns CREATED          | false |
 | GET    | /arn/:arn/tax-groups  |  Gets summaries of tax service groups ONLY            | true |
+| GET    | /arn/:arn/tax-group/:service  | Gets tax service group for ARN based on service             | true |
 | GET    | /tax-group/:groupId   |  Gets tax service group based on groupId        | true |
-| GET    | /arn/:arn/tax-group/:service  | NOT IMPLEMENTED - Gets tax service group for ARN based on service             | true |
 | PATCH  | /tax-group/:groupId   | Updates a group (name, team members, excluded clients, auto-updates) from their groupId             | false |
 | DELETE | /tax-group/:groupId   | Deletes a group from their groupId             | false |
 
 ### Manage clients/team members
-| **Method** | **Path**                       | **Description**                           |Allows Assistant user|
-|------------|--------------------------------|-------------------------------------------|----|
-| GET   | /arn/:arn/client/:enrolmentKey/groups   |   Gets group summaries that contain a given client   | false |
+| **Method** | **Path**               | **Description**         |Allows Assistant user|
+|------------|------------------------|-------------------------|---------------------|
+| GET   | /arn/:arn/client/:enrolmentKey/groups  |   Gets group summaries that contain a given client   | false |
 | GET   | /arn/:arn/team-member/:userId/groups   |   Gets group summaries that contain a given team member  | true |
 
 ### Other

@@ -26,7 +26,7 @@ import org.mongodb.scala.model.{DeleteOptions, IndexModel, ReplaceOptions}
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, TaxServiceAccessGroup}
 import uk.gov.hmrc.agentpermissions.model.SensitiveTaxServiceGroup
-import uk.gov.hmrc.agentpermissions.repository.TaxServiceGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
+import uk.gov.hmrc.agentpermissions.repository.TaxServiceGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, FIELD_SERVICE, caseInsensitiveCollation}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
@@ -39,6 +39,7 @@ trait TaxServiceGroupsRepository {
   def findById(id: String): Future[Option[TaxServiceAccessGroup]]
   def get(arn: Arn): Future[Seq[TaxServiceAccessGroup]]
   def get(arn: Arn, groupName: String): Future[Option[TaxServiceAccessGroup]]
+  def getByService(arn: Arn, service: String): Future[Option[TaxServiceAccessGroup]]
   def insert(accessGroup: TaxServiceAccessGroup): Future[Option[String]]
   def delete(arn: Arn, groupName: String): Future[Option[Long]]
   def update(arn: Arn, groupName: String, accessGroup: TaxServiceAccessGroup): Future[Option[Long]]
@@ -79,9 +80,17 @@ class TaxServiceGroupsRepositoryImpl @Inject() (
       .toFuture()
       .map(_.map(_.decryptedValue))
 
+  // check usage
   override def get(arn: Arn, groupName: String): Future[Option[TaxServiceAccessGroup]] =
     collection
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)))
+      .collation(caseInsensitiveCollation)
+      .headOption()
+      .map(_.map(_.decryptedValue))
+
+  override def getByService(arn: Arn, service: String): Future[Option[TaxServiceAccessGroup]] =
+    collection
+      .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_SERVICE, service)))
       .collation(caseInsensitiveCollation)
       .headOption()
       .map(_.map(_.decryptedValue))
@@ -124,6 +133,7 @@ class TaxServiceGroupsRepositoryImpl @Inject() (
 object TaxServiceGroupsRepositoryImpl {
   private val FIELD_ARN = "arn"
   private val FIELD_GROUPNAME = "groupName"
+  private val FIELD_SERVICE = "service"
 
   private def caseInsensitiveCollation: Collation =
     Collation.builder().locale("en").collationStrength(SECONDARY).build()

@@ -106,6 +106,15 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
       }
     }
 
+    "getting one group by arn and service Id" when {
+
+      "group of that service does not exist" should {
+        "return nothing" in new TestScope {
+          groupsRepository.getByService(arn, serviceCgt).futureValue shouldBe None
+        }
+      }
+    }
+
     "getting one group of Arn" when {
 
       "group of that name does not exist" should {

@@ -25,8 +25,8 @@ GET     /arn/:arn/unassigned-clients            uk.gov.hmrc.agentpermissions.con
 # Tax service groups
 POST    /arn/:arn/tax-group                     uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/tax-groups                    uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/tax-group/:service            uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.getGroupByService(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, service: String)
 GET     /tax-group/:groupId                     uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.getGroup(groupId: String)
-# GET     /arn/:arn/tax-group/:service
 PATCH   /tax-group/:groupId                     uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.updateGroup(groupId: String)
 DELETE  /tax-group/:groupId                     uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.deleteGroup(groupId: String)
 
