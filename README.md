@@ -52,7 +52,7 @@ Even though custom access groups and tax service groups are separate, they canno
 | PATCH  | /tax-group/:groupId   | Updates a group (name, team members, excluded clients, auto-updates) from their groupId             | false |
 | DELETE | /tax-group/:groupId   | Deletes a group from their groupId             | false |
 
-### Manage clients/team members (custom groups only)
+### Manage clients/team members
 | **Method** | **Path**               | **Description**         |Allows Assistant user|
 |------------|------------------------|-------------------------|---------------------|
 | GET   | /arn/:arn/client/:enrolmentKey/groups  |   Gets all group summaries that contain a given client   | false |

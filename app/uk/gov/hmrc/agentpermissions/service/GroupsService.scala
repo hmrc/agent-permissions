@@ -39,12 +39,6 @@ trait GroupsService {
     ec: ExecutionContext
   ): Future[Seq[AccessGroupSummary]]
 
-//  def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList]
-//
-//  def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
-//
-//  def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
-
 }
 
 @Singleton
