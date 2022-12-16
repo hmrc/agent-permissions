@@ -47,6 +47,10 @@ trait TaxServiceGroupsService {
     ec: ExecutionContext
   ): Future[Option[TaxServiceAccessGroup]]
 
+  def getTaxGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupSummary]]
+
   def delete(groupId: GroupId, agentUser: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -103,12 +107,23 @@ class TaxServiceGroupsServiceImpl @Inject() (
     taxServiceGroupsRepository
       .get(groupId.arn, groupId.groupName)
 
-  override def get(
-    arn: Arn,
-    service: String
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxServiceAccessGroup]] =
+  override def get(arn: Arn, service: String)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Option[TaxServiceAccessGroup]] =
     taxServiceGroupsRepository
       .getByService(arn, service)
+
+  override def getTaxGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupSummary]] =
+    taxServiceGroupsRepository
+      .get(arn)
+      .map(accessGroups =>
+        accessGroups
+          .filter(_.teamMembers.fold(false)(_.map(_.id).contains(userId)))
+          .map(AccessGroupSummary.convertTaxServiceGroup)
+      )
 
   override def delete(
     groupId: GroupId,

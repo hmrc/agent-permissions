@@ -55,8 +55,8 @@ Even though custom access groups and tax service groups are separate, they canno
 ### Manage clients/team members (custom groups only)
 | **Method** | **Path**               | **Description**         |Allows Assistant user|
 |------------|------------------------|-------------------------|---------------------|
-| GET   | /arn/:arn/client/:enrolmentKey/groups  |   Gets group summaries that contain a given client   | false |
-| GET   | /arn/:arn/team-member/:userId/groups   |   Gets group summaries that contain a given team member  | true |
+| GET   | /arn/:arn/client/:enrolmentKey/groups  |   Gets all group summaries that contain a given client   | false |
+| GET   | /arn/:arn/team-member/:userId/groups   |   Gets all group summaries that contain a given team member  | true |
 
 ### Other
 | **Method** | **Path**                       | **Description**                           |Allows Assistant user|

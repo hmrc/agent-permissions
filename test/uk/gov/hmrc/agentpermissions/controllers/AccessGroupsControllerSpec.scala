@@ -67,15 +67,23 @@ class AccessGroupsControllerSpec extends BaseSpec {
         Some(Set.empty)
       )
 
+    def groupSummary(id: ObjectId = dbId, name: String = groupName, isCustomGroup: Boolean = true): AccessGroupSummary =
+      AccessGroupSummary(id.toHexString, name, if (isCustomGroup) Some(3) else None, 3, isCustomGroup)
+
+    val groupSummaries = Seq(
+      groupSummary(),
+      groupSummary(dbId, "Capital Gains Tax", isCustomGroup = false)
+    )
+
     val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
-    val mockTaxServiceGroupsService: TaxServiceGroupsService = mock[TaxServiceGroupsService]
+    val mockGroupsService: GroupsService = mock[GroupsService]
     implicit val mockAuthAction: AuthAction = mock[AuthAction]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
     implicit val actorSystem: ActorSystem = ActorSystem()
 
-    val controller = new AccessGroupsController(mockAccessGroupsService, mockTaxServiceGroupsService)
+    val controller = new AccessGroupsController(mockAccessGroupsService, mockGroupsService)
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
@@ -113,7 +121,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       groups: Seq[AccessGroup]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroup]]] =
       (mockAccessGroupsService
-        .getAllGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .getAllCustomGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.successful(groups))
 
@@ -121,7 +129,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       ex: Exception
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroup]]] =
       (mockAccessGroupsService
-        .getAllGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .getAllCustomGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.failed(ex))
 
@@ -205,51 +213,51 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .expects(*, *, *, *)
         .returning(Future successful accessGroupUpdateStatuses)
 
-    def mockAccessGroupsServiceGetGroupsForClient(
+    def mockGroupsServiceGetGroupSummariesForClient(
+      accessGroupSummaries: Seq[AccessGroupSummary]
+    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockGroupsService
+        .getAllGroupSummariesForClient(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future successful accessGroupSummaries)
+
+    def mockGroupsServiceGetGroupSummariesForClientWithException(
+      ex: Exception
+    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockGroupsService
+        .getAllGroupSummariesForClient(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.failed(ex))
+
+    def mockGroupsServiceGetGroupSummariesForTeamMember(
       accessGroupSummaries: Seq[AccessGroupSummary]
     ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
-      (mockAccessGroupsService
-        .getGroupSummariesForClient(_: Arn, _: String)(_: ExecutionContext))
+      (mockGroupsService
+        .getAllGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful accessGroupSummaries)
 
-    def mockAccessGroupsServiceGetGroupsForClientWithException(
+    def mockGroupsServiceGetGroupSummariesForTeamMemberWithException(
       ex: Exception
     ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
-      (mockAccessGroupsService
-        .getGroupSummariesForClient(_: Arn, _: String)(_: ExecutionContext))
+      (mockGroupsService
+        .getAllGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
-    def mockAccessGroupsServiceGetGroupsForTeamMember(
-      accessGroupSummaries: Seq[AccessGroupSummary]
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
-      (mockAccessGroupsService
-        .getGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future successful accessGroupSummaries)
-
-    def mockAccessGroupsServiceGetGroupsForTeamMemberWithException(
-      ex: Exception
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
-      (mockAccessGroupsService
-        .getGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.failed(ex))
-
-    def mockTaxServiceGroupsServiceGetGroups(
-      groups: Seq[TaxServiceAccessGroup]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxServiceAccessGroup]]] =
-      (mockTaxServiceGroupsService
-        .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+    def mockGroupsServiceGetGroupSummaries(
+      summaries: Seq[AccessGroupSummary]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockGroupsService
+        .getAllGroupSummaries(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
-        .returning(Future.successful(groups))
+        .returning(Future.successful(summaries))
 
-    def mockTaxServiceGroupsServiceGetGroupsWithException(
+    def mockGroupsServiceGetGroupSummariesWithException(
       ex: Exception
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxServiceAccessGroup]]] =
-      (mockTaxServiceGroupsService
-        .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockGroupsService
+        .getAllGroupSummaries(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.failed(ex))
 
@@ -435,8 +443,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       "calls to fetch groups returns empty collections" should {
         s"return $NOT_FOUND" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroups(Seq.empty)
-          mockTaxServiceGroupsServiceGetGroups(Seq.empty)
+          mockGroupsServiceGetGroupSummaries(Seq.empty)
 
           val result = controller.getAllGroupSummaries(arn)(baseRequest)
 
@@ -446,94 +453,37 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
       "calls to fetch groups returns data collections" should {
 
-        s"return $OK" when {
-          "only custom groups" in new TestScope {
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
-            mockTaxServiceGroupsServiceGetGroups(Seq.empty)
+        s"return $OK and groups sorted A-Z" in new TestScope {
+          val dbId2 = new ObjectId()
 
-            val result = controller.getAllGroupSummaries(arn)(baseRequest)
+          val sortedGroupSummaries = Seq(
+            groupSummary(dbId, "Capital Gains Tax", isCustomGroup = false),
+            groupSummary(dbId2, "Over done"),
+            groupSummary()
+          )
 
-            status(result) shouldBe OK
-            contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
-              AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(0), 0, isCustomGroup = true)
-            )
-          }
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockGroupsServiceGetGroupSummaries(sortedGroupSummaries)
 
-          "only tax service groups" in new TestScope {
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq.empty)
-            mockTaxServiceGroupsServiceGetGroups(Seq(taxServiceGroup))
+          val result = controller.getAllGroupSummaries(arn)(baseRequest)
 
-            val result = controller.getAllGroupSummaries(arn)(baseRequest)
-
-            status(result) shouldBe OK
-            contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
-              AccessGroupSummary(
-                taxServiceGroup._id.toHexString,
-                taxServiceGroup.groupName,
-                None,
-                0,
-                isCustomGroup = false
-              )
-            )
-          }
-
-          "both group types sorted A-Z" in new TestScope {
-            val dbId2 = new ObjectId()
-            val accessGroup2: AccessGroup =
-              AccessGroup(dbId2, arn, "Overly complicated", now, now, user, user, Some(Set.empty), Some(Set.empty))
-            override val taxServiceGroup: TaxServiceAccessGroup =
-              TaxServiceAccessGroup(
-                dbId,
-                arn,
-                "Capital Gains Tax",
-                now,
-                now,
-                user,
-                user,
-                Some(Set.empty),
-                serviceCgt,
-                automaticUpdates = true,
-                Some(Set.empty)
-              )
-
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq(accessGroup, accessGroup2))
-            mockTaxServiceGroupsServiceGetGroups(Seq(taxServiceGroup))
-
-            val result = controller.getAllGroupSummaries(arn)(baseRequest)
-
-            status(result) shouldBe OK
-            contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
-              AccessGroupSummary(taxServiceGroup._id.toHexString, "Capital Gains Tax", None, 0, isCustomGroup = false),
-              AccessGroupSummary(accessGroup2._id.toHexString, "Overly complicated", Some(0), 0, isCustomGroup = true),
-              AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(0), 0, isCustomGroup = true)
-            )
-          }
+          status(result) shouldBe OK
+          contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
+            AccessGroupSummary(taxServiceGroup._id.toHexString, "Capital Gains Tax", None, 3, isCustomGroup = false),
+            AccessGroupSummary(dbId2.toHexString, "Over done", Some(3), 3, isCustomGroup = true),
+            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(3), 3, isCustomGroup = true)
+          )
         }
       }
 
       "call to fetch either access groups throws exception" should {
-        s"return $INTERNAL_SERVER_ERROR" when {
-          "get custom groups exception thrown" in new TestScope {
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroupsWithException(new RuntimeException("boo boo"))
+        s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockGroupsServiceGetGroupSummariesWithException(new RuntimeException("boo boo"))
 
-            val result = controller.getAllGroupSummaries(arn)(baseRequest)
+          val result = controller.getAllGroupSummaries(arn)(baseRequest)
 
-            status(result) shouldBe INTERNAL_SERVER_ERROR
-          }
-
-          "get tax service groups exception thrown" in new TestScope {
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq.empty)
-            mockTaxServiceGroupsServiceGetGroupsWithException(new RuntimeException("boo boo"))
-
-            val result = controller.getAllGroupSummaries(arn)(baseRequest)
-
-            status(result) shouldBe INTERNAL_SERVER_ERROR
-          }
+          status(result) shouldBe INTERNAL_SERVER_ERROR
         }
       }
 
@@ -781,9 +731,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "return only groups that the client is in" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForClient(
-        Seq(AccessGroupSummary(dbId.toHexString, groupName, Some(3), 3, isCustomGroup = true))
-      )
+      mockGroupsServiceGetGroupSummariesForClient(Seq(groupSummary()))
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
 
@@ -797,7 +745,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "return Not Found if there are no groups for the client" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForClient(Seq.empty)
+      mockGroupsServiceGetGroupSummariesForClient(Seq.empty)
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
 
@@ -806,7 +754,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     s"return $INTERNAL_SERVER_ERROR if there was some exception" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForClientWithException(new NullPointerException("bad"))
+      mockGroupsServiceGetGroupSummariesForClientWithException(new NullPointerException("bad"))
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
 
@@ -819,9 +767,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "return only groups that the team member is in" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForTeamMember(
-        Seq(AccessGroupSummary(dbId.toHexString, groupName, Some(3), 3, isCustomGroup = true))
-      )
+      mockGroupsServiceGetGroupSummariesForTeamMember(Seq(groupSummary()))
 
       val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
 
@@ -835,7 +781,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "return Not Found if there are no groups for the team member" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForTeamMember(Seq.empty)
+      mockGroupsServiceGetGroupSummariesForTeamMember(Seq.empty)
 
       val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
 
@@ -844,7 +790,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     s"return $INTERNAL_SERVER_ERROR if there was some exception" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForTeamMemberWithException(new NullPointerException("bad"))
+      mockGroupsServiceGetGroupSummariesForTeamMemberWithException(new NullPointerException("bad"))
 
       val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
 
@@ -1101,11 +1047,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
         }
       }
 
-      "call to fetch access groups returns empty collections" should {
+      "call to fetch access groups summaries returns empty collections" should {
         s"return $OK" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroups(Seq.empty)
-          mockTaxServiceGroupsServiceGetGroups(Seq.empty)
+          mockGroupsServiceGetGroupSummaries(Seq.empty)
 
           val result = controller.groupNameCheck(arn, groupName)(baseRequest)
 
@@ -1113,13 +1058,12 @@ class AccessGroupsControllerSpec extends BaseSpec {
         }
       }
 
-      "call to fetch access groups returns non-empty custom group collection" when {
+      "call to fetch access groups returns group summaries" when {
 
         "existing access groups contain a group whose name matches (even case-insensitively) that is being checked" should {
           s"return $CONFLICT" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
-            mockTaxServiceGroupsServiceGetGroups(Seq.empty)
+            mockGroupsServiceGetGroupSummaries(groupSummaries)
 
             val result = controller.groupNameCheck(arn, groupName.toUpperCase)(baseRequest)
 
@@ -1130,8 +1074,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
         "existing access groups contain a group whose name matches (except whitespace) that is being checked" should {
           s"return $CONFLICT" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
-            mockTaxServiceGroupsServiceGetGroups(Seq.empty)
+            mockGroupsServiceGetGroupSummaries(groupSummaries)
 
             val result = controller.groupNameCheck(arn, " " + groupName)(baseRequest)
 
@@ -1142,47 +1085,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
         "existing access groups do not contain any group whose name matches that is being checked" should {
           s"return $OK" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
-            mockTaxServiceGroupsServiceGetGroups(Seq.empty)
-
-            val result = controller.groupNameCheck(arn, "non existing group")(baseRequest)
-
-            status(result) shouldBe OK
-          }
-        }
-      }
-
-      "call to fetch access groups returns non-empty tax service group collection" when {
-
-        "existing access groups contain a group whose name matches (even case-insensitively) that is being checked" should {
-          s"return $CONFLICT" in new TestScope {
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq.empty)
-            mockTaxServiceGroupsServiceGetGroups(Seq(taxServiceGroup))
-
-            val result = controller.groupNameCheck(arn, groupName.toUpperCase)(baseRequest)
-
-            status(result) shouldBe CONFLICT
-          }
-        }
-
-        "existing access groups contain a group whose name matches (except whitespace) that is being checked" should {
-          s"return $CONFLICT" in new TestScope {
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq.empty)
-            mockTaxServiceGroupsServiceGetGroups(Seq(taxServiceGroup))
-
-            val result = controller.groupNameCheck(arn, " " + groupName)(baseRequest)
-
-            status(result) shouldBe CONFLICT
-          }
-        }
-
-        "existing access groups do not contain any group whose name matches that is being checked" should {
-          s"return $OK" in new TestScope {
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
-            mockTaxServiceGroupsServiceGetGroups(Seq(taxServiceGroup))
+            mockGroupsServiceGetGroupSummaries(groupSummaries)
 
             val result = controller.groupNameCheck(arn, "non existing group")(baseRequest)
 

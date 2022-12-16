@@ -31,8 +31,8 @@ import scala.util.{Failure, Success, Try}
 
 @Singleton()
 class AccessGroupsController @Inject() (
-  accessGroupsService: AccessGroupsService,
-  taxServiceGroupsService: TaxServiceGroupsService
+  accessGroupsService: AccessGroupsService, // TODO rename to customGroupsService
+  groupsService: GroupsService
 )(implicit authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
     extends BackendController(cc) with AuthorisedAgentSupport {
 
@@ -43,13 +43,9 @@ class AccessGroupsController @Inject() (
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
-          customGroups <- accessGroupsService.getAllGroups(matchedArn) // TODO rename, push logic back to AG service?
-          taxGroups    <- taxServiceGroupsService.getAllTaxServiceGroups(matchedArn)
+          groups <- groupsService.getAllGroupSummaries(matchedArn)
         } yield
-          if (
-            customGroups.exists(_.groupName.equalsIgnoreCase(Option(name).map(_.trim).getOrElse("")))
-            || taxGroups.exists(_.groupName.equalsIgnoreCase(Option(name).map(_.trim).getOrElse("")))
-          ) {
+          if (groups.exists(_.groupName.equalsIgnoreCase(Option(name).map(_.trim).getOrElse("")))) {
             Conflict
           } else {
             Ok
@@ -63,36 +59,32 @@ class AccessGroupsController @Inject() (
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
-          customGroups <- accessGroupsService.getAllGroups(matchedArn)
-          taxGroups    <- taxServiceGroupsService.getAllTaxServiceGroups(matchedArn)
-          customSummaries = customGroups.map(AccessGroupSummary.convertCustomGroup)
-          taxSummaries = taxGroups.map(AccessGroupSummary.convertTaxServiceGroup)
-          combinedSorted = (customSummaries ++ taxSummaries).sortBy(_.groupName)
+          combinedSorted <- groupsService.getAllGroupSummaries(matchedArn)
         } yield Ok(Json.toJson(combinedSorted))
       }
     } transformWith failureHandler
   }
 
-  // gets custom group summaries for client TODO include tax service groups
+  // gets all group summaries for client
   def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
     implicit request =>
       withAuthorisedAgent() { _ =>
-        accessGroupsService
-          .getGroupSummariesForClient(arn, enrolmentKey)
+        groupsService
+          .getAllGroupSummariesForClient(arn, enrolmentKey)
           .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
       } transformWith failureHandler
   }
 
-  // gets custom group summaries for team member TODO include tax service groups
+  // gets all group summaries for team member
   def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { _ =>
-      accessGroupsService
-        .getGroupSummariesForTeamMember(arn, userId)
+      groupsService
+        .getAllGroupSummariesForTeamMember(arn, userId)
         .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
     } transformWith failureHandler
   }
 
-  // TODO - do we need to account for Tax Service Groups?
+  // TODO - need to account for Tax Service Groups
   def unassignedClients(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
@@ -139,7 +131,7 @@ class AccessGroupsController @Inject() (
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         accessGroupsService
-          .getAllGroups(arn)
+          .getAllCustomGroups(arn)
           .map(groups => Ok(Json.toJson(groups.map(AccessGroupSummary.convertCustomGroup))))
       }
     } transformWith failureHandler
