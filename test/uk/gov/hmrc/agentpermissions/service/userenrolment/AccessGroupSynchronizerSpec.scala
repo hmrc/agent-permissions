@@ -47,7 +47,7 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
             arn,
             GroupDelegatedEnrolments(
               Seq(
-                AssignedClient(serviceVat, Seq(Identifier(serviceIdentifierKeyVat, "101747641")), None, agentUser1.id)
+                AssignedClient(s"$serviceVat~$serviceIdentifierKeyVat~101747641", None, agentUser1.id)
               )
             ),
             agentUser1
@@ -68,10 +68,9 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
         val groupDelegatedEnrolments: GroupDelegatedEnrolments = GroupDelegatedEnrolments(
           Seq(
-            AssignedClient(serviceVat, Seq(Identifier(serviceIdentifierKeyVat, "101747641")), None, agentUser1.id),
+            AssignedClient(s"$serviceVat~$serviceIdentifierKeyVat~101747641", None, agentUser1.id),
             AssignedClient(
-              servicePpt,
-              Seq(Identifier(serviceIdentifierKeyPpt, "XAPPT0000012345")),
+              s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345",
               None,
               "someOtherUser"
             )
