@@ -28,6 +28,8 @@ abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures 
   val serviceCgt = "HMRC-CGT-PD"
   val serviceMtdit = "HMRC-MTD-IT"
   val serviceTrust = "HMRC-TERS-ORG"
+  val serviceNTTrust = "HMRC-TERSNT-ORG"
+  val trustsRegex = "^HMRC-TERS[A-Z]{0,2}-ORG$"
 
   val serviceIdentifierKeyVat = "VRN"
   val serviceIdentifierKeyPpt = "EtmpRegistrationNumber"

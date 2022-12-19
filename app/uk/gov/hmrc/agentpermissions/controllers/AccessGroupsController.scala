@@ -30,13 +30,70 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 @Singleton()
-class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService)(implicit
-  authAction: AuthAction,
-  cc: ControllerComponents,
-  val ec: ExecutionContext
-) extends BackendController(cc) with AuthorisedAgentSupport {
+class AccessGroupsController @Inject() (
+  accessGroupsService: AccessGroupsService, // TODO rename to customGroupsService
+  groupsService: GroupsService
+)(implicit authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
+    extends BackendController(cc) with AuthorisedAgentSupport {
 
   private val MAX_LENGTH_GROUP_NAME = 32
+
+  // checks access groups names for duplicates
+  def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent() { authorisedAgent =>
+      withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
+        for {
+          groups <- groupsService.getAllGroupSummaries(matchedArn)
+        } yield
+          if (groups.exists(_.groupName.equalsIgnoreCase(Option(name).map(_.trim).getOrElse("")))) {
+            Conflict
+          } else {
+            Ok
+          }
+      }
+    } transformWith failureHandler
+  }
+
+  // sorted by group name A-Z
+  def getAllGroupSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
+      withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
+        for {
+          combinedSorted <- groupsService.getAllGroupSummaries(matchedArn)
+        } yield Ok(Json.toJson(combinedSorted))
+      }
+    } transformWith failureHandler
+  }
+
+  // gets all group summaries for client
+  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
+    implicit request =>
+      withAuthorisedAgent() { _ =>
+        groupsService
+          .getAllGroupSummariesForClient(arn, enrolmentKey)
+          .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
+      } transformWith failureHandler
+  }
+
+  // gets all group summaries for team member
+  def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent(allowStandardUser = true) { _ =>
+      groupsService
+        .getAllGroupSummariesForTeamMember(arn, userId)
+        .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
+    } transformWith failureHandler
+  }
+
+  // TODO - need to account for Tax Service Groups
+  def unassignedClients(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
+      withValidAndMatchingArn(arn, authorisedAgent) { _ =>
+        accessGroupsService
+          .getUnassignedClients(arn)
+          .map(clients => Ok(Json.toJson(clients)))
+      }
+    } transformWith failureHandler
+  }
 
   def createGroup(arn: Arn): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
@@ -69,22 +126,12 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
     } transformWith failureHandler
   }
 
-  def unassignedClients(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
-      withValidAndMatchingArn(arn, authorisedAgent) { _ =>
-        accessGroupsService
-          .getUnassignedClients(arn)
-          .map(clients => Ok(Json.toJson(clients)))
-      }
-    } transformWith failureHandler
-  }
-
   // gets access group summaries for custom groups ONLY
   def groups(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         accessGroupsService
-          .getAllGroups(arn)
+          .getAllCustomGroups(arn)
           .map(groups => Ok(Json.toJson(groups.map(AccessGroupSummary.convertCustomGroup))))
       }
     } transformWith failureHandler
@@ -104,25 +151,6 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
             Ok(Json.toJson(accessGroup))
           }
       }
-    } transformWith failureHandler
-  }
-
-  // gets custom group summaries for client TODO include tax service groups
-  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
-    implicit request =>
-      withAuthorisedAgent() { _ =>
-        accessGroupsService
-          .getGroupSummariesForClient(arn, enrolmentKey)
-          .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
-      } transformWith failureHandler
-  }
-
-  // gets custom group summaries for team member TODO include tax service groups
-  def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent(allowStandardUser = true) { _ =>
-      accessGroupsService
-        .getGroupSummariesForTeamMember(arn, userId)
-        .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
     } transformWith failureHandler
   }
 
@@ -191,22 +219,6 @@ class AccessGroupsController @Inject() (accessGroupsService: AccessGroupsService
               Ok
           }
         }
-      }
-    } transformWith failureHandler
-  }
-
-  // checks custom access groups names TODO include tax service groups
-  def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent() { authorisedAgent =>
-      withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
-        for {
-          existingGroups <- accessGroupsService.getAllGroups(matchedArn)
-        } yield
-          if (existingGroups.exists(_.groupName.equalsIgnoreCase(Option(name).map(_.trim).getOrElse("")))) {
-            Conflict
-          } else {
-            Ok
-          }
       }
     } transformWith failureHandler
   }

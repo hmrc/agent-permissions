@@ -97,6 +97,22 @@ class TaxServiceGroupsController @Inject() (taxServiceGroupsService: TaxServiceG
     } transformWith failureHandler
   }
 
+  def getGroupByService(arn: Arn, service: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
+      taxServiceGroupsService.get(arn, service) map {
+        case None =>
+          NotFound
+        case Some(accessGroup) =>
+          if (accessGroup.arn != authorisedAgent.arn) {
+            logger.info("ARN obtained from provided group id did not match with that identified by auth")
+            Forbidden
+          } else {
+            Ok(Json.toJson(accessGroup))
+          }
+      }
+    } transformWith failureHandler
+  }
+
   def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withGroupId(gid, authorisedAgent.arn) { (groupId, _) =>

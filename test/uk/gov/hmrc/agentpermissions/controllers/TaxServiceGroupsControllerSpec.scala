@@ -137,20 +137,21 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
         .expects(*, *, *)
         .returning(Future failed ex)
 
-    def mockTaxServiceGroupsServiceGetGroup(
+    def mockTaxServiceGroupsServiceGetGroupByService(
+      service: String,
       maybeGroup: Option[TaxServiceAccessGroup]
-    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
+    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
       (mockTaxServiceGroupsService
-        .get(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(GroupId(arn, groupName), *, *)
+        .get(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, service, *, *)
         .returning(Future.successful(maybeGroup))
 
-    def mockTaxServiceGroupsServiceGetGroupWithException(
+    def mockTaxServiceGroupsServiceGetGroupByServiceWithException(
       ex: Exception
-    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
+    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
       (mockTaxServiceGroupsService
-        .get(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(GroupId(arn, groupName), *, *)
+        .get(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, serviceVat, *, *)
         .returning(Future.failed(ex))
 
     def mockTaxServiceGroupsServiceUpdate(
@@ -470,6 +471,91 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           mockTaxServiceGroupsServiceGetGroupByIdWithException(new RuntimeException("boo boo"))
 
           val result = controller.getGroup(dbId.toHexString)(baseRequest)
+
+          status(result) shouldBe INTERNAL_SERVER_ERROR
+        }
+      }
+
+    }
+
+  }
+
+  "Call to fetch tax service group by ARN & service id" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.getGroupByService(arn, serviceVat)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "service id is not in the expected format" should {
+      s"return $NOT_FOUND" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        mockTaxServiceGroupsServiceGetGroupByService("bad", None)
+
+        val result = controller.getGroupByService(arn, "bad")(baseRequest)
+
+        status(result) shouldBe NOT_FOUND
+      }
+    }
+
+    "service id is in the expected format" when {
+
+      "auth identifies a different arn than that obtained from provided service id" should {
+        s"return $FORBIDDEN" in new TestScope {
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
+          mockTaxServiceGroupsServiceGetGroupByService(serviceVat, Some(taxServiceGroup))
+
+          val result = controller.getGroupByService(arn, serviceVat)(baseRequest)
+
+          status(result) shouldBe FORBIDDEN
+        }
+      }
+
+      "call to fetch group details returns nothing" should {
+        s"return $NOT_FOUND" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockTaxServiceGroupsServiceGetGroupByService(serviceVat, None)
+
+          val result = controller.getGroupByService(arn, serviceVat)(baseRequest)
+
+          status(result) shouldBe NOT_FOUND
+        }
+      }
+
+      "call to fetch group details returns a tax service group" should {
+        s"return $OK" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockTaxServiceGroupsServiceGetGroupByService(serviceVat, Some(taxServiceGroup))
+
+          val result = controller.getGroupByService(arn, serviceVat)(baseRequest)
+
+          status(result) shouldBe OK
+
+          val generatedJson: JsValue = contentAsJson(result)
+
+          (generatedJson \ "arn").get shouldBe JsString(arn.value)
+          (generatedJson \ "groupName").get shouldBe JsString(groupName)
+          (generatedJson \ "createdBy" \ "id").get shouldBe JsString(user.id)
+          (generatedJson \ "createdBy" \ "name").get shouldBe JsString(user.name)
+          (generatedJson \ "teamMembers").get shouldBe JsArray(Seq.empty)
+          (generatedJson \ "service").get shouldBe JsString(serviceVat)
+          (generatedJson \ "automaticUpdates").get shouldBe JsBoolean(true)
+          (generatedJson \ "excludedClients").get shouldBe JsArray(Seq.empty)
+        }
+      }
+
+      "call to fetch group details throws exception" should {
+        s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockTaxServiceGroupsServiceGetGroupByServiceWithException(new RuntimeException("boo boo"))
+
+          val result = controller.getGroupByService(arn, serviceVat)(baseRequest)
 
           status(result) shouldBe INTERNAL_SERVER_ERROR
         }

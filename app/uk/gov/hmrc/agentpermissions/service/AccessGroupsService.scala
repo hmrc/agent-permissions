@@ -37,15 +37,15 @@ trait AccessGroupsService {
     accessGroup: AccessGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus]
 
-  def getAllGroups(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[AccessGroup]]
+  def getAllCustomGroups(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[AccessGroup]]
 
   def get(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[AccessGroup]]
 
-  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
+  def getCustomGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     ec: ExecutionContext
   ): Future[Seq[AccessGroupSummary]]
 
-  def getGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+  def getCustomGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
   ): Future[Seq[AccessGroupSummary]]
 
@@ -112,7 +112,9 @@ class AccessGroupsServiceImpl @Inject() (
         } yield accessGroupCreationStatus
     }
 
-  override def getAllGroups(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[AccessGroup]] =
+  override def getAllCustomGroups(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[AccessGroup]] =
     accessGroupsRepository
       .get(arn)
       .flatMap(withClientNames)
@@ -122,7 +124,7 @@ class AccessGroupsServiceImpl @Inject() (
       .get(groupId.arn, groupId.groupName)
       .flatMap(withClientName)
 
-  override def getGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
+  override def getCustomGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     ec: ExecutionContext
   ): Future[Seq[AccessGroupSummary]] =
     accessGroupsRepository
@@ -133,7 +135,7 @@ class AccessGroupsServiceImpl @Inject() (
           .map(AccessGroupSummary.convertCustomGroup)
       )
 
-  override def getGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+  override def getCustomGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
   ): Future[Seq[AccessGroupSummary]] =
     accessGroupsRepository
@@ -209,6 +211,7 @@ class AccessGroupsServiceImpl @Inject() (
                                  }
     } yield accessGroupUpdateStatus
 
+  // TODO move below to groups summary service
   override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
     for {
       clients      <- userClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
@@ -227,6 +230,7 @@ class AccessGroupsServiceImpl @Inject() (
 
   override def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
     getAllClients(arn).map(_.unassigned)
+  // TODO move above to groups summary service
 
   private def mergeWhoIsUpdating(accessGroup: AccessGroup, whoIsUpdating: AgentUser): Future[AccessGroup] =
     Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))

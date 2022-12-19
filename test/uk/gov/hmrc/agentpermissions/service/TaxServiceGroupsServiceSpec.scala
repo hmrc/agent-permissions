@@ -71,7 +71,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     lazy val now: LocalDateTime = LocalDateTime.now()
 
-    def mockAccessGroupsRepositoryGet(
+    def mockTaxServiceGroupsRepositoryGet(
       maybeAccessGroup: Option[TaxServiceAccessGroup]
     ): CallHandler2[Arn, String, Future[Option[TaxServiceAccessGroup]]] =
       (mockTaxServiceGroupsRepository
@@ -79,7 +79,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         .expects(arn, groupName)
         .returning(Future.successful(maybeAccessGroup))
 
-    def mockAccessGroupsRepositoryGetById(
+    def mockTaxServiceGroupsRepositoryGetById(
       maybeAccessGroup: Option[TaxServiceAccessGroup]
     ): CallHandler1[String, Future[Option[TaxServiceAccessGroup]]] =
       (mockTaxServiceGroupsRepository
@@ -87,7 +87,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         .expects(dbId)
         .returning(Future.successful(maybeAccessGroup))
 
-    def mockAccessGroupsRepositoryGetAll(
+    def mockTaxServiceGroupsRepositoryGetAll(
       accessGroups: Seq[TaxServiceAccessGroup]
     ): CallHandler1[Arn, Future[Seq[TaxServiceAccessGroup]]] =
       (mockTaxServiceGroupsRepository
@@ -95,7 +95,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         .expects(arn)
         .returning(Future.successful(accessGroups))
 
-    def mockAccessGroupsRepositoryInsert(
+    def mockTaxServiceGroupsRepositoryInsert(
       accessGroup: TaxServiceAccessGroup,
       maybeCreationId: Option[String]
     ): CallHandler1[TaxServiceAccessGroup, Future[Option[String]]] =
@@ -104,7 +104,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         .expects(accessGroup)
         .returning(Future.successful(maybeCreationId))
 
-    def mockAccessGroupsRepositoryDelete(
+    def mockTaxServiceGroupsRepositoryDelete(
       maybeDeletedCount: Option[Long]
     ): CallHandler2[Arn, String, Future[Option[Long]]] =
       (mockTaxServiceGroupsRepository
@@ -112,7 +112,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         .expects(arn, groupName)
         .returning(Future.successful(maybeDeletedCount))
 
-    def mockAccessGroupsRepositoryUpdate(
+    def mockTaxServiceGroupsRepositoryUpdate(
       maybeModifiedCount: Option[Long]
     ): CallHandler3[Arn, String, TaxServiceAccessGroup, Future[Option[Long]]] =
       (mockTaxServiceGroupsRepository
@@ -126,7 +126,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "group of that name already exists" should {
       s"return $TaxServiceGroupExistsForCreation" in new TestScope {
-        mockAccessGroupsRepositoryGet(Some(accessGroup))
+        mockTaxServiceGroupsRepositoryGet(Some(accessGroup))
 
         taxServiceGroupsService
           .create(accessGroup)
@@ -138,9 +138,9 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
       "insert calls returns nothing" should {
         s"return $TaxServiceGroupNotCreated" in new TestScope {
-          mockAccessGroupsRepositoryGet(None)
+          mockTaxServiceGroupsRepositoryGet(None)
 
-          mockAccessGroupsRepositoryInsert(accessGroup, None)
+          mockTaxServiceGroupsRepositoryInsert(accessGroup, None)
 
           taxServiceGroupsService
             .create(accessGroup)
@@ -150,8 +150,8 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
       s"insert calls returns an id" should {
         s"return $TaxServiceGroupCreated" in new TestScope {
-          mockAccessGroupsRepositoryGet(None)
-          mockAccessGroupsRepositoryInsert(accessGroup, Some(insertedId))
+          mockTaxServiceGroupsRepositoryGet(None)
+          mockTaxServiceGroupsRepositoryInsert(accessGroup, Some(insertedId))
 
           taxServiceGroupsService
             .create(accessGroup)
@@ -164,9 +164,9 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
   "Fetching all groups" when {
 
-    "access groups exist" should {
+    "Tax Service groups exist" should {
       "return corresponding groups" in new TestScope {
-        mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+        mockTaxServiceGroupsRepositoryGetAll(Seq(accessGroup))
 
         taxServiceGroupsService.getAllTaxServiceGroups(arn).futureValue shouldBe
           Seq(accessGroup)
@@ -174,8 +174,8 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
     }
 
     "no groups found" should {
-      "return no access groups" in new TestScope {
-        mockAccessGroupsRepositoryGetAll(Seq.empty)
+      "return no Tax Service groups" in new TestScope {
+        mockTaxServiceGroupsRepositoryGetAll(Seq.empty)
 
         taxServiceGroupsService.getAllTaxServiceGroups(arn).futureValue shouldBe
           Seq.empty
@@ -183,11 +183,11 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
     }
   }
 
-  "Fetching group" when {
+  "Fetching group by arn and service id" when {
 
     "group exists" should {
       "return corresponding group" in new TestScope {
-        mockAccessGroupsRepositoryGet(Some(accessGroup))
+        mockTaxServiceGroupsRepositoryGet(Some(accessGroup))
 
         taxServiceGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
           Some(accessGroup)
@@ -196,7 +196,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "group does not exists" should {
       "return no group" in new TestScope {
-        mockAccessGroupsRepositoryGet(None)
+        mockTaxServiceGroupsRepositoryGet(None)
 
         taxServiceGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
           None
@@ -205,7 +205,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "group with no team members" should {
       "return the group" in new TestScope {
-        mockAccessGroupsRepositoryGet(Some(accessGroup.copy(teamMembers = None)))
+        mockTaxServiceGroupsRepositoryGet(Some(accessGroup.copy(teamMembers = None)))
 
         taxServiceGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
           Some(accessGroup.copy(teamMembers = None))
@@ -217,10 +217,26 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "group exists" should {
       "return corresponding summaries" in new TestScope {
-        mockAccessGroupsRepositoryGetById(Some(accessGroup))
+        mockTaxServiceGroupsRepositoryGetById(Some(accessGroup))
 
         taxServiceGroupsService.getById(dbId).futureValue shouldBe
           Some(accessGroup)
+      }
+    }
+  }
+
+  "Fetching groups for team member" when {
+
+    "groups found" should {
+      "return corresponding summaries" in new TestScope {
+
+        val ag1: TaxServiceAccessGroup = accessGroup
+        val ag2: TaxServiceAccessGroup = accessGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
+
+        mockTaxServiceGroupsRepositoryGetAll(Seq(ag1, ag2))
+
+        taxServiceGroupsService.getTaxGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
+          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", None, 1, isCustomGroup = false))
       }
     }
   }
@@ -229,7 +245,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "DB call to delete group returns nothing" should {
       s"return $TaxServiceGroupNotDeleted" in new TestScope {
-        mockAccessGroupsRepositoryDelete(None)
+        mockTaxServiceGroupsRepositoryDelete(None)
 
         taxServiceGroupsService.delete(groupId, user).futureValue shouldBe TaxServiceGroupNotDeleted
       }
@@ -239,7 +255,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
       "call to delete group indicates no record was deleted" should {
         s"return $TaxServiceGroupNotDeleted" in new TestScope {
-          mockAccessGroupsRepositoryDelete(Some(0L))
+          mockTaxServiceGroupsRepositoryDelete(Some(0L))
 
           taxServiceGroupsService.delete(groupId, user).futureValue shouldBe TaxServiceGroupNotDeleted
         }
@@ -247,7 +263,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
       "call to delete group indicates one record was deleted" should {
         s"return $TaxServiceGroupDeleted" in new TestScope {
-          mockAccessGroupsRepositoryDelete(Some(1L))
+          mockTaxServiceGroupsRepositoryDelete(Some(1L))
 
           taxServiceGroupsService.delete(groupId, user).futureValue shouldBe TaxServiceGroupDeleted
         }
@@ -260,7 +276,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "DB call to update group returns nothing" should {
       s"return $TaxServiceGroupNotUpdated" in new TestScope {
-        mockAccessGroupsRepositoryUpdate(None)
+        mockTaxServiceGroupsRepositoryUpdate(None)
 
         taxServiceGroupsService.update(groupId, accessGroup, user).futureValue shouldBe TaxServiceGroupNotUpdated
       }
@@ -268,7 +284,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "DB call to update group indicates no record was updated" should {
       s"return $TaxServiceGroupNotUpdated" in new TestScope {
-        mockAccessGroupsRepositoryUpdate(Some(0))
+        mockTaxServiceGroupsRepositoryUpdate(Some(0))
 
         taxServiceGroupsService.update(groupId, accessGroup, user).futureValue shouldBe TaxServiceGroupNotUpdated
       }
@@ -276,7 +292,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "DB call to update group indicates one record was updated" should {
       s"return $TaxServiceGroupUpdated" in new TestScope {
-        mockAccessGroupsRepositoryUpdate(Some(1))
+        mockTaxServiceGroupsRepositoryUpdate(Some(1))
 
         taxServiceGroupsService.update(groupId, accessGroup, user).futureValue shouldBe TaxServiceGroupUpdated
       }

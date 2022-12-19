@@ -304,7 +304,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockAccessGroupsRepositoryGetAll(Seq(accessGroupInMongo))
         mockUserClientDetailsConnectorGetClients(Some(clients))
 
-        accessGroupsService.getAllGroups(arn).futureValue shouldBe
+        accessGroupsService.getAllCustomGroups(arn).futureValue shouldBe
           Seq(accessGroup)
       }
     }
@@ -313,7 +313,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
       "return no access groups" in new TestScope {
         mockAccessGroupsRepositoryGetAll(Seq.empty)
 
-        accessGroupsService.getAllGroups(arn).futureValue shouldBe
+        accessGroupsService.getAllCustomGroups(arn).futureValue shouldBe
           Seq.empty
       }
     }
@@ -374,7 +374,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         )
 
         accessGroupsService
-          .getGroupSummariesForClient(arn, s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789")
+          .getCustomGroupSummariesForClient(arn, s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789")
           .futureValue shouldBe
           Seq(AccessGroupSummary(ag1._id.toHexString, "some group", Some(3), 3, isCustomGroup = true))
       }
@@ -393,7 +393,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           Seq(withClientNamesRemoved(ag1), withClientNamesRemoved(ag2))
         )
 
-        accessGroupsService.getGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
+        accessGroupsService.getCustomGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
           Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", Some(3), 1, isCustomGroup = true))
       }
     }

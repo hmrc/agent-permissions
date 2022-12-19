@@ -46,8 +46,222 @@ class AccessGroupsControllerSpec extends BaseSpec {
   val user2: AgentUser = AgentUser("user2", "User 2")
   val dbId: ObjectId = new ObjectId()
   val clientVat: Client = Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "John Innes")
-
   val clientPpt: Client = Client(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", "Frank Wright")
+
+  trait TestScope {
+
+    val accessGroup: AccessGroup =
+      AccessGroup(dbId, arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
+    val taxServiceGroup: TaxServiceAccessGroup =
+      TaxServiceAccessGroup(
+        dbId,
+        arn,
+        groupName,
+        now,
+        now,
+        user,
+        user,
+        Some(Set.empty),
+        serviceVat,
+        automaticUpdates = true,
+        Some(Set.empty)
+      )
+
+    def groupSummary(id: ObjectId = dbId, name: String = groupName, isCustomGroup: Boolean = true): AccessGroupSummary =
+      AccessGroupSummary(id.toHexString, name, if (isCustomGroup) Some(3) else None, 3, isCustomGroup)
+
+    val groupSummaries = Seq(
+      groupSummary(),
+      groupSummary(dbId, "Capital Gains Tax", isCustomGroup = false)
+    )
+
+    val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
+    val mockGroupsService: GroupsService = mock[GroupsService]
+    implicit val mockAuthAction: AuthAction = mock[AuthAction]
+    implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
+    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    implicit val actorSystem: ActorSystem = ActorSystem()
+
+    val controller = new AccessGroupsController(mockAccessGroupsService, mockGroupsService)
+
+    def mockAuthActionGetAuthorisedAgent(
+      maybeAuthorisedAgent: Option[AuthorisedAgent]
+    ): CallHandler4[Boolean, Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+      (mockAuthAction
+        .getAuthorisedAgent(_: Boolean, _: Boolean)(_: ExecutionContext, _: Request[_]))
+        .expects(*, *, *, *)
+        .returning(Future.successful(maybeAuthorisedAgent))
+
+    def mockAuthActionGetAuthorisedAgentWithException(
+      ex: Exception
+    ): CallHandler4[Boolean, Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
+      (mockAuthAction
+        .getAuthorisedAgent(_: Boolean, _: Boolean)(_: ExecutionContext, _: Request[_]))
+        .expects(*, *, *, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceCreate(
+      accessGroupCreationStatus: AccessGroupCreationStatus
+    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
+      (mockAccessGroupsService
+        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.successful(accessGroupCreationStatus))
+
+    def mockAccessGroupsServiceCreateWithException(
+      ex: Exception
+    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
+      (mockAccessGroupsService
+        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceGetGroups(
+      groups: Seq[AccessGroup]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroup]]] =
+      (mockAccessGroupsService
+        .getAllCustomGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *)
+        .returning(Future.successful(groups))
+
+    def mockAccessGroupsServiceGetGroupsWithException(
+      ex: Exception
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroup]]] =
+      (mockAccessGroupsService
+        .getAllCustomGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceGetGroupById(
+      maybeAccessGroup: Option[AccessGroup]
+    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsService
+        .getById(_: String)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.successful(maybeAccessGroup))
+
+    def mockAccessGroupsServiceGetGroupByIdWithException(
+      ex: Exception
+    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsService
+        .getById(_: String)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future failed ex)
+
+    def mockAccessGroupsServiceGetGroup(
+      maybeAccessGroup: Option[AccessGroup]
+    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsService
+        .get(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(GroupId(arn, groupName), *, *)
+        .returning(Future.successful(maybeAccessGroup))
+
+    def mockAccessGroupsServiceGetGroupWithException(
+      ex: Exception
+    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
+      (mockAccessGroupsService
+        .get(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(GroupId(arn, groupName), *, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceUpdate(
+      accessGroupUpdateStatus: AccessGroupUpdateStatus
+    ): CallHandler5[GroupId, AccessGroup, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
+      (mockAccessGroupsService
+        .update(_: GroupId, _: AccessGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *, *)
+        .returning(Future.successful(accessGroupUpdateStatus))
+
+    def mockAccessGroupsServiceDelete(
+      accessGroupDeletionStatus: AccessGroupDeletionStatus
+    ): CallHandler4[GroupId, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
+      (mockAccessGroupsService
+        .delete(_: GroupId, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.successful(accessGroupDeletionStatus))
+
+    def mockAccessGroupsServiceDeleteWithException(
+      ex: Exception
+    ): CallHandler4[GroupId, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
+      (mockAccessGroupsService
+        .delete(_: GroupId, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceGetUnassignedClients(
+      unassignedClients: Set[Client]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Set[Client]]] =
+      (mockAccessGroupsService
+        .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future successful unassignedClients)
+
+    def mockAccessGroupsServiceGetUnassignedClientsWithException(
+      ex: Exception
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Set[Client]]] =
+      (mockAccessGroupsService
+        .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.failed(ex))
+
+    def mockAccessGroupsServiceSyncWithEacd(
+      accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
+    ): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
+      (mockAccessGroupsService
+        .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future successful accessGroupUpdateStatuses)
+
+    def mockGroupsServiceGetGroupSummariesForClient(
+      accessGroupSummaries: Seq[AccessGroupSummary]
+    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockGroupsService
+        .getAllGroupSummariesForClient(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future successful accessGroupSummaries)
+
+    def mockGroupsServiceGetGroupSummariesForClientWithException(
+      ex: Exception
+    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockGroupsService
+        .getAllGroupSummariesForClient(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.failed(ex))
+
+    def mockGroupsServiceGetGroupSummariesForTeamMember(
+      accessGroupSummaries: Seq[AccessGroupSummary]
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockGroupsService
+        .getAllGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future successful accessGroupSummaries)
+
+    def mockGroupsServiceGetGroupSummariesForTeamMemberWithException(
+      ex: Exception
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockGroupsService
+        .getAllGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.failed(ex))
+
+    def mockGroupsServiceGetGroupSummaries(
+      summaries: Seq[AccessGroupSummary]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockGroupsService
+        .getAllGroupSummaries(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *)
+        .returning(Future.successful(summaries))
+
+    def mockGroupsServiceGetGroupSummariesWithException(
+      ex: Exception
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      (mockGroupsService
+        .getAllGroupSummaries(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *)
+        .returning(Future.failed(ex))
+
+  }
 
   "Call to create access group" when {
 
@@ -191,7 +405,92 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
   }
 
-  "Call to fetch groups" when {
+  "Call to fetch ALL group summaries" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.getAllGroupSummaries(arn)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "provided arn is not valid" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.getAllGroupSummaries(invalidArn)(baseRequest)
+
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "provided arn is valid" when {
+
+      "provided arn does not match that identified by auth" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          val result = controller.getAllGroupSummaries(nonMatchingArn)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "calls to fetch groups returns empty collections" should {
+        s"return $NOT_FOUND" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockGroupsServiceGetGroupSummaries(Seq.empty)
+
+          val result = controller.getAllGroupSummaries(arn)(baseRequest)
+
+          status(result) shouldBe OK
+        }
+      }
+
+      "calls to fetch groups returns data collections" should {
+
+        s"return $OK and groups sorted A-Z" in new TestScope {
+          val dbId2 = new ObjectId()
+
+          val sortedGroupSummaries = Seq(
+            groupSummary(dbId, "Capital Gains Tax", isCustomGroup = false),
+            groupSummary(dbId2, "Over done"),
+            groupSummary()
+          )
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockGroupsServiceGetGroupSummaries(sortedGroupSummaries)
+
+          val result = controller.getAllGroupSummaries(arn)(baseRequest)
+
+          status(result) shouldBe OK
+          contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
+            AccessGroupSummary(taxServiceGroup._id.toHexString, "Capital Gains Tax", None, 3, isCustomGroup = false),
+            AccessGroupSummary(dbId2.toHexString, "Over done", Some(3), 3, isCustomGroup = true),
+            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(3), 3, isCustomGroup = true)
+          )
+        }
+      }
+
+      "call to fetch either access groups throws exception" should {
+        s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockGroupsServiceGetGroupSummariesWithException(new RuntimeException("boo boo"))
+
+          val result = controller.getAllGroupSummaries(arn)(baseRequest)
+
+          status(result) shouldBe INTERNAL_SERVER_ERROR
+        }
+      }
+
+    }
+  }
+
+  "Call to fetch custom groups" when {
 
     "authorised agent is not identified by auth" should {
       s"return $FORBIDDEN" in new TestScope {
@@ -432,9 +731,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "return only groups that the client is in" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForClient(
-        Seq(AccessGroupSummary(dbId.toHexString, groupName, Some(3), 3, isCustomGroup = true))
-      )
+      mockGroupsServiceGetGroupSummariesForClient(Seq(groupSummary()))
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
 
@@ -448,7 +745,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "return Not Found if there are no groups for the client" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForClient(Seq.empty)
+      mockGroupsServiceGetGroupSummariesForClient(Seq.empty)
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
 
@@ -457,7 +754,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     s"return $INTERNAL_SERVER_ERROR if there was some exception" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForClientWithException(new NullPointerException("bad"))
+      mockGroupsServiceGetGroupSummariesForClientWithException(new NullPointerException("bad"))
 
       val result = controller.getGroupSummariesForClient(arn, "key")(baseRequest)
 
@@ -470,9 +767,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "return only groups that the team member is in" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForTeamMember(
-        Seq(AccessGroupSummary(dbId.toHexString, groupName, Some(3), 3, isCustomGroup = true))
-      )
+      mockGroupsServiceGetGroupSummariesForTeamMember(Seq(groupSummary()))
 
       val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
 
@@ -486,7 +781,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "return Not Found if there are no groups for the team member" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForTeamMember(Seq.empty)
+      mockGroupsServiceGetGroupSummariesForTeamMember(Seq.empty)
 
       val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
 
@@ -495,7 +790,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     s"return $INTERNAL_SERVER_ERROR if there was some exception" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-      mockAccessGroupsServiceGetGroupsForTeamMemberWithException(new NullPointerException("bad"))
+      mockGroupsServiceGetGroupSummariesForTeamMemberWithException(new NullPointerException("bad"))
 
       val result = controller.getGroupSummariesForTeamMember(arn, "key")(baseRequest)
 
@@ -752,10 +1047,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
         }
       }
 
-      "call to fetch access groups returns empty collection" should {
+      "call to fetch access groups summaries returns empty collections" should {
         s"return $OK" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockAccessGroupsServiceGetGroups(Seq.empty)
+          mockGroupsServiceGetGroupSummaries(Seq.empty)
 
           val result = controller.groupNameCheck(arn, groupName)(baseRequest)
 
@@ -763,12 +1058,12 @@ class AccessGroupsControllerSpec extends BaseSpec {
         }
       }
 
-      "call to fetch access groups returns non-empty collection" when {
+      "call to fetch access groups returns group summaries" when {
 
         "existing access groups contain a group whose name matches (even case-insensitively) that is being checked" should {
           s"return $CONFLICT" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+            mockGroupsServiceGetGroupSummaries(groupSummaries)
 
             val result = controller.groupNameCheck(arn, groupName.toUpperCase)(baseRequest)
 
@@ -779,7 +1074,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
         "existing access groups contain a group whose name matches (except whitespace) that is being checked" should {
           s"return $CONFLICT" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+            mockGroupsServiceGetGroupSummaries(groupSummaries)
 
             val result = controller.groupNameCheck(arn, " " + groupName)(baseRequest)
 
@@ -790,7 +1085,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
         "existing access groups do not contain any group whose name matches that is being checked" should {
           s"return $OK" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceGetGroups(Seq(accessGroup))
+            mockGroupsServiceGetGroupSummaries(groupSummaries)
 
             val result = controller.groupNameCheck(arn, "non existing group")(baseRequest)
 
@@ -798,6 +1093,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
           }
         }
       }
+
     }
   }
 
@@ -960,181 +1256,6 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
       }
     }
-  }
-
-  trait TestScope {
-
-    val accessGroup: AccessGroup =
-      AccessGroup(dbId, arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
-    val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
-    implicit val mockAuthAction: AuthAction = mock[AuthAction]
-    implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
-    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
-    implicit val actorSystem: ActorSystem = ActorSystem()
-
-    val controller = new AccessGroupsController(mockAccessGroupsService)
-
-    def mockAuthActionGetAuthorisedAgent(
-      maybeAuthorisedAgent: Option[AuthorisedAgent]
-    ): CallHandler4[Boolean, Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
-      (mockAuthAction
-        .getAuthorisedAgent(_: Boolean, _: Boolean)(_: ExecutionContext, _: Request[_]))
-        .expects(*, *, *, *)
-        .returning(Future.successful(maybeAuthorisedAgent))
-
-    def mockAuthActionGetAuthorisedAgentWithException(
-      ex: Exception
-    ): CallHandler4[Boolean, Boolean, ExecutionContext, Request[_], Future[Option[AuthorisedAgent]]] =
-      (mockAuthAction
-        .getAuthorisedAgent(_: Boolean, _: Boolean)(_: ExecutionContext, _: Request[_]))
-        .expects(*, *, *, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceCreate(
-      accessGroupCreationStatus: AccessGroupCreationStatus
-    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
-      (mockAccessGroupsService
-        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.successful(accessGroupCreationStatus))
-
-    def mockAccessGroupsServiceCreateWithException(
-      ex: Exception
-    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
-      (mockAccessGroupsService
-        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceGetGroups(
-      groups: Seq[AccessGroup]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroup]]] =
-      (mockAccessGroupsService
-        .getAllGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *)
-        .returning(Future.successful(groups))
-
-    def mockAccessGroupsServiceGetGroupsWithException(
-      ex: Exception
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroup]]] =
-      (mockAccessGroupsService
-        .getAllGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceGetGroupById(
-      maybeAccessGroup: Option[AccessGroup]
-    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
-      (mockAccessGroupsService
-        .getById(_: String)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.successful(maybeAccessGroup))
-
-    def mockAccessGroupsServiceGetGroupByIdWithException(
-      ex: Exception
-    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
-      (mockAccessGroupsService
-        .getById(_: String)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future failed ex)
-
-    def mockAccessGroupsServiceGetGroup(
-      maybeAccessGroup: Option[AccessGroup]
-    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
-      (mockAccessGroupsService
-        .get(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(GroupId(arn, groupName), *, *)
-        .returning(Future.successful(maybeAccessGroup))
-
-    def mockAccessGroupsServiceGetGroupWithException(
-      ex: Exception
-    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
-      (mockAccessGroupsService
-        .get(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(GroupId(arn, groupName), *, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceUpdate(
-      accessGroupUpdateStatus: AccessGroupUpdateStatus
-    ): CallHandler5[GroupId, AccessGroup, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
-      (mockAccessGroupsService
-        .update(_: GroupId, _: AccessGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *, *)
-        .returning(Future.successful(accessGroupUpdateStatus))
-
-    def mockAccessGroupsServiceDelete(
-      accessGroupDeletionStatus: AccessGroupDeletionStatus
-    ): CallHandler4[GroupId, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
-      (mockAccessGroupsService
-        .delete(_: GroupId, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *)
-        .returning(Future.successful(accessGroupDeletionStatus))
-
-    def mockAccessGroupsServiceDeleteWithException(
-      ex: Exception
-    ): CallHandler4[GroupId, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
-      (mockAccessGroupsService
-        .delete(_: GroupId, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceGetUnassignedClients(
-      unassignedClients: Set[Client]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Set[Client]]] =
-      (mockAccessGroupsService
-        .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future successful unassignedClients)
-
-    def mockAccessGroupsServiceGetUnassignedClientsWithException(
-      ex: Exception
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Set[Client]]] =
-      (mockAccessGroupsService
-        .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceSyncWithEacd(
-      accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
-    ): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
-      (mockAccessGroupsService
-        .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *)
-        .returning(Future successful accessGroupUpdateStatuses)
-
-    def mockAccessGroupsServiceGetGroupsForClient(
-      accessGroupSummaries: Seq[AccessGroupSummary]
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
-      (mockAccessGroupsService
-        .getGroupSummariesForClient(_: Arn, _: String)(_: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future successful accessGroupSummaries)
-
-    def mockAccessGroupsServiceGetGroupsForClientWithException(
-      ex: Exception
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
-      (mockAccessGroupsService
-        .getGroupSummariesForClient(_: Arn, _: String)(_: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.failed(ex))
-
-    def mockAccessGroupsServiceGetGroupsForTeamMember(
-      accessGroupSummaries: Seq[AccessGroupSummary]
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
-      (mockAccessGroupsService
-        .getGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future successful accessGroupSummaries)
-
-    def mockAccessGroupsServiceGetGroupsForTeamMemberWithException(
-      ex: Exception
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
-      (mockAccessGroupsService
-        .getGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.failed(ex))
-
   }
 
   def jsonPayloadForCreateGroup(groupName: String): JsValue =
