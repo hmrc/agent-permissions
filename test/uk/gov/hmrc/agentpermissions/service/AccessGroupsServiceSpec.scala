@@ -61,7 +61,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     val accessGroupInMongo: AccessGroup = withClientNamesRemoved(accessGroup)
 
-    val assignedClient: AssignedClient = AssignedClient("service", Seq(Identifier("key", "value")), None, "user")
+    val assignedClient: AssignedClient = AssignedClient("service~key~value", None, "user")
 
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()

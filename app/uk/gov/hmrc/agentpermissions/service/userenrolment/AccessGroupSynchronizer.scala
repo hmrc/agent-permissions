@@ -124,10 +124,9 @@ class AccessGroupSynchronizerImpl @Inject() (
   private def userEnrolmentsOf(groupDelegatedEnrolments: GroupDelegatedEnrolments): Set[UserEnrolment] =
     (for {
       assignedClient <- groupDelegatedEnrolments.clients
-      identifier     <- assignedClient.identifiers
     } yield UserEnrolment(
       assignedClient.assignedTo,
-      EnrolmentKey.enrolmentKey(assignedClient.serviceName, identifier.value)
+      assignedClient.clientEnrolmentKey
     )).toSet
 
 }
