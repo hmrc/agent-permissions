@@ -37,9 +37,9 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
     val user1: AgentUser = AgentUser("user1", "User 1")
     val user2: AgentUser = AgentUser("user2", "User 2")
     val user3: AgentUser = AgentUser("user3", "User 3")
-
-    val client1: Client = Client("HMRC-MTD-VAT~VRN~101747641", "John Innes")
-    val client2: Client = Client("HMRC-MTD-VAT~VRN~101746700", "Ann Von-Innes")
+    val vatService: String = "HMRC-MTD-VAT"
+    val client1: Client = Client(s"$vatService~VRN~101747641", "John Innes")
+    val client2: Client = Client(s"$vatService~VRN~101746700", "Ann Von-Innes")
 
     val groupId: GroupId = GroupId(arn, groupName)
     val dbId: String = new ObjectId().toHexString
@@ -52,7 +52,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
       user,
       user,
       Some(Set(user, user1, user2)),
-      "HMRC-MTD-VAT",
+      vatService,
       automaticUpdates = true,
       Some(Set(client1, client2))
     )
@@ -77,6 +77,14 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
       (mockTaxServiceGroupsRepository
         .get(_: Arn, _: String))
         .expects(arn, groupName)
+        .returning(Future.successful(maybeAccessGroup))
+
+    def mockTaxServiceGroupsRepositoryGetByService(
+      maybeAccessGroup: Option[TaxServiceAccessGroup]
+    ): CallHandler2[Arn, String, Future[Option[TaxServiceAccessGroup]]] =
+      (mockTaxServiceGroupsRepository
+        .getByService(_: Arn, _: String))
+        .expects(arn, vatService)
         .returning(Future.successful(maybeAccessGroup))
 
     def mockTaxServiceGroupsRepositoryGetById(
@@ -124,9 +132,9 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
   "Calling create" when {
 
-    "group of that name already exists" should {
+    "group of that service already exists" should {
       s"return $TaxServiceGroupExistsForCreation" in new TestScope {
-        mockTaxServiceGroupsRepositoryGet(Some(accessGroup))
+        mockTaxServiceGroupsRepositoryGetByService(Some(accessGroup))
 
         taxServiceGroupsService
           .create(accessGroup)
@@ -138,7 +146,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
       "insert calls returns nothing" should {
         s"return $TaxServiceGroupNotCreated" in new TestScope {
-          mockTaxServiceGroupsRepositoryGet(None)
+          mockTaxServiceGroupsRepositoryGetByService(None)
 
           mockTaxServiceGroupsRepositoryInsert(accessGroup, None)
 
@@ -150,7 +158,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
       s"insert calls returns an id" should {
         s"return $TaxServiceGroupCreated" in new TestScope {
-          mockTaxServiceGroupsRepositoryGet(None)
+          mockTaxServiceGroupsRepositoryGetByService(None)
           mockTaxServiceGroupsRepositoryInsert(accessGroup, Some(insertedId))
 
           taxServiceGroupsService
@@ -183,7 +191,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
     }
   }
 
-  "Fetching group by arn and service id" when {
+  "Fetching group by group id" when {
 
     "group exists" should {
       "return corresponding group" in new TestScope {
@@ -208,6 +216,36 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         mockTaxServiceGroupsRepositoryGet(Some(accessGroup.copy(teamMembers = None)))
 
         taxServiceGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+          Some(accessGroup.copy(teamMembers = None))
+      }
+    }
+  }
+
+  "Fetching group by arn and service id" when {
+
+    "group exists" should {
+      "return corresponding group" in new TestScope {
+        mockTaxServiceGroupsRepositoryGetByService(Some(accessGroup))
+
+        taxServiceGroupsService.get(arn, vatService).futureValue shouldBe
+          Some(accessGroup)
+      }
+    }
+
+    "group does not exists" should {
+      "return no group" in new TestScope {
+        mockTaxServiceGroupsRepositoryGetByService(None)
+
+        taxServiceGroupsService.get(arn, vatService).futureValue shouldBe
+          None
+      }
+    }
+
+    "group with no team members" should {
+      "return the group" in new TestScope {
+        mockTaxServiceGroupsRepositoryGetByService(Some(accessGroup.copy(teamMembers = None)))
+
+        taxServiceGroupsService.get(arn, vatService).futureValue shouldBe
           Some(accessGroup.copy(teamMembers = None))
       }
     }
