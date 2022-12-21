@@ -78,14 +78,14 @@ class TaxServiceGroupsServiceImpl @Inject() (
       .findById(id)
 
   override def create(
-    accessGroup: TaxServiceAccessGroup
+    taxGroup: TaxServiceAccessGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[TaxServiceGroupCreationStatus] =
-    taxServiceGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
+    taxServiceGroupsRepository.getByService(taxGroup.arn, taxGroup.service) flatMap {
       case Some(_) =>
         Future.successful(TaxServiceGroupExistsForCreation)
       case _ =>
         for {
-          maybeCreationId <- taxServiceGroupsRepository.insert(accessGroup)
+          maybeCreationId <- taxServiceGroupsRepository.insert(taxGroup)
         } yield maybeCreationId match {
           case None =>
             TaxServiceGroupNotCreated
