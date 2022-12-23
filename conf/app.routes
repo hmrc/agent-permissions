@@ -18,9 +18,6 @@ GET     /groups/:gid                     uk.gov.hmrc.agentpermissions.controller
 DELETE  /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
 PATCH   /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
 PUT     /groups/:gid/add-unassigned      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: String)
-
-PATCH   /arn/:arn/sync                   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-
 GET     /arn/:arn/unassigned-clients     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.unassignedClients(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 
 # Tax service groups

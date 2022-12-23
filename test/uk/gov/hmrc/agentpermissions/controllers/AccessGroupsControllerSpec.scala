@@ -1097,58 +1097,6 @@ class AccessGroupsControllerSpec extends BaseSpec {
     }
   }
 
-  "Call to sync with EACD" when {
-
-    "authorised agent is not identified by auth" should {
-      s"return $FORBIDDEN" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(None)
-
-        val result = controller.syncWithEacd(arn)(baseRequest)
-        status(result) shouldBe FORBIDDEN
-      }
-    }
-
-    "provided arn is not valid" should {
-      s"return $BAD_REQUEST" in new TestScope {
-        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-
-        val result = controller.syncWithEacd(invalidArn)(baseRequest)
-
-        status(result) shouldBe BAD_REQUEST
-      }
-    }
-
-    "provided arn is valid" when {
-
-      "provided arn does not match that identified by auth" should {
-        s"return $BAD_REQUEST" in new TestScope {
-          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-
-          val nonMatchingArn: Arn = Arn("FARN3782960")
-
-          val result = controller.syncWithEacd(nonMatchingArn)(baseRequest)
-
-          status(result) shouldBe BAD_REQUEST
-        }
-      }
-
-      "provided arn matches that identified by auth" when {
-
-        "sync is successful" should {
-          s"return $OK" in new TestScope {
-            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceSyncWithEacd(Seq(AccessGroupUpdated))
-
-            val result = controller.syncWithEacd(arn)(baseRequest)
-
-            status(result) shouldBe OK
-          }
-        }
-      }
-
-    }
-  }
-
   "Call to add unassigned clients/team members to a group" when {
 
     "authorised agent is not identified by auth" should {
