@@ -10,28 +10,29 @@ GET     /arn/:arn/access-group-name-check       uk.gov.hmrc.agentpermissions.con
 GET     /arn/:arn/client/:enrolmentKey/groups   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForClient(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, enrolmentKey)
 GET     /arn/:arn/team-member/:userId/groups    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForTeamMember(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, userId: String)
 GET     /arn/:arn/all-groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getAllGroupSummaries(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+
 # Custom access groups
-POST    /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/groups                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
-DELETE  /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
-PATCH   /groups/:gid                            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
-PUT     /groups/:gid/add-unassigned             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: String)
+POST    /arn/:arn/groups                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/groups                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
+DELETE  /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
+PATCH   /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
+PUT     /groups/:gid/add-unassigned      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: String)
 
-PATCH   /arn/:arn/sync                          uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+PATCH   /arn/:arn/sync                   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 
-GET     /arn/:arn/unassigned-clients            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.unassignedClients(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/unassigned-clients     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.unassignedClients(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 
 # Tax service groups
-POST    /arn/:arn/tax-group                     uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/tax-groups                    uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/tax-group/:service            uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.getGroupByService(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, service: String)
-GET     /tax-group/:groupId                     uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.getGroup(groupId: String)
-PATCH   /tax-group/:groupId                     uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.updateGroup(groupId: String)
-DELETE  /tax-group/:groupId                     uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.deleteGroup(groupId: String)
+POST    /arn/:arn/tax-group              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/tax-groups             uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/tax-group/:service     uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.getGroupByService(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, service: String)
+GET     /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.getGroup(groupId: String)
+PATCH   /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.updateGroup(groupId: String)
+DELETE  /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.deleteGroup(groupId: String)
 
 # ARN Allow List
-GET     /arn-allowed                            uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.isArnAllowed
-GET     /private-beta-invite                    uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.hideBetaInviteCheck
-POST    /private-beta-invite/decline            uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.hideBetaInvite
+GET     /arn-allowed                     uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.isArnAllowed
+GET     /private-beta-invite             uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.hideBetaInviteCheck
+POST    /private-beta-invite/decline     uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.hideBetaInvite
 
