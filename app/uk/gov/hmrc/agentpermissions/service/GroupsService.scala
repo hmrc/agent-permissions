@@ -45,7 +45,7 @@ trait GroupsService {
 class GroupsServiceImpl @Inject() (
   taxServiceGroupsRepo: TaxServiceGroupsRepository,
   customGroupsService: AccessGroupsService,
-  taxServiceGroupsService: TaxServiceGroupsService
+  taxGroupsService: TaxGroupsService
 ) extends GroupsService with Logging {
 
   override def getAllGroupSummaries(
@@ -54,7 +54,7 @@ class GroupsServiceImpl @Inject() (
     for {
       customGroups <- customGroupsService.getAllCustomGroups(arn)
       customSummaries = customGroups.map(AccessGroupSummary.convertCustomGroup)
-      taxGroups <- taxServiceGroupsService.getAllTaxServiceGroups(arn)
+      taxGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
       taxSummaries = taxGroups.map(AccessGroupSummary.convertTaxServiceGroup)
       combinedSorted = (customSummaries ++ taxSummaries).sortBy(_.groupName.toLowerCase())
     } yield combinedSorted
@@ -78,7 +78,7 @@ class GroupsServiceImpl @Inject() (
   ): Future[Seq[AccessGroupSummary]] =
     for {
       customSummaries <- customGroupsService.getCustomGroupSummariesForTeamMember(arn, userId)
-      taxSummaries    <- taxServiceGroupsService.getTaxGroupSummariesForTeamMember(arn, userId)
+      taxSummaries    <- taxGroupsService.getTaxGroupSummariesForTeamMember(arn, userId)
       combinedSummaries = customSummaries ++ taxSummaries
     } yield combinedSummaries
 

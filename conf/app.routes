@@ -31,6 +31,9 @@ GET     /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controller
 PATCH   /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.updateGroup(groupId: String)
 DELETE  /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.deleteGroup(groupId: String)
 
+GET     /arn/:arn/client-count/available-tax-services    uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.clientCountForAvailableTaxServices(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/client-count/tax-groups                uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.clientCountForTaxGroups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+
 # ARN Allow List
 GET     /arn-allowed                     uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.isArnAllowed
 GET     /private-beta-invite             uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.hideBetaInviteCheck

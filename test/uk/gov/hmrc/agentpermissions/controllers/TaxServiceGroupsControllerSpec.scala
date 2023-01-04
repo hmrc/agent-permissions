@@ -64,14 +64,14 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
         automaticUpdates = true,
         Some(Set.empty)
       )
-    val mockTaxServiceGroupsService: TaxServiceGroupsService = mock[TaxServiceGroupsService]
+    val mockTaxGroupsService: TaxGroupsService = mock[TaxGroupsService]
     implicit val mockAuthAction: AuthAction = mock[AuthAction]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
     implicit val actorSystem: ActorSystem = ActorSystem()
 
-    val controller = new TaxServiceGroupsController(mockTaxServiceGroupsService)
+    val controller = new TaxServiceGroupsController(mockTaxGroupsService)
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
@@ -89,96 +89,112 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
         .expects(*, *, *, *)
         .returning(Future.failed(ex))
 
-    def mockTaxServiceGroupsServiceCreate(
+    def mockTaxGroupsServiceCreate(
       groupCreationStatus: TaxServiceGroupCreationStatus
     ): CallHandler3[TaxServiceAccessGroup, HeaderCarrier, ExecutionContext, Future[TaxServiceGroupCreationStatus]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .create(_: TaxServiceAccessGroup)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.successful(groupCreationStatus))
 
-    def mockTaxServiceGroupsServiceCreateWithException(
+    def mockTaxGroupsServiceCreateWithException(
       ex: Exception
     ): CallHandler3[TaxServiceAccessGroup, HeaderCarrier, ExecutionContext, Future[TaxServiceGroupCreationStatus]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .create(_: TaxServiceAccessGroup)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
-    def mockTaxServiceGroupsServiceGetGroups(
+    def mockTaxGroupsServiceGetGroups(
       groups: Seq[TaxServiceAccessGroup]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxServiceAccessGroup]]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.successful(groups))
 
-    def mockTaxServiceGroupsServiceGetGroupsWithException(
+    def mockTaxGroupsServiceGetGroupsWithException(
       ex: Exception
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxServiceAccessGroup]]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.failed(ex))
 
-    def mockTaxServiceGroupsServiceGetGroupById(
+    def mockTaxGroupsServiceGetGroupById(
       maybeGroup: Option[TaxServiceAccessGroup]
     ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .getById(_: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.successful(maybeGroup))
 
-    def mockTaxServiceGroupsServiceGetGroupByIdWithException(
+    def mockTaxGroupsServiceGetGroupByIdWithException(
       ex: Exception
     ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .getById(_: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future failed ex)
 
-    def mockTaxServiceGroupsServiceGetGroupByService(
+    def mockTaxGroupsServiceGetGroupByService(
       service: String,
       maybeGroup: Option[TaxServiceAccessGroup]
     ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .get(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, service, *, *)
         .returning(Future.successful(maybeGroup))
 
-    def mockTaxServiceGroupsServiceGetGroupByServiceWithException(
+    def mockTaxGroupsServiceGetGroupByServiceWithException(
       ex: Exception
     ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .get(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, serviceVat, *, *)
         .returning(Future.failed(ex))
 
-    def mockTaxServiceGroupsServiceUpdate(
+    def mockTaxGroupsServiceUpdate(
       groupUpdateStatus: TaxServiceGroupUpdateStatus
     ): CallHandler5[GroupId, TaxServiceAccessGroup, AgentUser, HeaderCarrier, ExecutionContext, Future[
       TaxServiceGroupUpdateStatus
     ]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .update(_: GroupId, _: TaxServiceAccessGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *, *)
         .returning(Future.successful(groupUpdateStatus))
 
-    def mockTaxServiceGroupsServiceDelete(
+    def mockTaxGroupsServiceDelete(
       groupDeletionStatus: TaxServiceGroupDeletionStatus
     ): CallHandler4[GroupId, AgentUser, HeaderCarrier, ExecutionContext, Future[TaxServiceGroupDeletionStatus]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .delete(_: GroupId, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(Future.successful(groupDeletionStatus))
 
-    def mockTaxServiceGroupsServiceDeleteWithException(
+    def mockTaxGroupsServiceDeleteWithException(
       ex: Exception
     ): CallHandler4[GroupId, AgentUser, HeaderCarrier, ExecutionContext, Future[TaxServiceGroupDeletionStatus]] =
-      (mockTaxServiceGroupsService
+      (mockTaxGroupsService
         .delete(_: GroupId, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(Future.failed(ex))
+
+    def mockGetClientCountForTaxGroups(
+      count: Map[String, Int]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Map[String, Int]]] =
+      (mockTaxGroupsService
+        .clientCountForTaxGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *)
+        .returning(Future.successful(count))
+
+    def mockGetClientCountForAvailableTaxServices(
+      count: Map[String, Int]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Map[String, Int]]] =
+      (mockTaxGroupsService
+        .clientCountForAvailableTaxServices(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *)
+        .returning(Future.successful(count))
 
   }
 
@@ -266,7 +282,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           s"tax service groups service returns $TaxServiceGroupExistsForCreation" should {
             s"return $CONFLICT" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockTaxServiceGroupsServiceCreate(TaxServiceGroupExistsForCreation)
+              mockTaxGroupsServiceCreate(TaxServiceGroupExistsForCreation)
 
               val result = controller.createGroup(arn)(request)
 
@@ -277,7 +293,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           s"access groups service returns $TaxServiceGroupCreated" should {
             s"return $CREATED" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockTaxServiceGroupsServiceCreate(TaxServiceGroupCreated(createdId))
+              mockTaxGroupsServiceCreate(TaxServiceGroupCreated(createdId))
 
               val result = controller.createGroup(arn)(request)
 
@@ -288,7 +304,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           s"access groups service returns $TaxServiceGroupNotCreated" should {
             s"return $INTERNAL_SERVER_ERROR" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockTaxServiceGroupsServiceCreate(TaxServiceGroupNotCreated)
+              mockTaxGroupsServiceCreate(TaxServiceGroupNotCreated)
 
               val result = controller.createGroup(arn)(request)
 
@@ -299,7 +315,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           s"access groups service throws an exception" should {
             s"return $INTERNAL_SERVER_ERROR" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockTaxServiceGroupsServiceCreateWithException(new RuntimeException("boo boo"))
+              mockTaxGroupsServiceCreateWithException(new RuntimeException("boo boo"))
 
               val result = controller.createGroup(arn)(request)
 
@@ -311,6 +327,144 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       }
 
     }
+  }
+
+  "Call to get client count for available tax services" when {
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.clientCountForAvailableTaxServices(arn)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "provided arn is not valid" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.clientCountForAvailableTaxServices(invalidArn)(baseRequest)
+
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "provided arn is valid" when {
+
+      "provided arn does not match that identified by auth" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          val result = controller.clientCountForAvailableTaxServices(nonMatchingArn)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "calls to fetch count returns empty map" should {
+        s"return $OK" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockGetClientCountForAvailableTaxServices(Map.empty[String, Int])
+
+          val result = controller.clientCountForAvailableTaxServices(arn)(baseRequest)
+
+          status(result) shouldBe OK
+        }
+      }
+
+      "calls to fetch count returns map of count" should {
+        s"return $OK" in new TestScope {
+          val expectedCount = Map(
+            "HMRC-MTD-VAT" -> 2,
+            "HMRC-CGT-PD"  -> 3,
+            "HMRC-PPT-ORG" -> 4,
+            "HMRC-MTD-IT"  -> 5,
+            "HMRC-TERS"    -> 7 // combined trusts
+          )
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockGetClientCountForAvailableTaxServices(expectedCount)
+
+          val result = controller.clientCountForAvailableTaxServices(arn)(baseRequest)
+
+          status(result) shouldBe OK
+          contentAsJson(result).as[Map[String, Int]] shouldBe expectedCount
+        }
+      }
+
+    }
+
+  }
+
+  "Call to get client count for existing tax groups" when {
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.clientCountForTaxGroups(arn)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "provided arn is not valid" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.clientCountForTaxGroups(invalidArn)(baseRequest)
+
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "provided arn is valid" when {
+
+      "provided arn does not match that identified by auth" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          val result = controller.clientCountForTaxGroups(nonMatchingArn)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "calls to fetch count returns empty map" should {
+        s"return $OK" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockGetClientCountForTaxGroups(Map.empty[String, Int])
+
+          val result = controller.clientCountForTaxGroups(arn)(baseRequest)
+
+          status(result) shouldBe OK
+        }
+      }
+
+      "calls to fetch count returns map of count" should {
+        s"return $OK" in new TestScope {
+          val expectedCount = Map(
+            "HMRC-MTD-VAT" -> 2,
+            "HMRC-CGT-PD"  -> 3,
+            "HMRC-PPT-ORG" -> 4,
+            "HMRC-MTD-IT"  -> 5,
+            "HMRC-TERS"    -> 7 // combined trusts
+          )
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockGetClientCountForTaxGroups(expectedCount)
+
+          val result = controller.clientCountForTaxGroups(arn)(baseRequest)
+
+          status(result) shouldBe OK
+          contentAsJson(result).as[Map[String, Int]] shouldBe expectedCount
+        }
+      }
+
+    }
+
   }
 
   "Call to fetch all tax service groups" when {
@@ -351,7 +505,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       "calls to fetch groups returns empty collections" should {
         s"return $NOT_FOUND" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroups(Seq.empty)
+          mockTaxGroupsServiceGetGroups(Seq.empty)
 
           val result = controller.groups(arn)(baseRequest)
 
@@ -364,7 +518,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
         s"return $OK" in new TestScope {
 
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroups(Seq(taxServiceGroup))
+          mockTaxGroupsServiceGetGroups(Seq(taxServiceGroup))
 
           val result = controller.groups(arn)(baseRequest)
 
@@ -384,7 +538,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       "call to fetch access groups throws exception" should {
         s"return $INTERNAL_SERVER_ERROR" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupsWithException(new RuntimeException("boo boo"))
+          mockTaxGroupsServiceGetGroupsWithException(new RuntimeException("boo boo"))
 
           val result = controller.groups(arn)(baseRequest)
 
@@ -409,7 +563,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
     "group id is not in the expected format" should {
       s"return $NOT_FOUND" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        mockTaxServiceGroupsServiceGetGroupById(None)
+        mockTaxGroupsServiceGetGroupById(None)
 
         val result = controller.getGroup("bad")(baseRequest)
 
@@ -424,7 +578,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           val nonMatchingArn: Arn = Arn("FARN3782960")
 
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
-          mockTaxServiceGroupsServiceGetGroupById(Some(taxServiceGroup))
+          mockTaxGroupsServiceGetGroupById(Some(taxServiceGroup))
 
           val result = controller.getGroup(dbId.toHexString)(baseRequest)
 
@@ -435,7 +589,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       "call to fetch group details returns nothing" should {
         s"return $NOT_FOUND" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupById(None)
+          mockTaxGroupsServiceGetGroupById(None)
 
           val result = controller.getGroup(dbId.toHexString)(baseRequest)
 
@@ -446,7 +600,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       "call to fetch group details returns a tax service group" should {
         s"return $OK" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupById(Some(taxServiceGroup))
+          mockTaxGroupsServiceGetGroupById(Some(taxServiceGroup))
 
           val result = controller.getGroup(dbId.toHexString)(baseRequest)
 
@@ -468,7 +622,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       "call to fetch group details throws exception" should {
         s"return $INTERNAL_SERVER_ERROR" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupByIdWithException(new RuntimeException("boo boo"))
+          mockTaxGroupsServiceGetGroupByIdWithException(new RuntimeException("boo boo"))
 
           val result = controller.getGroup(dbId.toHexString)(baseRequest)
 
@@ -494,7 +648,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
     "service id is not in the expected format" should {
       s"return $NOT_FOUND" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        mockTaxServiceGroupsServiceGetGroupByService("bad", None)
+        mockTaxGroupsServiceGetGroupByService("bad", None)
 
         val result = controller.getGroupByService(arn, "bad")(baseRequest)
 
@@ -509,7 +663,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           val nonMatchingArn: Arn = Arn("FARN3782960")
 
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
-          mockTaxServiceGroupsServiceGetGroupByService(serviceVat, Some(taxServiceGroup))
+          mockTaxGroupsServiceGetGroupByService(serviceVat, Some(taxServiceGroup))
 
           val result = controller.getGroupByService(arn, serviceVat)(baseRequest)
 
@@ -520,7 +674,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       "call to fetch group details returns nothing" should {
         s"return $NOT_FOUND" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupByService(serviceVat, None)
+          mockTaxGroupsServiceGetGroupByService(serviceVat, None)
 
           val result = controller.getGroupByService(arn, serviceVat)(baseRequest)
 
@@ -531,7 +685,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       "call to fetch group details returns a tax service group" should {
         s"return $OK" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupByService(serviceVat, Some(taxServiceGroup))
+          mockTaxGroupsServiceGetGroupByService(serviceVat, Some(taxServiceGroup))
 
           val result = controller.getGroupByService(arn, serviceVat)(baseRequest)
 
@@ -553,7 +707,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       "call to fetch group details throws exception" should {
         s"return $INTERNAL_SERVER_ERROR" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupByServiceWithException(new RuntimeException("boo boo"))
+          mockTaxGroupsServiceGetGroupByServiceWithException(new RuntimeException("boo boo"))
 
           val result = controller.getGroupByService(arn, serviceVat)(baseRequest)
 
@@ -579,7 +733,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
     "group id is not in the expected format" should {
       s"return $BAD_REQUEST" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        mockTaxServiceGroupsServiceGetGroupById(None)
+        mockTaxGroupsServiceGetGroupById(None)
 
         val result = controller.deleteGroup("bad")(baseRequest)
 
@@ -594,7 +748,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           val nonMatchingArn: Arn = Arn("FARN3782960")
 
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
-          mockTaxServiceGroupsServiceGetGroupById(Some(taxServiceGroup))
+          mockTaxGroupsServiceGetGroupById(Some(taxServiceGroup))
 
           val result = controller.deleteGroup(dbId.toHexString)(baseRequest)
 
@@ -605,8 +759,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       s"access groups service returns $TaxServiceGroupNotDeleted" should {
         s"return $NOT_MODIFIED" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupById(Some(taxServiceGroup))
-          mockTaxServiceGroupsServiceDelete(TaxServiceGroupNotDeleted)
+          mockTaxGroupsServiceGetGroupById(Some(taxServiceGroup))
+          mockTaxGroupsServiceDelete(TaxServiceGroupNotDeleted)
 
           val result = controller.deleteGroup(dbId.toHexString)(baseRequest)
 
@@ -617,8 +771,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       s"access groups service returns $TaxServiceGroupDeleted" should {
         s"return $OK" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupById(Some(taxServiceGroup))
-          mockTaxServiceGroupsServiceDelete(TaxServiceGroupDeleted)
+          mockTaxGroupsServiceGetGroupById(Some(taxServiceGroup))
+          mockTaxGroupsServiceDelete(TaxServiceGroupDeleted)
 
           val result = controller.deleteGroup(dbId.toHexString)(baseRequest)
 
@@ -629,8 +783,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       s"access groups service throws an exception" should {
         s"return $INTERNAL_SERVER_ERROR" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupById(Some(taxServiceGroup))
-          mockTaxServiceGroupsServiceDeleteWithException(new RuntimeException("boo boo"))
+          mockTaxGroupsServiceGetGroupById(Some(taxServiceGroup))
+          mockTaxGroupsServiceDeleteWithException(new RuntimeException("boo boo"))
 
           val result = controller.deleteGroup(dbId.toHexString)(baseRequest)
 
@@ -677,7 +831,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       "group id is not in the expected format" should {
         s"return $BAD_REQUEST" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupById(None)
+          mockTaxGroupsServiceGetGroupById(None)
 
           val result = controller.updateGroup("bad")(request)
           status(result) shouldBe BAD_REQUEST
@@ -691,7 +845,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
             val nonMatchingArn: Arn = Arn("FARN3782960")
 
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
-            mockTaxServiceGroupsServiceGetGroupById(Some(taxServiceGroup))
+            mockTaxGroupsServiceGetGroupById(Some(taxServiceGroup))
 
             val result = controller.updateGroup(dbId.toHexString)(request)
 
@@ -702,7 +856,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
         "group for provided id does not exist" should {
           s"return $BAD_REQUEST" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockTaxServiceGroupsServiceGetGroupById(None)
+            mockTaxGroupsServiceGetGroupById(None)
 
             val result = controller.updateGroup(dbId.toHexString)(request)
 
@@ -713,7 +867,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
         "provided group name length is more than the maximum allowed" should {
           s"return $BAD_REQUEST" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockTaxServiceGroupsServiceGetGroupById(Some(taxServiceGroup))
+            mockTaxGroupsServiceGetGroupById(Some(taxServiceGroup))
 
             val result = controller.updateGroup(dbId.toHexString)(
               baseRequest
@@ -729,8 +883,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           s"access groups service returns $TaxServiceGroupNotUpdated" should {
             s"return $NOT_FOUND" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockTaxServiceGroupsServiceGetGroupById(Some(taxServiceGroup))
-              mockTaxServiceGroupsServiceUpdate(TaxServiceGroupNotUpdated)
+              mockTaxGroupsServiceGetGroupById(Some(taxServiceGroup))
+              mockTaxGroupsServiceUpdate(TaxServiceGroupNotUpdated)
 
               val result = controller.updateGroup(dbId.toHexString)(request)
 
@@ -741,8 +895,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           s"access groups service returns $TaxServiceGroupUpdated" should {
             s"return $OK" in new TestScope {
               mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-              mockTaxServiceGroupsServiceGetGroupById(Some(taxServiceGroup))
-              mockTaxServiceGroupsServiceUpdate(TaxServiceGroupUpdated)
+              mockTaxGroupsServiceGetGroupById(Some(taxServiceGroup))
+              mockTaxGroupsServiceUpdate(TaxServiceGroupUpdated)
 
               val result = controller.updateGroup(dbId.toHexString)(request)
 
@@ -791,7 +945,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       "group id is not in the expected format" should {
         s"return $BAD_REQUEST" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-          mockTaxServiceGroupsServiceGetGroupById(None)
+          mockTaxGroupsServiceGetGroupById(None)
 
           val result = controller.addUnassignedMembers("bad")(request)
           status(result) shouldBe BAD_REQUEST
@@ -808,8 +962,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
               excludedClients = Some(Set(Client("whatever", "friendly")))
             )
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockTaxServiceGroupsServiceGetGroupById(Some(group))
-            mockTaxServiceGroupsServiceUpdate(TaxServiceGroupUpdated)
+            mockTaxGroupsServiceGetGroupById(Some(group))
+            mockTaxGroupsServiceUpdate(TaxServiceGroupUpdated)
 
             val result = controller.addUnassignedMembers(dbId.toHexString)(request)
 
@@ -824,8 +978,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
               excludedClients = Some(Set(Client("whatever", "friendly")))
             )
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockTaxServiceGroupsServiceGetGroupById(Some(group))
-            mockTaxServiceGroupsServiceUpdate(TaxServiceGroupNotUpdated)
+            mockTaxGroupsServiceGetGroupById(Some(group))
+            mockTaxGroupsServiceUpdate(TaxServiceGroupNotUpdated)
 
             val result = controller.addUnassignedMembers(dbId.toHexString)(request)
 
@@ -836,7 +990,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
         "group for provided id does not exist" should {
           s"return $BAD_REQUEST" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockTaxServiceGroupsServiceGetGroupById(None)
+            mockTaxGroupsServiceGetGroupById(None)
 
             val result = controller.addUnassignedMembers(dbId.toHexString)(request)
 
