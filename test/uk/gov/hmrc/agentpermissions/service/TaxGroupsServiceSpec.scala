@@ -20,6 +20,7 @@ import org.bson.types.ObjectId
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.TaxServiceGroupsRepository
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.http.HeaderCarrier
@@ -27,7 +28,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
-class TaxServiceGroupsServiceSpec extends BaseSpec {
+class TaxGroupsServiceSpec extends BaseSpec {
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -44,7 +45,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
     val groupId: GroupId = GroupId(arn, groupName)
     val dbId: String = new ObjectId().toHexString
 
-    val accessGroup: TaxServiceAccessGroup = TaxServiceAccessGroup(
+    val taxGroup: TaxServiceAccessGroup = TaxServiceAccessGroup(
       arn,
       groupName,
       now,
@@ -57,21 +58,40 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
       Some(Set(client1, client2))
     )
 
+    val fullCountMap = Map(
+      "HMRC-MTD-VAT"    -> 2,
+      "HMRC-CGT-PD"     -> 3,
+      "HMRC-PPT-ORG"    -> 4,
+      "HMRC-MTD-IT"     -> 5,
+      "HMRC-TERS-ORG"   -> 6,
+      "HMRC-TERSNT-ORG" -> 1
+    )
+
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
+    val mockAUCDConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
     val mockTaxServiceGroupsRepository: TaxServiceGroupsRepository = mock[TaxServiceGroupsRepository]
     val mockAuditService: AuditService = mock[AuditService]
 
-    val taxServiceGroupsService: TaxServiceGroupsService =
-      new TaxServiceGroupsServiceImpl(
+    val taxGroupsService: TaxGroupsService =
+      new TaxGroupsServiceImpl(
         mockTaxServiceGroupsRepository,
+        mockAUCDConnector,
         mockAuditService
       )
 
     lazy val now: LocalDateTime = LocalDateTime.now()
 
-    def mockTaxServiceGroupsRepositoryGet(
+    def mockAUCDGetClientCount(
+      clientCountMap: Option[Map[String, Int]]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Map[String, Int]]]] =
+      (mockAUCDConnector
+        .clientCountByTaxService(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, headerCarrier, executionContext)
+        .returning(Future.successful(clientCountMap))
+
+    def mockTaxGroupsRepositoryGet(
       maybeAccessGroup: Option[TaxServiceAccessGroup]
     ): CallHandler2[Arn, String, Future[Option[TaxServiceAccessGroup]]] =
       (mockTaxServiceGroupsRepository
@@ -79,7 +99,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         .expects(arn, groupName)
         .returning(Future.successful(maybeAccessGroup))
 
-    def mockTaxServiceGroupsRepositoryGetByService(
+    def mockTaxGroupsRepositoryGetByService(
       maybeAccessGroup: Option[TaxServiceAccessGroup]
     ): CallHandler2[Arn, String, Future[Option[TaxServiceAccessGroup]]] =
       (mockTaxServiceGroupsRepository
@@ -87,7 +107,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         .expects(arn, vatService)
         .returning(Future.successful(maybeAccessGroup))
 
-    def mockTaxServiceGroupsRepositoryGetById(
+    def mockTaxGroupsRepositoryGetById(
       maybeAccessGroup: Option[TaxServiceAccessGroup]
     ): CallHandler1[String, Future[Option[TaxServiceAccessGroup]]] =
       (mockTaxServiceGroupsRepository
@@ -95,7 +115,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         .expects(dbId)
         .returning(Future.successful(maybeAccessGroup))
 
-    def mockTaxServiceGroupsRepositoryGetAll(
+    def mockTaxGroupsRepositoryGetAll(
       accessGroups: Seq[TaxServiceAccessGroup]
     ): CallHandler1[Arn, Future[Seq[TaxServiceAccessGroup]]] =
       (mockTaxServiceGroupsRepository
@@ -134,10 +154,10 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "group of that service already exists" should {
       s"return $TaxServiceGroupExistsForCreation" in new TestScope {
-        mockTaxServiceGroupsRepositoryGetByService(Some(accessGroup))
+        mockTaxGroupsRepositoryGetByService(Some(taxGroup))
 
-        taxServiceGroupsService
-          .create(accessGroup)
+        taxGroupsService
+          .create(taxGroup)
           .futureValue shouldBe TaxServiceGroupExistsForCreation
       }
     }
@@ -146,23 +166,23 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
       "insert calls returns nothing" should {
         s"return $TaxServiceGroupNotCreated" in new TestScope {
-          mockTaxServiceGroupsRepositoryGetByService(None)
+          mockTaxGroupsRepositoryGetByService(None)
 
-          mockTaxServiceGroupsRepositoryInsert(accessGroup, None)
+          mockTaxServiceGroupsRepositoryInsert(taxGroup, None)
 
-          taxServiceGroupsService
-            .create(accessGroup)
+          taxGroupsService
+            .create(taxGroup)
             .futureValue shouldBe TaxServiceGroupNotCreated
         }
       }
 
       s"insert calls returns an id" should {
         s"return $TaxServiceGroupCreated" in new TestScope {
-          mockTaxServiceGroupsRepositoryGetByService(None)
-          mockTaxServiceGroupsRepositoryInsert(accessGroup, Some(insertedId))
+          mockTaxGroupsRepositoryGetByService(None)
+          mockTaxServiceGroupsRepositoryInsert(taxGroup, Some(insertedId))
 
-          taxServiceGroupsService
-            .create(accessGroup)
+          taxGroupsService
+            .create(taxGroup)
             .futureValue shouldBe TaxServiceGroupCreated(insertedId)
         }
       }
@@ -174,18 +194,18 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "Tax Service groups exist" should {
       "return corresponding groups" in new TestScope {
-        mockTaxServiceGroupsRepositoryGetAll(Seq(accessGroup))
+        mockTaxGroupsRepositoryGetAll(Seq(taxGroup))
 
-        taxServiceGroupsService.getAllTaxServiceGroups(arn).futureValue shouldBe
-          Seq(accessGroup)
+        taxGroupsService.getAllTaxServiceGroups(arn).futureValue shouldBe
+          Seq(taxGroup)
       }
     }
 
     "no groups found" should {
       "return no Tax Service groups" in new TestScope {
-        mockTaxServiceGroupsRepositoryGetAll(Seq.empty)
+        mockTaxGroupsRepositoryGetAll(Seq.empty)
 
-        taxServiceGroupsService.getAllTaxServiceGroups(arn).futureValue shouldBe
+        taxGroupsService.getAllTaxServiceGroups(arn).futureValue shouldBe
           Seq.empty
       }
     }
@@ -195,28 +215,28 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "group exists" should {
       "return corresponding group" in new TestScope {
-        mockTaxServiceGroupsRepositoryGet(Some(accessGroup))
+        mockTaxGroupsRepositoryGet(Some(taxGroup))
 
-        taxServiceGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
-          Some(accessGroup)
+        taxGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+          Some(taxGroup)
       }
     }
 
     "group does not exists" should {
       "return no group" in new TestScope {
-        mockTaxServiceGroupsRepositoryGet(None)
+        mockTaxGroupsRepositoryGet(None)
 
-        taxServiceGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+        taxGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
           None
       }
     }
 
     "group with no team members" should {
       "return the group" in new TestScope {
-        mockTaxServiceGroupsRepositoryGet(Some(accessGroup.copy(teamMembers = None)))
+        mockTaxGroupsRepositoryGet(Some(taxGroup.copy(teamMembers = None)))
 
-        taxServiceGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
-          Some(accessGroup.copy(teamMembers = None))
+        taxGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+          Some(taxGroup.copy(teamMembers = None))
       }
     }
   }
@@ -225,28 +245,28 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "group exists" should {
       "return corresponding group" in new TestScope {
-        mockTaxServiceGroupsRepositoryGetByService(Some(accessGroup))
+        mockTaxGroupsRepositoryGetByService(Some(taxGroup))
 
-        taxServiceGroupsService.get(arn, vatService).futureValue shouldBe
-          Some(accessGroup)
+        taxGroupsService.get(arn, vatService).futureValue shouldBe
+          Some(taxGroup)
       }
     }
 
     "group does not exists" should {
       "return no group" in new TestScope {
-        mockTaxServiceGroupsRepositoryGetByService(None)
+        mockTaxGroupsRepositoryGetByService(None)
 
-        taxServiceGroupsService.get(arn, vatService).futureValue shouldBe
+        taxGroupsService.get(arn, vatService).futureValue shouldBe
           None
       }
     }
 
     "group with no team members" should {
       "return the group" in new TestScope {
-        mockTaxServiceGroupsRepositoryGetByService(Some(accessGroup.copy(teamMembers = None)))
+        mockTaxGroupsRepositoryGetByService(Some(taxGroup.copy(teamMembers = None)))
 
-        taxServiceGroupsService.get(arn, vatService).futureValue shouldBe
-          Some(accessGroup.copy(teamMembers = None))
+        taxGroupsService.get(arn, vatService).futureValue shouldBe
+          Some(taxGroup.copy(teamMembers = None))
       }
     }
   }
@@ -255,10 +275,10 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
 
     "group exists" should {
       "return corresponding summaries" in new TestScope {
-        mockTaxServiceGroupsRepositoryGetById(Some(accessGroup))
+        mockTaxGroupsRepositoryGetById(Some(taxGroup))
 
-        taxServiceGroupsService.getById(dbId).futureValue shouldBe
-          Some(accessGroup)
+        taxGroupsService.getById(dbId).futureValue shouldBe
+          Some(taxGroup)
       }
     }
   }
@@ -268,12 +288,12 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
     "groups found" should {
       "return corresponding summaries" in new TestScope {
 
-        val ag1: TaxServiceAccessGroup = accessGroup
-        val ag2: TaxServiceAccessGroup = accessGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
+        val ag1: TaxServiceAccessGroup = taxGroup
+        val ag2: TaxServiceAccessGroup = taxGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
 
-        mockTaxServiceGroupsRepositoryGetAll(Seq(ag1, ag2))
+        mockTaxGroupsRepositoryGetAll(Seq(ag1, ag2))
 
-        taxServiceGroupsService.getTaxGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
+        taxGroupsService.getTaxGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
           Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", None, 1, isCustomGroup = false))
       }
     }
@@ -285,7 +305,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
       s"return $TaxServiceGroupNotDeleted" in new TestScope {
         mockTaxServiceGroupsRepositoryDelete(None)
 
-        taxServiceGroupsService.delete(groupId, user).futureValue shouldBe TaxServiceGroupNotDeleted
+        taxGroupsService.delete(groupId, user).futureValue shouldBe TaxServiceGroupNotDeleted
       }
     }
 
@@ -295,7 +315,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         s"return $TaxServiceGroupNotDeleted" in new TestScope {
           mockTaxServiceGroupsRepositoryDelete(Some(0L))
 
-          taxServiceGroupsService.delete(groupId, user).futureValue shouldBe TaxServiceGroupNotDeleted
+          taxGroupsService.delete(groupId, user).futureValue shouldBe TaxServiceGroupNotDeleted
         }
       }
 
@@ -303,7 +323,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
         s"return $TaxServiceGroupDeleted" in new TestScope {
           mockTaxServiceGroupsRepositoryDelete(Some(1L))
 
-          taxServiceGroupsService.delete(groupId, user).futureValue shouldBe TaxServiceGroupDeleted
+          taxGroupsService.delete(groupId, user).futureValue shouldBe TaxServiceGroupDeleted
         }
       }
     }
@@ -316,7 +336,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
       s"return $TaxServiceGroupNotUpdated" in new TestScope {
         mockTaxServiceGroupsRepositoryUpdate(None)
 
-        taxServiceGroupsService.update(groupId, accessGroup, user).futureValue shouldBe TaxServiceGroupNotUpdated
+        taxGroupsService.update(groupId, taxGroup, user).futureValue shouldBe TaxServiceGroupNotUpdated
       }
     }
 
@@ -324,7 +344,7 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
       s"return $TaxServiceGroupNotUpdated" in new TestScope {
         mockTaxServiceGroupsRepositoryUpdate(Some(0))
 
-        taxServiceGroupsService.update(groupId, accessGroup, user).futureValue shouldBe TaxServiceGroupNotUpdated
+        taxGroupsService.update(groupId, taxGroup, user).futureValue shouldBe TaxServiceGroupNotUpdated
       }
     }
 
@@ -332,10 +352,130 @@ class TaxServiceGroupsServiceSpec extends BaseSpec {
       s"return $TaxServiceGroupUpdated" in new TestScope {
         mockTaxServiceGroupsRepositoryUpdate(Some(1))
 
-        taxServiceGroupsService.update(groupId, accessGroup, user).futureValue shouldBe TaxServiceGroupUpdated
+        taxGroupsService.update(groupId, taxGroup, user).futureValue shouldBe TaxServiceGroupUpdated
       }
     }
 
+  }
+
+  "Client count for available tax services" when {
+    "no existing tax groups" should {
+      "return map with client count for all services" in new TestScope {
+        mockAUCDGetClientCount(Some(fullCountMap))
+        mockTaxGroupsRepositoryGetAll(Seq.empty)
+
+        val expectedCount = Map(
+          "HMRC-MTD-VAT" -> 2,
+          "HMRC-CGT-PD"  -> 3,
+          "HMRC-PPT-ORG" -> 4,
+          "HMRC-MTD-IT"  -> 5,
+          "HMRC-TERS"    -> 7 // Combined trusts
+        )
+
+        taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
+      }
+    }
+
+    "some existing tax groups" should {
+      "return map with client count for available services" in new TestScope {
+        mockAUCDGetClientCount(Some(fullCountMap))
+        mockTaxGroupsRepositoryGetAll(Seq(taxGroup)) // vat group
+
+        val expectedCount = Map(
+          "HMRC-CGT-PD"  -> 3,
+          "HMRC-PPT-ORG" -> 4,
+          "HMRC-MTD-IT"  -> 5,
+          "HMRC-TERS"    -> 7 // Combined trusts
+        )
+
+        taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
+      }
+    }
+
+    "all tax groups exist" should {
+      "return empty map" in new TestScope {
+        val allTaxGroups = Seq(
+          taxGroup, // vat group
+          taxGroup.copy(service = serviceCgt),
+          taxGroup.copy(service = servicePpt),
+          taxGroup.copy(service = serviceMtdit),
+          taxGroup.copy(service = "HMRC-TERS")
+        )
+
+        mockAUCDGetClientCount(Some(fullCountMap))
+        mockTaxGroupsRepositoryGetAll(allTaxGroups)
+
+        val expectedCount = Map.empty[String, Int]
+
+        taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
+      }
+    }
+
+    "AUCD fails to return full client count" should {
+      "return empty map" in new TestScope {
+        mockAUCDGetClientCount(None)
+        mockTaxGroupsRepositoryGetAll(Seq.empty) // does not matter
+
+        taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe Map.empty[String, Int]
+      }
+    }
+  }
+
+  "Client count for existing tax groups" when {
+    "no existing tax groups" should {
+      "return empty map" in new TestScope {
+        mockAUCDGetClientCount(Some(fullCountMap))
+        mockTaxGroupsRepositoryGetAll(Seq.empty)
+
+        taxGroupsService.clientCountForTaxGroups(arn).futureValue shouldBe Map.empty[String, Int]
+
+      }
+    }
+
+    "some existing tax groups" should {
+      "return map with client count for existing groups" in new TestScope {
+        mockAUCDGetClientCount(Some(fullCountMap))
+        mockTaxGroupsRepositoryGetAll(Seq(taxGroup)) // vat group
+
+        val expectedCount = Map("HMRC-MTD-VAT" -> 2)
+
+        taxGroupsService.clientCountForTaxGroups(arn).futureValue shouldBe expectedCount
+      }
+    }
+
+    "all tax groups exist" should {
+      "return map with client count for all services" in new TestScope {
+        val allTaxGroups = Seq(
+          taxGroup, // vat group
+          taxGroup.copy(service = serviceCgt),
+          taxGroup.copy(service = servicePpt),
+          taxGroup.copy(service = serviceMtdit),
+          taxGroup.copy(service = "HMRC-TERS")
+        )
+
+        mockAUCDGetClientCount(Some(fullCountMap))
+        mockTaxGroupsRepositoryGetAll(allTaxGroups)
+
+        val expectedCount = Map(
+          "HMRC-MTD-VAT" -> 2,
+          "HMRC-CGT-PD"  -> 3,
+          "HMRC-PPT-ORG" -> 4,
+          "HMRC-MTD-IT"  -> 5,
+          "HMRC-TERS"    -> 7 // combined trusts
+        )
+
+        taxGroupsService.clientCountForTaxGroups(arn).futureValue shouldBe expectedCount
+      }
+    }
+
+    "AUCD fails to return full client count" should {
+      "return empty map" in new TestScope {
+        mockAUCDGetClientCount(None)
+        mockTaxGroupsRepositoryGetAll(Seq.empty) // does not matter
+
+        taxGroupsService.clientCountForTaxGroups(arn).futureValue shouldBe Map.empty[String, Int]
+      }
+    }
   }
 
 }

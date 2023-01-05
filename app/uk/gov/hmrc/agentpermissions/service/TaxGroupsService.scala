@@ -19,6 +19,7 @@ package uk.gov.hmrc.agentpermissions.service
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.TaxServiceGroupsRepository
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.http.HeaderCarrier
@@ -27,12 +28,18 @@ import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
-@ImplementedBy(classOf[TaxServiceGroupsServiceImpl])
-trait TaxServiceGroupsService {
+@ImplementedBy(classOf[TaxGroupsServiceImpl])
+trait TaxGroupsService {
+  def clientCountForAvailableTaxServices(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]]
+
+  def clientCountForTaxGroups(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]]
+
   def getById(id: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxServiceAccessGroup]]
 
   def create(
-    accessGroup: TaxServiceAccessGroup
+    taxGroup: TaxServiceAccessGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[TaxServiceGroupCreationStatus]
 
   def getAllTaxServiceGroups(
@@ -56,7 +63,7 @@ trait TaxServiceGroupsService {
     ec: ExecutionContext
   ): Future[TaxServiceGroupDeletionStatus]
 
-  def update(groupId: GroupId, accessGroup: TaxServiceAccessGroup, whoIsUpdating: AgentUser)(implicit
+  def update(groupId: GroupId, taxGroup: TaxServiceAccessGroup, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus]
@@ -66,10 +73,44 @@ trait TaxServiceGroupsService {
 }
 
 @Singleton
-class TaxServiceGroupsServiceImpl @Inject() (
+class TaxGroupsServiceImpl @Inject() (
   taxServiceGroupsRepository: TaxServiceGroupsRepository,
+  userClientDetailsConnector: UserClientDetailsConnector,
   auditService: AuditService
-) extends TaxServiceGroupsService with Logging {
+) extends TaxGroupsService with Logging {
+
+  override def clientCountForAvailableTaxServices(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]] =
+    for {
+      fullCount         <- userClientDetailsConnector.clientCountByTaxService(arn)
+      existingTaxGroups <- getAllTaxServiceGroups(arn)
+
+      taxServiceIds = existingTaxGroups.map(groups => groups.service)
+      combinedCount = fullCount.fold(Map.empty[String, Int])(fc => combineTrustCount(fc))
+
+      availableCount = combinedCount.filterNot(m => taxServiceIds.contains(m._1))
+    } yield availableCount
+
+  override def clientCountForTaxGroups(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]] =
+    for {
+      fullCount         <- userClientDetailsConnector.clientCountByTaxService(arn)
+      existingTaxGroups <- getAllTaxServiceGroups(arn)
+
+      taxServiceIds = existingTaxGroups.map(groups => groups.service)
+      combinedCount = fullCount.fold(Map.empty[String, Int])(fc => combineTrustCount(fc))
+
+      groupCount = combinedCount.filter(m => taxServiceIds.contains(m._1))
+    } yield groupCount
+
+  private def combineTrustCount(fullCount: Map[String, Int]): Map[String, Int] = {
+    val trustCounts = fullCount.filter(m => m._1.contains("HMRC-TERS"))
+    val combinedTrustCountValue = trustCounts.values.sum // total
+
+    fullCount.filterNot(m => m._1.contains("HMRC-TERS")) ++ Map("HMRC-TERS" -> combinedTrustCountValue)
+  }
 
   override def getById(
     id: String
@@ -160,10 +201,10 @@ class TaxServiceGroupsServiceImpl @Inject() (
     } yield accessGroupUpdateStatus
 
   private def mergeWhoIsUpdating(
-    accessGroup: TaxServiceAccessGroup,
+    taxGroup: TaxServiceAccessGroup,
     whoIsUpdating: AgentUser
   ): Future[TaxServiceAccessGroup] =
-    Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
+    Future.successful(taxGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
 
 }
 

@@ -60,6 +60,10 @@ trait UserClientDetailsConnector {
   def getClientsWithAssignedUsers(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[GroupDelegatedEnrolments]]
+
+  def clientCountByTaxService(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Map[String, Int]]]
 }
 
 @Singleton
@@ -78,6 +82,23 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
         response.status match {
           case OK =>
             Option((response.json \ "client-count").as[Int])
+          case other =>
+            logger.warn(s"Received $other status: ${response.body}")
+            None
+        }
+      }
+    }
+  }
+
+  override def clientCountByTaxService(
+    arn: Arn
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Map[String, Int]]] = {
+    val url = new URL(aucdBaseUrl, s"/agent-user-client-details/arn/${arn.value}/tax-service-client-count")
+
+    monitor(s"ConsumedAPI-AgentUserClientDetails-ClientCount-GET") {
+      http.GET[HttpResponse](url.toString).map { response =>
+        response.status match {
+          case OK => Option(response.json.as[Map[String, Int]])
           case other =>
             logger.warn(s"Received $other status: ${response.body}")
             None

@@ -73,6 +73,38 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     }
   }
 
+  "clientCountByTaxService" when {
+
+    s"http response has $OK status code" should {
+      "return the client count by tax service" in new TestScope {
+        val clientCount: Map[String, Int] = Map("HMRC-MTD-VAT" -> 7)
+        mockAppConfigAgentUserClientDetailsBaseUrl
+        mockMetricsDefaultRegistry
+        mockHttpGet(
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/tax-service-client-count",
+          HttpResponse(OK, Json.toJson(clientCount).toString)
+        )
+
+        userClientDetailsConnector.clientCountByTaxService(arn).futureValue shouldBe Some(clientCount)
+      }
+    }
+
+    "http response has non-200 status codes" should {
+      Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+        s"return nothing for $statusCode" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpGet(
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/tax-service-client-count",
+            HttpResponse(statusCode, "")
+          )
+
+          userClientDetailsConnector.clientCountByTaxService(arn).futureValue shouldBe None
+        }
+      }
+    }
+  }
+
   "userCheck" when {
 
     s"http response has $NO_CONTENT status code" should {

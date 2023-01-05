@@ -95,7 +95,7 @@ class GroupsServiceSpec extends BaseSpec {
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
     val mockTaxGroupsRepository: TaxServiceGroupsRepository = mock[TaxServiceGroupsRepository]
-    val mockTaxGroupsService: TaxServiceGroupsService = mock[TaxServiceGroupsService]
+    val mockTaxGroupsService: TaxGroupsService = mock[TaxGroupsService]
     val mockCustomGroupsService: AccessGroupsService = mock[AccessGroupsService]
 
     val mockAuditService: AuditService = mock[AuditService]
