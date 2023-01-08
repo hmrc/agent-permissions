@@ -32,7 +32,8 @@ import scala.util.{Failure, Success, Try}
 @Singleton()
 class AccessGroupsController @Inject() (
   accessGroupsService: AccessGroupsService, // TODO rename to customGroupsService
-  groupsService: GroupsService
+  groupsService: GroupsService,
+  eacdSynchronizer: EacdSynchronizer
 )(implicit authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
     extends BackendController(cc) with AuthorisedAgentSupport {
 
@@ -219,6 +220,14 @@ class AccessGroupsController @Inject() (
               Ok
           }
         }
+      }
+    } transformWith failureHandler
+  }
+
+  def syncWithEacd(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent() { authorisedAgent =>
+      withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
+        eacdSynchronizer.syncWithEacd(matchedArn, authorisedAgent.agentUser).map(_ => Ok)
       }
     } transformWith failureHandler
   }

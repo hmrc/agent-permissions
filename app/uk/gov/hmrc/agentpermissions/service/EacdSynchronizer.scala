@@ -16,69 +16,63 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import akka.actor.ActorSystem
+import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.OptedIn
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.http.{Authorization, HeaderCarrier}
-import uk.gov.hmrc.mongo.lock.{LockService, MongoLockRepository}
+import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.repository.EacdSyncRepository
+import uk.gov.hmrc.agentpermissions.service.userenrolment.AccessGroupSynchronizer
+import uk.gov.hmrc.http.HeaderCarrier
 
-import java.time.Duration.ofSeconds
 import javax.inject.{Inject, Singleton}
-import scala.concurrent.duration.DurationLong
 import scala.concurrent.{ExecutionContext, Future}
 
+@ImplementedBy(classOf[EacdSynchronizerImpl])
+trait EacdSynchronizer {
+  def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupUpdateStatus]]
+}
+
 @Singleton
-class EacdSynchronizer @Inject() (
-  optinService: OptinService,
-  accessGroupsService: AccessGroupsService,
-  mongoLockRepository: MongoLockRepository,
-  actorSystem: ActorSystem,
+class EacdSynchronizerImpl @Inject() (
+  userClientDetailsConnector: UserClientDetailsConnector,
+  accessGroupSynchronizer: AccessGroupSynchronizer,
+  eacdSyncRepository: EacdSyncRepository,
   appConfig: AppConfig
-)(implicit executionContext: ExecutionContext)
-    extends Logging {
+) extends EacdSynchronizer with Logging {
 
-  private lazy val lockService =
-    LockService(mongoLockRepository, lockId = "eacd-sync-lock", ttl = appConfig.eacdSyncIntervalSeconds.seconds)
+  override def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupUpdateStatus]] =
+    eacdSyncRepository.acquire(arn, appConfig.eacdSyncNotBeforeSeconds) flatMap {
+      case None =>
+        logger.debug(s"Skipping EACD sync for '${arn.value}'")
+        Future successful Seq.empty[AccessGroupUpdateStatus]
+      case _ =>
+        logger.info(s"Calling EACD sync for '${arn.value}'")
+        sync(arn, whoIsUpdating)
+    }
 
-  actorSystem.scheduler.scheduleWithFixedDelay(
-    ofSeconds(1),
-    ofSeconds(appConfig.eacdSyncIntervalSeconds),
-    () =>
-      lockService
-        .withLock {
-          logger.info(s"Starting EACD sync process in the background")
-
-          syncOptedInAgents recover { case ex: Exception =>
-            logger.error(s"Problem in EACD sync process: ${ex.getMessage}")
-            Seq.empty[AccessGroupUpdateStatus]
-          }
-        }
-        .map {
-          case Some(_) => logger.info(s"Finished with EACD sync process. Lock has been released.")
-          case None    => logger.warn("Failed to obtain lock for EACD sync process")
-        },
-    executionContext
-  )
-
-  private def syncOptedInAgents: Future[Seq[AccessGroupUpdateStatus]] = {
-
-    // TODO Find a way for backend endpoints to accept requests other than from agent users i.e. one service to another
-    implicit val hc: HeaderCarrier = HeaderCarrier(authorization = Some(Authorization("Bearer XYZ")))
-
+  private def sync(arn: Arn, whoIsUpdating: AgentUser)(implicit hc: HeaderCarrier, ex: ExecutionContext) =
     for {
-      optinRecords <- optinService.getAll
-      optedInRecords = optinRecords.filter(_.status == OptedIn)
-      accessGroupUpdateStatuses <-
-        Future
-          .sequence(
-            optedInRecords.map { optinRecord =>
-              logger.info(s"Calling EACD sync for '${optinRecord.arn.value}'")
-              accessGroupsService.syncWithEacd(optinRecord.arn, optinRecord.history.head.user)
-            }
-          )
-          .map(_.flatten)
-    } yield accessGroupUpdateStatuses
-
-  }
+      maybeOutstandingAssignmentsWorkItemsExist <-
+        userClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn)
+      maybeGroupDelegatedEnrolments <- maybeOutstandingAssignmentsWorkItemsExist match {
+                                         case None => Future successful None
+                                         case Some(outstandingAssignmentsWorkItemsExist) =>
+                                           if (outstandingAssignmentsWorkItemsExist) Future.successful(None)
+                                           else userClientDetailsConnector.getClientsWithAssignedUsers(arn)
+                                       }
+      updateStatuses <-
+        maybeGroupDelegatedEnrolments match {
+          case None =>
+            Future successful Seq.empty[AccessGroupUpdateStatus]
+          case Some(groupDelegatedEnrolments) =>
+            accessGroupSynchronizer.syncWithEacd(arn, groupDelegatedEnrolments, whoIsUpdating)
+        }
+    } yield updateStatuses
 }

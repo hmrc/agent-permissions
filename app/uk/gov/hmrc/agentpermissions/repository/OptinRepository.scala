@@ -35,7 +35,7 @@ import scala.concurrent.{ExecutionContext, Future}
 trait OptinRepository {
   def get(arn: Arn): Future[Option[OptinRecord]]
   def upsert(optinRecord: OptinRecord): Future[Option[UpsertType]]
-  def getAll: Future[Seq[OptinRecord]]
+  def getAll(): Future[Seq[OptinRecord]]
 }
 
 /** Note: This implementation stores some fields encrypted in mongo. (APB-6461)
@@ -71,7 +71,7 @@ class OptinRepositoryImpl @Inject() (
         )
       )
 
-  override def getAll: Future[Seq[OptinRecord]] = collection.find().toFuture().map(_.map(_.decryptedValue))
+  override def getAll(): Future[Seq[OptinRecord]] = collection.find().toFuture().map(_.map(_.decryptedValue))
 
   private def upsertOptions = new ReplaceOptions().upsert(true)
 }

@@ -77,13 +77,14 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
     val mockGroupsService: GroupsService = mock[GroupsService]
+    val mockEacdSynchronizer: EacdSynchronizer = mock[EacdSynchronizer]
     implicit val mockAuthAction: AuthAction = mock[AuthAction]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
     implicit val actorSystem: ActorSystem = ActorSystem()
 
-    val controller = new AccessGroupsController(mockAccessGroupsService, mockGroupsService)
+    val controller = new AccessGroupsController(mockAccessGroupsService, mockGroupsService, mockEacdSynchronizer)
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
@@ -205,10 +206,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
-    def mockAccessGroupsServiceSyncWithEacd(
+    def mockEacdSynchronizerSyncWithEacd(
       accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
     ): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
-      (mockAccessGroupsService
+      (mockEacdSynchronizer
         .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(Future successful accessGroupUpdateStatuses)
@@ -1088,6 +1089,58 @@ class AccessGroupsControllerSpec extends BaseSpec {
             mockGroupsServiceGetGroupSummaries(groupSummaries)
 
             val result = controller.groupNameCheck(arn, "non existing group")(baseRequest)
+
+            status(result) shouldBe OK
+          }
+        }
+      }
+
+    }
+  }
+
+  "Call to sync with EACD" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.syncWithEacd(arn)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "provided arn is not valid" should {
+      s"return $BAD_REQUEST" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        val result = controller.syncWithEacd(invalidArn)(baseRequest)
+
+        status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "provided arn is valid" when {
+
+      "provided arn does not match that identified by auth" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          val result = controller.syncWithEacd(nonMatchingArn)(baseRequest)
+
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "provided arn matches that identified by auth" when {
+
+        "sync is successful" should {
+          s"return $OK" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockEacdSynchronizerSyncWithEacd(Seq(AccessGroupUpdated))
+
+            val result = controller.syncWithEacd(arn)(baseRequest)
 
             status(result) shouldBe OK
           }

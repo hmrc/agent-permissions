@@ -23,7 +23,7 @@ import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
-import uk.gov.hmrc.agentpermissions.service.userenrolment.{AccessGroupSynchronizer, UserEnrolmentAssignmentService}
+import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -69,7 +69,6 @@ class AccessGroupsServiceSpec extends BaseSpec {
     val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
     val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
     val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
-    val mockAccessGroupSynchronizer: AccessGroupSynchronizer = mock[AccessGroupSynchronizer]
     val mockAuditService: AuditService = mock[AuditService]
 
     val accessGroupsService: AccessGroupsService =
@@ -77,7 +76,6 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockAccessGroupsRepository,
         mockUserEnrolmentAssignmentService,
         mockUserClientDetailsConnector,
-        mockAccessGroupSynchronizer,
         mockAuditService
       )
 
@@ -195,16 +193,6 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .outstandingAssignmentsWorkItemsExist(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future successful maybeOutstandingAssignmentsWorkItemsExist)
-
-    def mockAccessGroupSynchronizerSyncWithEacd(
-      accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
-    ): CallHandler5[Arn, GroupDelegatedEnrolments, AgentUser, HeaderCarrier, ExecutionContext, Future[
-      Seq[AccessGroupUpdateStatus]
-    ]] =
-      (mockAccessGroupSynchronizer
-        .syncWithEacd(_: Arn, _: GroupDelegatedEnrolments, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *, *, *)
-        .returning(Future successful accessGroupUpdateStatuses)
 
     def mockAuditServiceAuditEsAssignmentUnassignments()
       : CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Unit] =
@@ -601,56 +589,6 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
         accessGroupsService.getUnassignedClients(arn).futureValue shouldBe
           Set(backendClient2)
-      }
-    }
-  }
-
-  "Syncing with EACD" when {
-
-    "call to check outstanding assignments work items exist returns nothing" should {
-      "neither fetch clients with assigned users nor call access groups synchronizer" in new TestScope {
-        mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(None)
-
-        accessGroupsService.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
-      }
-    }
-
-    "call to check outstanding assignments work items exist returns some value" when {
-
-      "call to check outstanding assignments work items exist returns true" should {
-        "neither fetch clients with assigned users nor call access groups synchronizer" in new TestScope {
-          mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(true))
-
-          accessGroupsService.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
-        }
-      }
-
-      "call to check outstanding assignments work items exist returns false" when {
-
-        "assigned users are not returned by connector" should {
-          "not call access groups synchronizer" in new TestScope {
-            mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
-            mockUserClientDetailsConnectorGetClientsWithAssignedUsers(None)
-
-            accessGroupsService.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
-          }
-        }
-
-        "assigned users are returned by connector" when {
-
-          "call to access groups synchronizer returns non-empty update statuses" should {
-            "indicate access groups were updated" in new TestScope {
-              mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
-              mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
-                Some(GroupDelegatedEnrolments(Seq(assignedClient)))
-              )
-              mockAccessGroupSynchronizerSyncWithEacd(Seq(AccessGroupUpdated))
-
-              accessGroupsService.syncWithEacd(arn, user).futureValue shouldBe Seq(AccessGroupUpdated)
-            }
-          }
-        }
-
       }
     }
   }

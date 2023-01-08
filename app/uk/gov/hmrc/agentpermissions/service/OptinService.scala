@@ -44,7 +44,7 @@ trait OptinService {
 
   def optinRecordExists(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean]
 
-  def getAll: Future[Seq[OptinRecord]]
+  def getAll(): Future[Seq[OptinRecord]]
 }
 
 @Singleton
@@ -97,7 +97,7 @@ class OptinServiceImpl @Inject() (
       maybeOptinRecord <- optinRepository.get(arn)
     } yield maybeOptinRecord.fold(false)(_.status == OptedIn)
 
-  override def getAll: Future[Seq[OptinRecord]] = optinRepository.getAll
+  override def getAll(): Future[Seq[OptinRecord]] = optinRepository.getAll()
 
   private def handleOptinOptout(arn: Arn, agentUser: AgentUser, optinEventType: OptinEventType, lang: Option[String])(
     implicit
