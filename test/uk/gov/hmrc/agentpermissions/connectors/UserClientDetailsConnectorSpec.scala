@@ -18,14 +18,17 @@ package uk.gov.hmrc.agentpermissions.connectors
 
 import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
 import com.kenshoo.play.metrics.Metrics
-import org.scalamock.handlers.CallHandler0
+import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2}
 import play.api.http.Status._
 import play.api.libs.json.{Json, Writes}
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, AssignedClient, Client, GroupDelegatedEnrolments, UserEnrolmentAssignments}
+import play.api.libs.ws.WSRequest
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client, GroupDelegatedEnrolments, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.http.client.{HttpClientV2, RequestBuilder}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpReads, HttpResponse, UpstreamErrorResponse}
 
+import java.net.URL
 import scala.concurrent.{ExecutionContext, Future}
 
 class UserClientDetailsConnectorSpec extends BaseSpec {
@@ -33,6 +36,8 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
   val arn: Arn = Arn("TARN0000001")
 
   val mockHttpClient: HttpClient = mock[HttpClient]
+  val mockHttpClientV2: HttpClientV2 = mock[HttpClientV2]
+  val mockRequestBuilder: RequestBuilder = mock[RequestBuilder]
   val mockMetrics: Metrics = mock[Metrics]
   val noopMetricRegistry = new NoopMetricRegistry
 
@@ -431,10 +436,13 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       "return some value" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
         mockMetricsDefaultRegistry
-        mockHttpGet(
-          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users",
-          HttpResponse(OK, Json.obj("clients" -> Seq.empty[AssignedClient]).toString)
+        mockHttpGetV2(
+          new URL(
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users"
+          )
         )
+        mockRequestBuilderTransform
+        mockRequestBuilderExecute(Some(GroupDelegatedEnrolments(Seq.empty)))
 
         userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe Some(
           GroupDelegatedEnrolments(Seq.empty)
@@ -447,10 +455,13 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
           mockMetricsDefaultRegistry
-          mockHttpGet(
-            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users",
-            HttpResponse(statusCode, "")
+          mockHttpGetV2(
+            new URL(
+              s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users"
+            )
           )
+          mockRequestBuilderTransform
+          mockRequestBuilderExecute(None)
 
           userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe None
         }
@@ -460,7 +471,7 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
 
   trait TestScope {
     lazy val userClientDetailsConnector: UserClientDetailsConnector =
-      new UserClientDetailsConnectorImpl(mockHttpClient, mockMetrics)
+      new UserClientDetailsConnectorImpl(mockHttpClient, mockHttpClientV2, mockMetrics)
 
     def mockAppConfigAgentUserClientDetailsBaseUrl: CallHandler0[String] =
       (mockAppConfig.agentUserClientDetailsBaseUrl _)
@@ -482,6 +493,25 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         ))
         .expects(url, *, *, *, *, *)
         .returning(Future.successful(response))
+
+    def mockHttpGetV2[A](url: URL): Unit =
+      (mockHttpClientV2
+        .get(_: URL)(_: HeaderCarrier))
+        .expects(url, *)
+        .returning(mockRequestBuilder)
+
+    def mockRequestBuilderTransform: CallHandler1[WSRequest => WSRequest, RequestBuilder] =
+      (mockRequestBuilder.transform(_: WSRequest => WSRequest)).expects(*).returning(mockRequestBuilder)
+
+    def mockRequestBuilderExecute(
+      maybeGroupDelegatedEnrolments: Option[GroupDelegatedEnrolments]
+    ): CallHandler2[HttpReads[
+      Option[GroupDelegatedEnrolments]
+    ], ExecutionContext, Future[Option[GroupDelegatedEnrolments]]] =
+      (mockRequestBuilder
+        .execute(_: HttpReads[Option[GroupDelegatedEnrolments]], _: ExecutionContext))
+        .expects(*, *)
+        .returning(Future successful maybeGroupDelegatedEnrolments)
 
     def mockHttpPost[I, A](url: String, response: A): Unit =
       (mockHttpClient

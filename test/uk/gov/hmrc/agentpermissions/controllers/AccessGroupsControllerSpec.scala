@@ -206,13 +206,21 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
-    def mockEacdSynchronizerSyncWithEacd(
+    def mockEacdSynchronizerSyncWithEacdNoException(
       accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
     ): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
       (mockEacdSynchronizer
         .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(Future successful accessGroupUpdateStatuses)
+
+    def mockEacdSynchronizerSyncWithEacdHasException(
+      ex: Exception
+    ): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
+      (mockEacdSynchronizer
+        .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future failed ex)
 
     def mockGroupsServiceGetGroupSummariesForClient(
       accessGroupSummaries: Seq[AccessGroupSummary]
@@ -1138,7 +1146,18 @@ class AccessGroupsControllerSpec extends BaseSpec {
         "sync is successful" should {
           s"return $OK" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockEacdSynchronizerSyncWithEacd(Seq(AccessGroupUpdated))
+            mockEacdSynchronizerSyncWithEacdNoException(Seq(AccessGroupUpdated))
+
+            val result = controller.syncWithEacd(arn)(baseRequest)
+
+            status(result) shouldBe OK
+          }
+        }
+
+        "sync throws exception" should {
+          s"return $OK" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockEacdSynchronizerSyncWithEacdHasException(new RuntimeException("boo boo"))
 
             val result = controller.syncWithEacd(arn)(baseRequest)
 
