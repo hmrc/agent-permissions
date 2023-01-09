@@ -32,6 +32,7 @@ trait AppConfig {
   def teamMembersRemovalChunkSize: Int
   def accessGroupChunkSize: Int
   def useEnrolmentAssignmentsChunkSize: Int
+  def eacdSyncNotBeforeSeconds: Int
 }
 
 @Singleton
@@ -45,4 +46,5 @@ class AppConfigImpl @Inject() (servicesConfig: ServicesConfig, configuration: Co
   override lazy val accessGroupChunkSize: Int = servicesConfig.getInt("audit.access-group-chunk-size")
   override lazy val useEnrolmentAssignmentsChunkSize: Int =
     servicesConfig.getInt("audit.user-enrolment-assignments-chunk-size")
+  override lazy val eacdSyncNotBeforeSeconds: Int = configuration.underlying.getInt("eacdsync.notBeforeSeconds")
 }

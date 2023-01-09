@@ -77,13 +77,14 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
     val mockGroupsService: GroupsService = mock[GroupsService]
+    val mockEacdSynchronizer: EacdSynchronizer = mock[EacdSynchronizer]
     implicit val mockAuthAction: AuthAction = mock[AuthAction]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
     implicit val actorSystem: ActorSystem = ActorSystem()
 
-    val controller = new AccessGroupsController(mockAccessGroupsService, mockGroupsService)
+    val controller = new AccessGroupsController(mockAccessGroupsService, mockGroupsService, mockEacdSynchronizer)
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
@@ -205,13 +206,21 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
-    def mockAccessGroupsServiceSyncWithEacd(
+    def mockEacdSynchronizerSyncWithEacdNoException(
       accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
     ): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
-      (mockAccessGroupsService
+      (mockEacdSynchronizer
         .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(Future successful accessGroupUpdateStatuses)
+
+    def mockEacdSynchronizerSyncWithEacdHasException(
+      ex: Exception
+    ): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
+      (mockEacdSynchronizer
+        .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future failed ex)
 
     def mockGroupsServiceGetGroupSummariesForClient(
       accessGroupSummaries: Seq[AccessGroupSummary]
@@ -1137,7 +1146,18 @@ class AccessGroupsControllerSpec extends BaseSpec {
         "sync is successful" should {
           s"return $OK" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockAccessGroupsServiceSyncWithEacd(Seq(AccessGroupUpdated))
+            mockEacdSynchronizerSyncWithEacdNoException(Seq(AccessGroupUpdated))
+
+            val result = controller.syncWithEacd(arn)(baseRequest)
+
+            status(result) shouldBe OK
+          }
+        }
+
+        "sync throws exception" should {
+          s"return $OK" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockEacdSynchronizerSyncWithEacdHasException(new RuntimeException("boo boo"))
 
             val result = controller.syncWithEacd(arn)(baseRequest)
 

@@ -22,7 +22,7 @@ import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
-import uk.gov.hmrc.agentpermissions.service.userenrolment.{AccessGroupSynchronizer, UserEnrolmentAssignmentService}
+import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -65,10 +65,6 @@ trait AccessGroupsService {
 
   def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
 
-  def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): Future[Seq[AccessGroupUpdateStatus]]
 }
 
 @Singleton
@@ -76,7 +72,6 @@ class AccessGroupsServiceImpl @Inject() (
   accessGroupsRepository: AccessGroupsRepository,
   userEnrolmentAssignmentService: UserEnrolmentAssignmentService,
   userClientDetailsConnector: UserClientDetailsConnector,
-  accessGroupSynchronizer: AccessGroupSynchronizer,
   auditService: AuditService
 ) extends AccessGroupsService with Logging {
 
@@ -234,27 +229,6 @@ class AccessGroupsServiceImpl @Inject() (
 
   private def mergeWhoIsUpdating(accessGroup: AccessGroup, whoIsUpdating: AgentUser): Future[AccessGroup] =
     Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
-
-  override def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): Future[Seq[AccessGroupUpdateStatus]] =
-    for {
-      maybeOutstandingAssignmentsWorkItemsExist <- userClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn)
-      maybeGroupDelegatedEnrolments <- maybeOutstandingAssignmentsWorkItemsExist match {
-                                         case None => Future successful None
-                                         case Some(outstandingAssignmentsWorkItemsExist) =>
-                                           if (outstandingAssignmentsWorkItemsExist) Future.successful(None)
-                                           else userClientDetailsConnector.getClientsWithAssignedUsers(arn)
-                                       }
-      updateStatuses <-
-        maybeGroupDelegatedEnrolments match {
-          case None =>
-            Future successful Seq.empty[AccessGroupUpdateStatus]
-          case Some(groupDelegatedEnrolments) =>
-            accessGroupSynchronizer.syncWithEacd(arn, groupDelegatedEnrolments, whoIsUpdating)
-        }
-    } yield updateStatuses
 
   private def pushAssignments(maybeCalculatedAssignments: Option[UserEnrolmentAssignments])(implicit
     hc: HeaderCarrier,

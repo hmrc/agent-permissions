@@ -24,12 +24,13 @@ import play.api.http.Status._
 import uk.gov.hmrc.agent.kenshoo.monitoring.HttpAPIMonitor
 import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client, GroupDelegatedEnrolments, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.http.HttpReads.Implicits.readRaw
 import uk.gov.hmrc.http.HttpReads.is5xx
-import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpResponse, UpstreamErrorResponse}
+import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpResponse, Upstream4xxResponse, UpstreamErrorResponse}
 
 import java.net.URL
 import javax.inject.{Inject, Singleton}
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
@@ -67,8 +68,11 @@ trait UserClientDetailsConnector {
 }
 
 @Singleton
-class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metrics)(implicit appConfig: AppConfig)
-    extends UserClientDetailsConnector with HttpAPIMonitor with Logging {
+class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, httpV2: HttpClientV2, metrics: Metrics)(implicit
+  appConfig: AppConfig
+) extends UserClientDetailsConnector with HttpAPIMonitor with Logging {
+
+  import uk.gov.hmrc.http.HttpReads.Implicits._
 
   override val kenshooRegistry: MetricRegistry = metrics.defaultRegistry
 
@@ -243,15 +247,14 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, metrics: Metri
     val url = new URL(aucdBaseUrl, s"/agent-user-client-details/arn/${arn.value}/clients-assigned-users")
 
     monitor("ConsumedAPI-AgentUserClientDetails-ClientsWithAssignedUsers-GET") {
-      http.GET[HttpResponse](url).map { response =>
-        response.status match {
-          case OK =>
-            Some(response.json.as[GroupDelegatedEnrolments])
-          case other =>
-            logger.warn(s"Received $other status: ${response.body}")
-            None
+      httpV2
+        .get(url)
+        .transform(ws => ws.withRequestTimeout(30.minutes))
+        .execute[Option[GroupDelegatedEnrolments]]
+        .recover { case Upstream4xxResponse(message, upstreamResponseCode, _, _) =>
+          logger.warn(s"Received $upstreamResponseCode status: $message")
+          Option.empty[GroupDelegatedEnrolments]
         }
-      }
     }
   }
 }

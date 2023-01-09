@@ -95,6 +95,14 @@ class OptinRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySuppor
       }
     }
 
+    "fetching all" should {
+      "return all" in new TestScope {
+        optinRepository.upsert(optinRecord).futureValue
+
+        optinRepository.getAll.futureValue shouldBe Seq(optinRecord)
+      }
+    }
+
   }
 
   override protected def repository: PlayMongoRepository[SensitiveOptinRecord] =

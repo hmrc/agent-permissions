@@ -57,6 +57,9 @@ class OptinServiceSpec extends BaseSpec {
     def mockOptinRepositoryGet(maybeOptinRecord: Option[OptinRecord]): CallHandler1[Arn, Future[Option[OptinRecord]]] =
       (mockOptinRepository.get(_: Arn)).expects(arn).returning(Future.successful(maybeOptinRecord))
 
+    def mockOptinRepositoryGetAll(optinRecords: Seq[OptinRecord]) =
+      (mockOptinRepository.getAll: () => Future[Seq[OptinRecord]]).expects().returning(Future successful optinRecords)
+
     def mockOptinRecordBuilderForUpdating(
       maybeExistingOptinRecord: Option[OptinRecord],
       maybeOptinRecordToUpdate: Option[OptinRecord],
@@ -309,6 +312,26 @@ class OptinServiceSpec extends BaseSpec {
       }
     }
 
+  }
+
+  "Calling getAll" should {
+    "work" in new TestScope {
+      val now: LocalDateTime = LocalDateTime.now()
+
+      val optinRecord: OptinRecord = OptinRecord(
+        arn,
+        List(
+          OptinEvent(OptedOut, user, now.minusSeconds(1)),
+          OptinEvent(OptedIn, user, now.minusSeconds(2)),
+          OptinEvent(OptedOut, user, now.minusSeconds(3)),
+          OptinEvent(OptedIn, user, now.minusSeconds(4))
+        )
+      )
+
+      mockOptinRepositoryGetAll(Seq(optinRecord))
+
+      optinService.getAll().futureValue shouldBe Seq(optinRecord)
+    }
   }
 
 }
