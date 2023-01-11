@@ -41,7 +41,8 @@ Even though custom access groups and tax service groups are separate, they canno
 | GET    | /groups/:groupId      | Gets custom access group based on groupId                | true |
 | PATCH  | /groups/:groupId      | Updates a group (name, clients, team members) from their groupId             | false |
 | DELETE | /groups/:groupId      | Deletes a group from their groupId             | false |
-
+| GET    | /group/:groupId/clients  | Gets paginated list of clients from group, can search/filter   | true |
+|
 ### Create & Manage tax service groups
 | **Method** | **Path**          | **Description**                           |Allows Assistant user|
 |------------|-------------------|-------------------------------------------|----|
