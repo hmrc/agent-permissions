@@ -529,7 +529,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
               taxServiceGroup.groupName,
               None,
               0,
-              taxService = taxServiceGroup.service
+              taxService = Some(taxServiceGroup.service)
             )
           )
         }
