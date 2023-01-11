@@ -9,6 +9,8 @@ lazy val microservice = Project(appName, file("."))
   .enablePlugins(play.sbt.PlayScala, SbtDistributablesPlugin)
   .settings(
     PlayKeys.playDefaultPort         := 9447,
+    PlayKeys.devSettings             += "play.ws.timeout.idle" -> "18000 seconds",
+    PlayKeys.devSettings             += "play.ws.timeout.request" -> "600 seconds",
     routesImport                     ++= Seq("uk.gov.hmrc.agentpermissions.binders.Binders._"),
     majorVersion                     := 0,
     scalaVersion                     := "2.12.15",

@@ -249,7 +249,7 @@ class UserClientDetailsConnectorImpl @Inject() (http: HttpClient, httpV2: HttpCl
     monitor("ConsumedAPI-AgentUserClientDetails-ClientsWithAssignedUsers-GET") {
       httpV2
         .get(url)
-        .transform(ws => ws.withRequestTimeout(30.minutes))
+        .transform(ws => ws.withRequestTimeout(300.minutes))
         .execute[Option[GroupDelegatedEnrolments]]
         .recover { case Upstream4xxResponse(message, upstreamResponseCode, _, _) =>
           logger.warn(s"Received $upstreamResponseCode status: $message")
