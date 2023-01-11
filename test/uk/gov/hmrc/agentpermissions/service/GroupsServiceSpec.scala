@@ -72,13 +72,13 @@ class GroupsServiceSpec extends BaseSpec {
     def groupSummary(
       id: ObjectId = new ObjectId(),
       name: String = groupName,
-      isCustomGroup: Boolean = true
+      taxService: String = ""
     ): AccessGroupSummary =
-      AccessGroupSummary(id.toHexString, name, if (isCustomGroup) Some(3) else None, 3, isCustomGroup)
+      AccessGroupSummary(id.toHexString, name, if (taxService.isEmpty) Some(3) else None, 3, taxService)
 
     val taxSummaries = Seq(
-      groupSummary(name = "Capital Gains Tax", isCustomGroup = false),
-      groupSummary(name = "VAT", isCustomGroup = false)
+      groupSummary(name = "Capital Gains Tax", taxService = serviceCgt),
+      groupSummary(name = "VAT", taxService = serviceVat)
     )
 
     val customSummaries = Seq(
@@ -88,7 +88,7 @@ class GroupsServiceSpec extends BaseSpec {
     )
     val mixedSummaries = Seq(
       groupSummary(),
-      groupSummary(name = "VAT", isCustomGroup = false)
+      groupSummary(name = "VAT", taxService = serviceVat)
     )
 
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
@@ -198,9 +198,9 @@ class GroupsServiceSpec extends BaseSpec {
 
         groupsService.getAllGroupSummaries(arn).futureValue shouldBe
           Seq(
-            AccessGroupSummary(taxGroup._id.toHexString, "Capital Gains Tax", None, 1, isCustomGroup = false),
-            AccessGroupSummary(accessGroup._id.toHexString, "some group", Some(3), 3, isCustomGroup = true),
-            AccessGroupSummary(taxGroup._id.toHexString, "VAT", None, 3, isCustomGroup = false)
+            AccessGroupSummary(taxGroup._id.toHexString, "Capital Gains Tax", None, 1, taxService = serviceCgt),
+            AccessGroupSummary(accessGroup._id.toHexString, "some group", Some(3), 3, ""),
+            AccessGroupSummary(taxGroup._id.toHexString, "VAT", None, 3, taxService = serviceVat)
           )
       }
     }

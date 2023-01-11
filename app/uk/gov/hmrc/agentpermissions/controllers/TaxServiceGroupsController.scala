@@ -69,13 +69,13 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  // gets access group summaries for tax service groups ONLY
+  // gets access group summaries for tax service groups ONLY, without client count
   def groups(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         taxGroupsService
           .getAllTaxServiceGroups(arn)
-          .map(groups => Ok(Json.toJson(groups.map(AccessGroupSummary.convertTaxServiceGroup))))
+          .map(groups => Ok(Json.toJson(groups.map(group => AccessGroupSummary.convertTaxServiceGroup(group)))))
       }
     } transformWith failureHandler
   }

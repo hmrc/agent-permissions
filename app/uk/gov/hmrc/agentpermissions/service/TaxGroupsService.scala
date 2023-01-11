@@ -163,7 +163,7 @@ class TaxGroupsServiceImpl @Inject() (
       .map(accessGroups =>
         accessGroups
           .filter(_.teamMembers.fold(false)(_.map(_.id).contains(userId)))
-          .map(AccessGroupSummary.convertTaxServiceGroup)
+          .map(group => AccessGroupSummary.convertTaxServiceGroup(group))
       )
 
   override def delete(
