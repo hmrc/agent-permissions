@@ -364,7 +364,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         accessGroupsService
           .getCustomGroupSummariesForClient(arn, s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789")
           .futureValue shouldBe
-          Seq(AccessGroupSummary(ag1._id.toHexString, "some group", Some(3), 3, isCustomGroup = true))
+          Seq(AccessGroupSummary(ag1._id.toHexString, "some group", Some(3), 3, ""))
       }
     }
   }
@@ -382,7 +382,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         )
 
         accessGroupsService.getCustomGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
-          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", Some(3), 1, isCustomGroup = true))
+          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", Some(3), 1, ""))
       }
     }
   }
