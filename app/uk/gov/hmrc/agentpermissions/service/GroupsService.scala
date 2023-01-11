@@ -55,6 +55,7 @@ class GroupsServiceImpl @Inject() (
       customGroups <- customGroupsService.getAllCustomGroups(arn)
       customSummaries = customGroups.map(AccessGroupSummary.convertCustomGroup)
       taxGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
+      // TODO add taxGroupClientCount <- taxGroupsService.clientCountForTaxGroups(arn)
       taxSummaries = taxGroups.map(group => AccessGroupSummary.convertTaxServiceGroup(group))
       combinedSorted = (customSummaries ++ taxSummaries).sortBy(_.groupName.toLowerCase())
     } yield combinedSorted

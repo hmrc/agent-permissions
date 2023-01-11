@@ -535,7 +535,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       }
 
       "calls to fetch groups returns empty collections" should {
-        s"return $NOT_FOUND" in new TestScope {
+        s"return $OK" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetGroups(Seq.empty)
 
@@ -567,6 +567,87 @@ class AccessGroupsControllerSpec extends BaseSpec {
           mockAccessGroupsServiceGetGroupsWithException(new RuntimeException("boo boo"))
 
           val result = controller.groups(arn)(baseRequest)
+
+          status(result) shouldBe INTERNAL_SERVER_ERROR
+        }
+      }
+
+    }
+  }
+
+  "Call to fetch paginated clients from a group" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.getPaginatedClientsForGroup(accessGroup._id.toHexString)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "provided arn is valid" when {
+
+      "provided arn in group does not match that identified by auth" should {
+        s"return $FORBIDDEN" in new TestScope {
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup))
+
+          val result = controller.getPaginatedClientsForGroup(accessGroup._id.toHexString)(baseRequest)
+
+          status(result) shouldBe FORBIDDEN
+        }
+      }
+
+      "calls to fetch a group by id returns not found" should {
+        s"return $NOT_FOUND" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(None)
+
+          val result = controller.getPaginatedClientsForGroup(accessGroup._id.toHexString)(baseRequest)
+
+          status(result) shouldBe NOT_FOUND
+        }
+      }
+
+      "calls to fetch paginated clients from a group returns data" should {
+
+        s"return $OK and paginated list of groups clients sorted A-Z" in new TestScope {
+          // given
+          val dbId2 = new ObjectId()
+          val clients = (1 to 20).map(i => Client("HMRC-MTD-VAT~VRN~101747642", s"Ross Barker $i"))
+          val accessGroup2 = accessGroup.copy(_id = dbId2, clients = Some(clients.toSet))
+
+          val sortedClients = clients.sortBy(c => c.friendlyName)
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup2))
+
+          val result = controller.getPaginatedClientsForGroup(accessGroup2._id.toHexString, 1, 10)(baseRequest)
+
+          status(result) shouldBe OK
+          contentAsJson(result).as[PaginatedList[Client]] shouldBe PaginatedList(
+            pageContent = sortedClients.take(10),
+            paginationMetaData = PaginationMetaData(
+              lastPage = false,
+              firstPage = true,
+              totalSize = 20,
+              totalPages = 2,
+              pageSize = 10,
+              currentPageNumber = 1,
+              currentPageSize = 10
+            )
+          )
+        }
+      }
+
+      "call to fetch paginated clients from a group throws exception" should {
+        s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupByIdWithException(new RuntimeException("boo boo"))
+
+          val result = controller.getPaginatedClientsForGroup(accessGroup._id.toHexString)(baseRequest)
 
           status(result) shouldBe INTERNAL_SERVER_ERROR
         }

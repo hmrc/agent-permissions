@@ -19,6 +19,7 @@ package uk.gov.hmrc.agentpermissions.controllers
 import play.api.libs.json._
 import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.utils.PaginatedListBuilder
 import uk.gov.hmrc.agentpermissions.model.{AddMembersToAccessGroupRequest, CreateAccessGroupRequest, UpdateAccessGroupRequest}
 import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.auth.core.AuthorisationException
@@ -39,7 +40,7 @@ class AccessGroupsController @Inject() (
 
   private val MAX_LENGTH_GROUP_NAME = 32
 
-  // checks access groups names for duplicates
+  // checks all group names for duplicates
   def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
@@ -150,6 +151,44 @@ class AccessGroupsController @Inject() (
             Forbidden
           } else {
             Ok(Json.toJson(accessGroup))
+          }
+      }
+    } transformWith failureHandler
+  }
+
+  def getPaginatedClientsForGroup(
+    gid: String,
+    page: Int = 1,
+    pageSize: Int = 20,
+    search: Option[String] = None,
+    filter: Option[String] = None
+  ): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
+      accessGroupsService.getById(gid) map {
+        case None =>
+          NotFound
+        case Some(accessGroup) =>
+          if (accessGroup.arn != authorisedAgent.arn) {
+            logger.info("ARN obtained from provided group id did not match with that identified by auth")
+            Forbidden
+          } else {
+            val groupClients = accessGroup.clients.getOrElse(Set.empty)
+            val clientsMatchingSearch = search.fold(groupClients) { searchTerm =>
+              groupClients.filter(c => c.friendlyName.toLowerCase.contains(searchTerm.toLowerCase))
+            }
+            val taxServiceFilteredClients = filter.fold(clientsMatchingSearch) { term =>
+              if (term == "TRUST") clientsMatchingSearch.filter(_.enrolmentKey.contains("HMRC-TERS"))
+              else clientsMatchingSearch.filter(_.enrolmentKey.contains(term))
+            }
+            Ok(
+              Json.toJson(
+                PaginatedListBuilder.build[Client](
+                  page,
+                  pageSize,
+                  taxServiceFilteredClients.toSeq.sortBy(c => c.friendlyName.toLowerCase)
+                )
+              )
+            )
           }
       }
     } transformWith failureHandler
