@@ -15,6 +15,7 @@ GET     /arn/:arn/all-groups                    uk.gov.hmrc.agentpermissions.con
 POST    /arn/:arn/groups                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/groups                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
+GET     /custom-group/:gid               uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getCustomGroupSummary(gid: String)
 DELETE  /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
 PATCH   /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
 PUT     /groups/:gid/add-unassigned      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: String)

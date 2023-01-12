@@ -140,6 +140,7 @@ class AccessGroupsController @Inject() (
   }
 
   // gets a custom access group ONLY
+  @deprecated("group could be too big with 5000+ clients - use getCustomGroupSummary & paginated lists instead")
   def getGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       accessGroupsService.getById(gid) map {
@@ -151,6 +152,22 @@ class AccessGroupsController @Inject() (
             Forbidden
           } else {
             Ok(Json.toJson(accessGroup))
+          }
+      }
+    } transformWith failureHandler
+  }
+
+  def getCustomGroupSummary(gid: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
+      accessGroupsService.getById(gid) map {
+        case None =>
+          NotFound
+        case Some(accessGroup) =>
+          if (accessGroup.arn != authorisedAgent.arn) {
+            logger.info("ARN obtained from provided group id did not match with that identified by auth")
+            Forbidden
+          } else {
+            Ok(Json.toJson(AccessGroupSummary.convertCustomGroup(accessGroup)))
           }
       }
     } transformWith failureHandler

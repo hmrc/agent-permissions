@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.controllers
 import akka.actor.ActorSystem
 import org.bson.types.ObjectId
 import org.scalamock.handlers.{CallHandler3, CallHandler4, CallHandler5}
-import play.api.libs.json.{JsArray, JsString, JsValue, Json}
+import play.api.libs.json.{JsArray, JsNumber, JsString, JsValue, Json}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
@@ -808,6 +808,87 @@ class AccessGroupsControllerSpec extends BaseSpec {
           mockAccessGroupsServiceGetGroupByIdWithException(new RuntimeException("boo boo"))
 
           val result = controller.getGroup(dbId.toHexString)(baseRequest)
+
+          status(result) shouldBe INTERNAL_SERVER_ERROR
+        }
+      }
+
+    }
+
+  }
+
+  "Call to fetch custom group summary" when {
+
+    "authorised agent is not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(None)
+
+        val result = controller.getCustomGroupSummary(dbId.toHexString)(baseRequest)
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+
+    "group id is not in the expected format" should {
+      s"return $NOT_FOUND" in new TestScope {
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        mockAccessGroupsServiceGetGroupById(None)
+
+        val result = controller.getCustomGroupSummary("bad")(baseRequest)
+
+        status(result) shouldBe NOT_FOUND
+      }
+    }
+
+    "group id is in the expected format" when {
+
+      "auth identifies a different arn than that obtained from provided group id" should {
+        s"return $FORBIDDEN" in new TestScope {
+          val nonMatchingArn: Arn = Arn("FARN3782960")
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup))
+
+          val result = controller.getCustomGroupSummary(dbId.toHexString)(baseRequest)
+
+          status(result) shouldBe FORBIDDEN
+        }
+      }
+
+      "call to fetch group details returns nothing" should {
+        s"return $NOT_FOUND" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(None)
+
+          val result = controller.getCustomGroupSummary(dbId.toHexString)(baseRequest)
+
+          status(result) shouldBe NOT_FOUND
+        }
+      }
+
+      "call to fetch group details returns an access group" should {
+        s"return $OK" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(Some(accessGroup))
+
+          val result = controller.getCustomGroupSummary(dbId.toHexString)(baseRequest)
+
+          status(result) shouldBe OK
+
+          val generatedJson: JsValue = contentAsJson(result)
+
+          (generatedJson \ "groupId").get shouldBe JsString(dbId.toHexString)
+          (generatedJson \ "groupName").get shouldBe JsString(groupName)
+          (generatedJson \ "clientCount").get shouldBe JsNumber(0)
+          (generatedJson \ "teamMemberCount").get shouldBe JsNumber(0)
+        }
+      }
+
+      "call to fetch group details throws exception" should {
+        s"return $INTERNAL_SERVER_ERROR" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupByIdWithException(new RuntimeException("boo boo"))
+
+          val result = controller.getCustomGroupSummary(dbId.toHexString)(baseRequest)
 
           status(result) shouldBe INTERNAL_SERVER_ERROR
         }
