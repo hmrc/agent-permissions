@@ -67,12 +67,16 @@ class AccessGroupsControllerSpec extends BaseSpec {
         Some(Set.empty)
       )
 
-    def groupSummary(id: ObjectId = dbId, name: String = groupName, taxService: String = ""): AccessGroupSummary =
+    def groupSummary(
+      id: ObjectId = dbId,
+      name: String = groupName,
+      taxService: Option[String] = None
+    ): AccessGroupSummary =
       AccessGroupSummary(id.toHexString, name, if (taxService.isEmpty) Some(3) else None, 3, taxService)
 
     val groupSummaries = Seq(
       groupSummary(),
-      groupSummary(dbId, "Capital Gains Tax", taxService = serviceCgt)
+      groupSummary(dbId, "Capital Gains Tax", taxService = Some(serviceCgt))
     )
 
     val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
@@ -466,7 +470,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
           val dbId2 = new ObjectId()
 
           val sortedGroupSummaries = Seq(
-            groupSummary(dbId, "Capital Gains Tax", taxService = serviceCgt),
+            groupSummary(dbId, "Capital Gains Tax", taxService = Some(serviceCgt)),
             groupSummary(dbId2, "Over done"),
             groupSummary()
           )
@@ -478,9 +482,9 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
           status(result) shouldBe OK
           contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
-            AccessGroupSummary(taxServiceGroup._id.toHexString, "Capital Gains Tax", None, 3, serviceCgt),
-            AccessGroupSummary(dbId2.toHexString, "Over done", Some(3), 3, ""),
-            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(3), 3, "")
+            AccessGroupSummary(taxServiceGroup._id.toHexString, "Capital Gains Tax", None, 3, Some(serviceCgt)),
+            AccessGroupSummary(dbId2.toHexString, "Over done", Some(3), 3),
+            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(3), 3)
           )
         }
       }
@@ -556,7 +560,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
           status(result) shouldBe OK
           contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
-            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(0), 0, "")
+            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(0), 0)
           )
         }
       }
@@ -909,7 +913,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       status(result) shouldBe OK
 
       contentAsJson(result) shouldBe Json.parse(
-        s"""[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":3,"teamMemberCount":3,"taxService":""}]"""
+        s"""[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":3,"teamMemberCount":3}]"""
       )
 
     }
@@ -945,7 +949,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       status(result) shouldBe OK
 
       contentAsJson(result) shouldBe Json.parse(
-        s"""[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":3,"teamMemberCount":3,"taxService":""}]"""
+        s"""[{"groupId":"${dbId.toHexString}","groupName":"$groupName","clientCount":3,"teamMemberCount":3}]"""
       )
 
     }

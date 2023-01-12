@@ -294,7 +294,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
         mockTaxGroupsRepositoryGetAll(Seq(ag1, ag2))
 
         taxGroupsService.getTaxGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
-          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", None, 1, taxService = serviceVat))
+          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", None, 1, taxService = Some(serviceVat)))
       }
     }
   }
