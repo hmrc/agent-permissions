@@ -38,7 +38,8 @@ Even though custom access groups and tax service groups are separate, they canno
 |------------|-------------------|-------------------------------------------|----|
 | POST   | /arn/:arn/groups      | Creates a custom access group. Returns CREATED          | false |
 | GET    | /arn/:arn/groups      | Gets summaries of custom groups ONLY   | true |
-| GET    | /groups/:groupId      | Gets custom access group based on groupId                | true |
+| GET    | /groups/:groupId      | Deprecated for 1000+ get summary and paginated list instead. Gets custom access group based on groupId               | true |
+| GET    | /custom-group/:groupId  | Gets custom group summary based on groupId                | true |
 | PATCH  | /groups/:groupId      | Updates a group (name, clients, team members) from their groupId             | false |
 | DELETE | /groups/:groupId      | Deletes a group from their groupId             | false |
 | GET    | /group/:groupId/clients  | Gets paginated list of clients from group, can search/filter   | true |
