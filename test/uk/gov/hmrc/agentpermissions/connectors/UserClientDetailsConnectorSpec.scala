@@ -53,10 +53,14 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         val clientCount = 10
         mockAppConfigAgentUserClientDetailsBaseUrl
         mockMetricsDefaultRegistry
-        mockHttpGet(
-          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/agent-size",
-          HttpResponse(OK, Json.obj("client-count" -> clientCount).toString)
+
+        mockHttpGetV2(
+          new URL(
+            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/agent-size"
+          )
         )
+        mockRequestBuilderTransform
+        mockRequestBuilderExecuteWithoutException(AgentClientSize(10))
 
         userClientDetailsConnector.agentSize(arn).futureValue shouldBe Some(clientCount)
       }
@@ -67,10 +71,13 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
           mockMetricsDefaultRegistry
-          mockHttpGet(
-            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/agent-size",
-            HttpResponse(statusCode, "")
+          mockHttpGetV2(
+            new URL(
+              s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/agent-size"
+            )
           )
+          mockRequestBuilderTransform
+          mockRequestBuilderExecuteWithException(UpstreamErrorResponse("boo boo", statusCode))
 
           userClientDetailsConnector.agentSize(arn).futureValue shouldBe None
         }
@@ -442,7 +449,7 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
           )
         )
         mockRequestBuilderTransform
-        mockRequestBuilderExecute(Some(GroupDelegatedEnrolments(Seq.empty)))
+        mockRequestBuilderExecuteWithoutException(GroupDelegatedEnrolments(Seq.empty))
 
         userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe Some(
           GroupDelegatedEnrolments(Seq.empty)
@@ -461,7 +468,7 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
             )
           )
           mockRequestBuilderTransform
-          mockRequestBuilderExecute(None)
+          mockRequestBuilderExecuteWithException(UpstreamErrorResponse("boo boo", statusCode))
 
           userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe None
         }
@@ -503,15 +510,21 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     def mockRequestBuilderTransform: CallHandler1[WSRequest => WSRequest, RequestBuilder] =
       (mockRequestBuilder.transform(_: WSRequest => WSRequest)).expects(*).returning(mockRequestBuilder)
 
-    def mockRequestBuilderExecute(
-      maybeGroupDelegatedEnrolments: Option[GroupDelegatedEnrolments]
-    ): CallHandler2[HttpReads[
-      Option[GroupDelegatedEnrolments]
-    ], ExecutionContext, Future[Option[GroupDelegatedEnrolments]]] =
+    def mockRequestBuilderExecuteWithoutException[A](
+      value: A
+    ): CallHandler2[HttpReads[A], ExecutionContext, Future[A]] =
       (mockRequestBuilder
-        .execute(_: HttpReads[Option[GroupDelegatedEnrolments]], _: ExecutionContext))
+        .execute(_: HttpReads[A], _: ExecutionContext))
         .expects(*, *)
-        .returning(Future successful maybeGroupDelegatedEnrolments)
+        .returning(Future successful value)
+
+    def mockRequestBuilderExecuteWithException[A](
+      ex: Exception
+    ): CallHandler2[HttpReads[A], ExecutionContext, Future[A]] =
+      (mockRequestBuilder
+        .execute(_: HttpReads[A], _: ExecutionContext))
+        .expects(*, *)
+        .returning(Future failed ex)
 
     def mockHttpPost[I, A](url: String, response: A): Unit =
       (mockHttpClient
