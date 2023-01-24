@@ -270,7 +270,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
             val result = controller.createGroup(arn)(
               baseRequest
-                .withBody(jsonPayloadForCreateGroup("0123456789012345678901234567890123"))
+                .withBody(jsonPayloadForCreateGroup("0123456789012345678901234567890123456789012345678901"))
             )
 
             status(result) shouldBe BAD_REQUEST
@@ -871,7 +871,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
             val result = controller.updateGroup(dbId.toHexString)(
               baseRequest
-                .withBody(jsonPayloadForUpdatingGroup("0123456789012345678901234567890123"))
+                .withBody(jsonPayloadForUpdatingGroup("0123456789012345678901234567890123456789012345678901"))
             )
 
             status(result) shouldBe BAD_REQUEST
