@@ -36,7 +36,7 @@ class AccessGroupsController @Inject() (
 )(implicit authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
     extends BackendController(cc) with AuthorisedAgentSupport {
 
-  private val MAX_LENGTH_GROUP_NAME = 32
+  private val MAX_LENGTH_GROUP_NAME = 50 // 32
 
   // checks access groups names for duplicates
   def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>

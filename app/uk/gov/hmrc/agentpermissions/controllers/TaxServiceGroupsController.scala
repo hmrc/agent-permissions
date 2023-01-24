@@ -36,7 +36,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
   val ec: ExecutionContext
 ) extends BackendController(cc) with AuthorisedAgentSupport {
 
-  private val MAX_LENGTH_GROUP_NAME = 32
+  private val MAX_LENGTH_GROUP_NAME = 50 // 32
 
   def createGroup(arn: Arn): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
