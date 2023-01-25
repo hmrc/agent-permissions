@@ -48,31 +48,33 @@ class EacdSynchronizerImpl @Inject() (
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Seq[AccessGroupUpdateStatus]] =
-    eacdSyncRepository.acquire(arn, appConfig.eacdSyncNotBeforeSeconds) flatMap {
-      case None =>
-        logger.debug(s"Skipping EACD sync for '${arn.value}'")
-        Future successful Seq.empty[AccessGroupUpdateStatus]
-      case _ =>
-        logger.info(s"Calling EACD sync for '${arn.value}'")
-        sync(arn, whoIsUpdating)
-    }
-
-  private def sync(arn: Arn, whoIsUpdating: AgentUser)(implicit hc: HeaderCarrier, ex: ExecutionContext) =
     for {
       maybeOutstandingAssignmentsWorkItemsExist <-
         userClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn)
-      maybeGroupDelegatedEnrolments <- maybeOutstandingAssignmentsWorkItemsExist match {
-                                         case None => Future successful None
-                                         case Some(outstandingAssignmentsWorkItemsExist) =>
-                                           if (outstandingAssignmentsWorkItemsExist) Future.successful(None)
-                                           else userClientDetailsConnector.getClientsWithAssignedUsers(arn)
+
+      maybeEacdSyncRecord <- maybeOutstandingAssignmentsWorkItemsExist match {
+                               case None => Future successful None
+                               case Some(outstandingAssignmentsWorkItemsExist) =>
+                                 if (outstandingAssignmentsWorkItemsExist) Future.successful(None)
+                                 else eacdSyncRepository.acquire(arn, appConfig.eacdSyncNotBeforeSeconds)
+                             }
+
+      maybeGroupDelegatedEnrolments <- maybeEacdSyncRecord match {
+                                         case None =>
+                                           logger.debug(s"Skipping EACD sync for '${arn.value}'")
+                                           Future successful None
+                                         case _ =>
+                                           logger.info(s"Calling EACD sync for '${arn.value}'")
+                                           userClientDetailsConnector.getClientsWithAssignedUsers(arn)
+
                                        }
-      updateStatuses <-
-        maybeGroupDelegatedEnrolments match {
-          case None =>
-            Future successful Seq.empty[AccessGroupUpdateStatus]
-          case Some(groupDelegatedEnrolments) =>
-            accessGroupSynchronizer.syncWithEacd(arn, groupDelegatedEnrolments, whoIsUpdating)
-        }
+
+      updateStatuses <- maybeGroupDelegatedEnrolments match {
+                          case None =>
+                            Future successful Seq.empty[AccessGroupUpdateStatus]
+                          case Some(groupDelegatedEnrolments) =>
+                            accessGroupSynchronizer.syncWithEacd(arn, groupDelegatedEnrolments, whoIsUpdating)
+                        }
     } yield updateStatuses
+
 }

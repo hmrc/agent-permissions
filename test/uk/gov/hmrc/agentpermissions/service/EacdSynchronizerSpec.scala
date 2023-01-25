@@ -32,67 +32,66 @@ class EacdSynchronizerSpec extends BaseSpec {
 
   "Syncing with EACD" when {
 
-    "eacd sync token is not acquired" should {
-      "neither fetch clients with assigned users nor call access groups synchronizer" in new TestScope {
-        mockAppConfigEacdSyncNotBeforeSeconds(10)
-        mockEacdSyncRepositoryAcquire(Option.empty[EacdSyncRecord])
+    "fetching outstanding assignment work items returns nothing" should {
+      "not attempt to sync with EACD" in new TestScope {
+        mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(None)
 
         eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
       }
-
     }
 
-    "eacd sync token is acquired" when {
+    "fetching outstanding assignment work items returns a value" when {
 
-      "call to check outstanding assignments work items exist returns nothing" should {
-        "neither fetch clients with assigned users nor call access groups synchronizer" in new TestScope {
-          mockAppConfigEacdSyncNotBeforeSeconds(10)
-          mockEacdSyncRepositoryAcquire(Option(EacdSyncRecord(arn, Instant.now())))
-          mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(None)
+      "outstanding assignment work items exist" should {
+        "not attempt to sync with EACD" in new TestScope {
+          mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(true))
 
           eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
         }
       }
 
-      "call to check outstanding assignments work items exist returns some value" when {
+      "outstanding assignment work items do not exist" when {
 
-        "call to check outstanding assignments work items exist returns true" should {
-          "neither fetch clients with assigned users nor call access groups synchronizer" in new TestScope {
+        "eacd sync token is not acquired" should {
+          "not attempt to sync with EACD" in new TestScope {
+            mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
+
             mockAppConfigEacdSyncNotBeforeSeconds(10)
-            mockEacdSyncRepositoryAcquire(Option(EacdSyncRecord(arn, Instant.now())))
-            mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(true))
+            mockEacdSyncRepositoryAcquire(Option.empty[EacdSyncRecord])
 
             eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
           }
         }
 
-        "call to check outstanding assignments work items exist returns false" when {
+        "eacd sync token is acquired" when {
 
-          "assigned users are not returned by connector" should {
-            "not call access groups synchronizer" in new TestScope {
+          "call to fetch assigned users returns nothing" should {
+            "not attempt to sync with EACD" in new TestScope {
+              mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
+
               mockAppConfigEacdSyncNotBeforeSeconds(10)
               mockEacdSyncRepositoryAcquire(Option(EacdSyncRecord(arn, Instant.now())))
-              mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
+
               mockUserClientDetailsConnectorGetClientsWithAssignedUsers(None)
 
               eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
             }
           }
 
-          "assigned users are returned by connector" when {
+          "call to fetch assigned users returns a value" should {
+            "attempt to sync with EACD" in new TestScope {
+              mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
 
-            "call to access groups synchronizer returns non-empty update statuses" should {
-              "indicate access groups were updated" in new TestScope {
-                mockAppConfigEacdSyncNotBeforeSeconds(10)
-                mockEacdSyncRepositoryAcquire(Option(EacdSyncRecord(arn, Instant.now())))
-                mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
-                mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
-                  Some(GroupDelegatedEnrolments(Seq(assignedClient)))
-                )
-                mockAccessGroupSynchronizerSyncWithEacd(Seq(AccessGroupUpdated))
+              mockAppConfigEacdSyncNotBeforeSeconds(10)
+              mockEacdSyncRepositoryAcquire(Option(EacdSyncRecord(arn, Instant.now())))
 
-                eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq(AccessGroupUpdated)
-              }
+              mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
+                Some(GroupDelegatedEnrolments(Seq(assignedClient)))
+              )
+
+              mockAccessGroupSynchronizerSyncWithEacd(Seq(AccessGroupUpdated))
+
+              eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq(AccessGroupUpdated)
             }
           }
 
