@@ -24,7 +24,6 @@ lazy val microservice = Project(appName, file("."))
     )
     // ***************
   )
-  .settings(publishingSettings: _*)
   .configs(IntegrationTest)
   .settings(integrationTestSettings(): _*)
   .settings(resolvers += Resolver.jcenterRepo)

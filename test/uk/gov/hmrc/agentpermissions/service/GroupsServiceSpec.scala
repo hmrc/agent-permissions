@@ -126,6 +126,14 @@ class GroupsServiceSpec extends BaseSpec {
         .expects(arn, *, *)
         .returning(Future.successful(groups))
 
+    def mockTaxGroupsServiceGetClientCountForAllGroups(
+      clientsCounts: Map[String, Int]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Map[String, Int]]] =
+      (mockTaxGroupsService
+        .clientCountForTaxGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(arn, *, *)
+        .returning(Future.successful(clientsCounts))
+
     def mockCustomGroupsServiceGetAllGroups(
       groups: Seq[AccessGroup]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroup]]] =
@@ -195,12 +203,19 @@ class GroupsServiceSpec extends BaseSpec {
 
         mockCustomGroupsServiceGetAllGroups(Seq(ag1))
         mockTaxGroupsServiceGetAllGroups(Seq(tg1, tg2))
+        mockTaxGroupsServiceGetClientCountForAllGroups(Map(serviceVat -> 5, serviceCgt -> 10))
 
         groupsService.getAllGroupSummaries(arn).futureValue shouldBe
           Seq(
-            AccessGroupSummary(taxGroup._id.toHexString, "Capital Gains Tax", None, 1, taxService = Some(serviceCgt)),
+            AccessGroupSummary(
+              taxGroup._id.toHexString,
+              "Capital Gains Tax",
+              Some(10),
+              1,
+              taxService = Some(serviceCgt)
+            ),
             AccessGroupSummary(accessGroup._id.toHexString, "some group", Some(3), 3),
-            AccessGroupSummary(taxGroup._id.toHexString, "VAT", None, 3, taxService = Some(serviceVat))
+            AccessGroupSummary(taxGroup._id.toHexString, "VAT", Some(5), 3, taxService = Some(serviceVat))
           )
       }
     }
@@ -209,6 +224,7 @@ class GroupsServiceSpec extends BaseSpec {
       "return empty seq" in new TestScope {
         mockCustomGroupsServiceGetAllGroups(Seq.empty)
         mockTaxGroupsServiceGetAllGroups(Seq.empty)
+        mockTaxGroupsServiceGetClientCountForAllGroups(Map.empty)
 
         groupsService.getAllGroupSummaries(arn).futureValue shouldBe Seq.empty
       }

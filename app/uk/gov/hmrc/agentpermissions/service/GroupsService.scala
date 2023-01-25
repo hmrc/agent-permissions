@@ -29,12 +29,10 @@ import scala.concurrent.{ExecutionContext, Future}
 @ImplementedBy(classOf[GroupsServiceImpl])
 trait GroupsService {
   def getAllGroupSummaries(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[AccessGroupSummary]]
-
   def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Seq[AccessGroupSummary]]
-
   def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
   ): Future[Seq[AccessGroupSummary]]
@@ -54,9 +52,13 @@ class GroupsServiceImpl @Inject() (
     for {
       customGroups <- customGroupsService.getAllCustomGroups(arn)
       customSummaries = customGroups.map(AccessGroupSummary.convertCustomGroup)
-      taxGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
-      // TODO add taxGroupClientCount <- taxGroupsService.clientCountForTaxGroups(arn)
-      taxSummaries = taxGroups.map(group => AccessGroupSummary.convertTaxServiceGroup(group))
+      taxGroups           <- taxGroupsService.getAllTaxServiceGroups(arn)
+      taxGroupClientCount <- taxGroupsService.clientCountForTaxGroups(arn)
+      taxSummaries = taxGroups.map(group =>
+                       AccessGroupSummary
+                         .convertTaxServiceGroup(group)
+                         .copy(clientCount = Option(taxGroupClientCount(group.service)))
+                     )
       combinedSorted = (customSummaries ++ taxSummaries).sortBy(_.groupName.toLowerCase())
     } yield combinedSorted
 
