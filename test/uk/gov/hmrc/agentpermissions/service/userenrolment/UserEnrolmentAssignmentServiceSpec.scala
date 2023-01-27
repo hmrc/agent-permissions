@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, GroupId, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, CustomGroup, GroupId, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
@@ -35,7 +35,7 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
   val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)
   val maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments] = Some(userEnrolmentAssignments)
 
-  val accessGroup: AccessGroup = AccessGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
+  val accessGroup: CustomGroup = CustomGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
 
   lazy val now: LocalDateTime = LocalDateTime.now()
 
@@ -55,15 +55,15 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    def mockAccessGroupsRepositoryGetAll(accessGroups: Seq[AccessGroup]): CallHandler1[Arn, Future[Seq[AccessGroup]]] =
+    def mockAccessGroupsRepositoryGetAll(accessGroups: Seq[CustomGroup]): CallHandler1[Arn, Future[Seq[CustomGroup]]] =
       (mockAccessGroupsRepository
         .get(_: Arn))
         .expects(arn)
         .returning(Future successful accessGroups)
 
     def mockAccessGroupsRepositoryGet(
-      maybeAccessGroup: Option[AccessGroup]
-    ): CallHandler2[Arn, String, Future[Option[AccessGroup]]] =
+      maybeAccessGroup: Option[CustomGroup]
+    ): CallHandler2[Arn, String, Future[Option[CustomGroup]]] =
       (mockAccessGroupsRepository
         .get(_: Arn, _: String))
         .expects(arn, *)
@@ -71,25 +71,25 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
 
     def mockUserEnrolmentAssignmentCalculatorForGroupCreation(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[AccessGroup, Seq[AccessGroup], Option[UserEnrolmentAssignments]] =
+    ): CallHandler2[CustomGroup, Seq[CustomGroup], Option[UserEnrolmentAssignments]] =
       (mockUserEnrolmentAssignmentCalculator
-        .forGroupCreation(_: AccessGroup, _: Seq[AccessGroup]))
+        .forGroupCreation(_: CustomGroup, _: Seq[CustomGroup]))
         .expects(accessGroup, *)
         .returning(maybeUserEnrolmentAssignments)
 
     def mockUserEnrolmentAssignmentCalculatorForGroupUpdate(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[AccessGroup, Seq[AccessGroup], Option[UserEnrolmentAssignments]] =
+    ): CallHandler2[CustomGroup, Seq[CustomGroup], Option[UserEnrolmentAssignments]] =
       (mockUserEnrolmentAssignmentCalculator
-        .forGroupUpdate(_: AccessGroup, _: Seq[AccessGroup]))
+        .forGroupUpdate(_: CustomGroup, _: Seq[CustomGroup]))
         .expects(accessGroup, *)
         .returning(maybeUserEnrolmentAssignments)
 
     def mockUserEnrolmentAssignmentCalculatorForGroupDeletion(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[AccessGroup, Seq[AccessGroup], Option[UserEnrolmentAssignments]] =
+    ): CallHandler2[CustomGroup, Seq[CustomGroup], Option[UserEnrolmentAssignments]] =
       (mockUserEnrolmentAssignmentCalculator
-        .forGroupDeletion(_: AccessGroup, _: Seq[AccessGroup]))
+        .forGroupDeletion(_: CustomGroup, _: Seq[CustomGroup]))
         .expects(accessGroup, *)
         .returning(maybeUserEnrolmentAssignments)
 

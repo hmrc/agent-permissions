@@ -24,7 +24,7 @@ import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
 import org.mongodb.scala.model.{DeleteOptions, IndexModel, ReplaceOptions}
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, Arn}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, CustomGroup}
 import uk.gov.hmrc.agentpermissions.model.SensitiveAccessGroup
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
@@ -36,12 +36,12 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[AccessGroupsRepositoryImpl])
 trait AccessGroupsRepository {
-  def findById(id: String): Future[Option[AccessGroup]]
-  def get(arn: Arn): Future[Seq[AccessGroup]]
-  def get(arn: Arn, groupName: String): Future[Option[AccessGroup]]
-  def insert(accessGroup: AccessGroup): Future[Option[String]]
+  def findById(id: String): Future[Option[CustomGroup]]
+  def get(arn: Arn): Future[Seq[CustomGroup]]
+  def get(arn: Arn, groupName: String): Future[Option[CustomGroup]]
+  def insert(accessGroup: CustomGroup): Future[Option[String]]
   def delete(arn: Arn, groupName: String): Future[Option[Long]]
-  def update(arn: Arn, groupName: String, accessGroup: AccessGroup): Future[Option[Long]]
+  def update(arn: Arn, groupName: String, accessGroup: CustomGroup): Future[Option[Long]]
 }
 
 @Singleton
@@ -65,13 +65,13 @@ class AccessGroupsRepositoryImpl @Inject() (
       )
     ) with AccessGroupsRepository with Logging {
 
-  override def findById(id: String): Future[Option[AccessGroup]] =
+  override def findById(id: String): Future[Option[CustomGroup]] =
     collection
       .find(new BasicDBObject("_id", id))
       .headOption()
       .map(_.map(_.decryptedValue))
 
-  override def get(arn: Arn): Future[Seq[AccessGroup]] =
+  override def get(arn: Arn): Future[Seq[CustomGroup]] =
     collection
       .find(equal(FIELD_ARN, arn.value))
       .collation(caseInsensitiveCollation)
@@ -79,14 +79,14 @@ class AccessGroupsRepositoryImpl @Inject() (
       .toFuture()
       .map(_.map(_.decryptedValue))
 
-  override def get(arn: Arn, groupName: String): Future[Option[AccessGroup]] =
+  override def get(arn: Arn, groupName: String): Future[Option[CustomGroup]] =
     collection
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)))
       .collation(caseInsensitiveCollation)
       .headOption()
       .map(_.map(_.decryptedValue))
 
-  override def insert(accessGroup: AccessGroup): Future[Option[String]] =
+  override def insert(accessGroup: CustomGroup): Future[Option[String]] =
     collection
       .insertOne(SensitiveAccessGroup(accessGroup))
       .headOption()
@@ -104,7 +104,7 @@ class AccessGroupsRepositoryImpl @Inject() (
       .headOption()
       .map(_.map(result => result.getDeletedCount))
 
-  override def update(arn: Arn, groupName: String, accessGroup: AccessGroup): Future[Option[Long]] =
+  override def update(arn: Arn, groupName: String, accessGroup: CustomGroup): Future[Option[Long]] =
     collection
       .replaceOne(
         and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),

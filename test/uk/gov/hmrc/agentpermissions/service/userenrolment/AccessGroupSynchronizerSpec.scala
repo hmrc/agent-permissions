@@ -32,10 +32,10 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
     "synchronization happens successfully" should {
       "indicate access groups were updated" in new TestScope {
-        val accessGroup1: AccessGroup =
+        val accessGroup1: CustomGroup =
           buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
 
-        val accessGroups: Seq[AccessGroup] = Seq(accessGroup1)
+        val accessGroups: Seq[CustomGroup] = Seq(accessGroup1)
 
         mockAccessGroupsRepositoryGetAll(accessGroups)
         mockRemoveClientsFromGroup(accessGroup1, Set(clientPpt, clientCgt).map(_.enrolmentKey), agentUser1)
@@ -61,7 +61,7 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
     "GroupDelegatedEnrolments contains mismatched enrolments than in access group" should {
       "calculate removals correctly" in new TestScope {
-        val accessGroups: Seq[AccessGroup] = Seq(
+        val accessGroups: Seq[CustomGroup] = Seq(
           buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt))),
           buildAccessGroup(Some(Set(agentUser2)), Some(Set(clientPpt, clientTrust)))
         )
@@ -91,12 +91,12 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
     "removal set contains fewer enrolments than in access groups" should {
       "have corresponding enrolments and users removed" in new TestScope {
-        val accessGroup1: AccessGroup =
+        val accessGroup1: CustomGroup =
           buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
-        val accessGroup2: AccessGroup =
+        val accessGroup2: CustomGroup =
           buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientPpt, clientTrust)))
 
-        val accessGroups: Seq[AccessGroup] = Seq(accessGroup1, accessGroup2)
+        val accessGroups: Seq[CustomGroup] = Seq(accessGroup1, accessGroup2)
 
         val removalSet: RemovalSet = RemovalSet(
           Set(clientPpt.enrolmentKey, clientTrust.enrolmentKey),
@@ -117,9 +117,9 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
       "not affect existing clients of access group" in new TestScope {
         val removalSet: RemovalSet = RemovalSet(Set("unknown"), Set.empty)
 
-        val accessGroup1: AccessGroup =
+        val accessGroup1: CustomGroup =
           buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
-        val accessGroups: Seq[AccessGroup] = Seq(accessGroup1)
+        val accessGroups: Seq[CustomGroup] = Seq(accessGroup1)
 
         mockRemoveClientsFromGroup(accessGroup1, Set("unknown"), agentUser1)
         mockRemoveTeamMembersFromGroup(accessGroup1, Set.empty, agentUser1)
@@ -132,10 +132,10 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
       "not affect existing team members of access group" in new TestScope {
         val removalSet: RemovalSet = RemovalSet(Set.empty, Set("unknown"))
 
-        val accessGroup1: AccessGroup =
+        val accessGroup1: CustomGroup =
           buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
 
-        val accessGroups: Seq[AccessGroup] = Seq(accessGroup1)
+        val accessGroups: Seq[CustomGroup] = Seq(accessGroup1)
 
         mockRemoveClientsFromGroup(accessGroup1, Set.empty, agentUser1)
         mockRemoveTeamMembersFromGroup(accessGroup1, Set("unknown"), agentUser1)
@@ -149,7 +149,7 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
     "update returns nothing" should {
       s"return $AccessGroupNotUpdated" in new TestScope {
-        val accessGroups: Seq[AccessGroup] = Seq(
+        val accessGroups: Seq[CustomGroup] = Seq(
           buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
         )
 
@@ -161,7 +161,7 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
     "update indicates one record was updated in DB" should {
       s"return $AccessGroupUpdated" in new TestScope {
-        val accessGroups: Seq[AccessGroup] = Seq(
+        val accessGroups: Seq[CustomGroup] = Seq(
           buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
         )
 
@@ -173,7 +173,7 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
     "update indicates no record was updated in DB" should {
       s"return $AccessGroupNotUpdated" in new TestScope {
-        val accessGroups: Seq[AccessGroup] = Seq(
+        val accessGroups: Seq[CustomGroup] = Seq(
           buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
         )
 
@@ -211,8 +211,8 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
     val accessGroupSynchronizer =
       new AccessGroupSynchronizerImpl(mockAccessGroupsRepository, mockGroupClientsRemover, mockGroupTeamMembersRemover)
 
-    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): AccessGroup =
-      AccessGroup(
+    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): CustomGroup =
+      CustomGroup(
         arn,
         groupName,
         now,
@@ -224,8 +224,8 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
       )
 
     def mockAccessGroupsRepositoryGetAll(
-      accessGroups: Seq[AccessGroup]
-    ): CallHandler1[Arn, Future[Seq[AccessGroup]]] =
+      accessGroups: Seq[CustomGroup]
+    ): CallHandler1[Arn, Future[Seq[CustomGroup]]] =
       (mockAccessGroupsRepository
         .get(_: Arn))
         .expects(arn)
@@ -233,29 +233,29 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
     def mockAccessGroupsRepositoryUpdate(
       maybeModifiedCount: Option[Long]
-    ): CallHandler3[Arn, String, AccessGroup, Future[Option[Long]]] =
+    ): CallHandler3[Arn, String, CustomGroup, Future[Option[Long]]] =
       (mockAccessGroupsRepository
-        .update(_: Arn, _: String, _: AccessGroup))
+        .update(_: Arn, _: String, _: CustomGroup))
         .expects(arn, groupName, *)
         .returning(Future.successful(maybeModifiedCount))
 
     def mockRemoveClientsFromGroup(
-      accessGroup: AccessGroup,
+      accessGroup: CustomGroup,
       removalEnrolmentKeys: Set[String],
       whoIsUpdating: AgentUser
-    ): CallHandler5[AccessGroup, Set[String], AgentUser, HeaderCarrier, ExecutionContext, AccessGroup] =
+    ): CallHandler5[CustomGroup, Set[String], AgentUser, HeaderCarrier, ExecutionContext, CustomGroup] =
       (mockGroupClientsRemover
-        .removeClientsFromGroup(_: AccessGroup, _: Set[String], _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .removeClientsFromGroup(_: CustomGroup, _: Set[String], _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(accessGroup, removalEnrolmentKeys, whoIsUpdating, *, *)
         .returning(accessGroup)
 
     def mockRemoveTeamMembersFromGroup(
-      accessGroup: AccessGroup,
+      accessGroup: CustomGroup,
       removalUserIds: Set[String],
       whoIsUpdating: AgentUser
-    ): CallHandler5[AccessGroup, Set[String], AgentUser, HeaderCarrier, ExecutionContext, AccessGroup] =
+    ): CallHandler5[CustomGroup, Set[String], AgentUser, HeaderCarrier, ExecutionContext, CustomGroup] =
       (mockGroupTeamMembersRemover
-        .removeTeamMembersFromGroup(_: AccessGroup, _: Set[String], _: AgentUser)(
+        .removeTeamMembersFromGroup(_: CustomGroup, _: Set[String], _: AgentUser)(
           _: HeaderCarrier,
           _: ExecutionContext
         ))

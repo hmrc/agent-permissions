@@ -36,34 +36,34 @@ trait TaxGroupsService {
 
   def clientCountForTaxGroups(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]]
 
-  def getById(id: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxServiceAccessGroup]]
+  def getById(id: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxGroup]]
 
   def create(
-    taxGroup: TaxServiceAccessGroup
+    taxGroup: TaxGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[TaxServiceGroupCreationStatus]
 
   def getAllTaxServiceGroups(
     arn: Arn
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[TaxServiceAccessGroup]]
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[TaxGroup]]
 
   // unused? get(groupId) seems to be the same as getById(id) - will be same for AccessGroupService
-  def get(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxServiceAccessGroup]]
+  def get(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxGroup]]
 
   def get(arn: Arn, service: String)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Option[TaxServiceAccessGroup]]
+  ): Future[Option[TaxGroup]]
 
   def getTaxGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupSummary]]
+  ): Future[Seq[GroupSummary]]
 
   def delete(groupId: GroupId, agentUser: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[TaxServiceGroupDeletionStatus]
 
-  def update(groupId: GroupId, taxGroup: TaxServiceAccessGroup, whoIsUpdating: AgentUser)(implicit
+  def update(groupId: GroupId, taxGroup: TaxGroup, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus]
@@ -114,12 +114,12 @@ class TaxGroupsServiceImpl @Inject() (
 
   override def getById(
     id: String
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxServiceAccessGroup]] =
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxGroup]] =
     taxServiceGroupsRepository
       .findById(id)
 
   override def create(
-    taxGroup: TaxServiceAccessGroup
+    taxGroup: TaxGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[TaxServiceGroupCreationStatus] =
     taxServiceGroupsRepository.getByService(taxGroup.arn, taxGroup.service) flatMap {
       case Some(_) =>
@@ -138,32 +138,32 @@ class TaxGroupsServiceImpl @Inject() (
 
   override def getAllTaxServiceGroups(
     arn: Arn
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[TaxServiceAccessGroup]] =
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[TaxGroup]] =
     taxServiceGroupsRepository
       .get(arn)
 
   override def get(
     groupId: GroupId
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxServiceAccessGroup]] =
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxGroup]] =
     taxServiceGroupsRepository
       .get(groupId.arn, groupId.groupName)
 
   override def get(arn: Arn, service: String)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Option[TaxServiceAccessGroup]] =
+  ): Future[Option[TaxGroup]] =
     taxServiceGroupsRepository
       .getByService(arn, service)
 
   override def getTaxGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupSummary]] =
+  ): Future[Seq[GroupSummary]] =
     taxServiceGroupsRepository
       .get(arn)
       .map(accessGroups =>
         accessGroups
           .filter(_.teamMembers.fold(false)(_.map(_.id).contains(userId)))
-          .map(group => AccessGroupSummary.convertTaxServiceGroup(group))
+          .map(group => GroupSummary.fromAccessGroup(group))
       )
 
   override def delete(
@@ -180,7 +180,7 @@ class TaxGroupsServiceImpl @Inject() (
                                        }
     } yield taxServiceGroupDeletionStatus
 
-  override def update(groupId: GroupId, accessGroup: TaxServiceAccessGroup, whoIsUpdating: AgentUser)(implicit
+  override def update(groupId: GroupId, accessGroup: TaxGroup, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus] =
@@ -201,9 +201,9 @@ class TaxGroupsServiceImpl @Inject() (
     } yield accessGroupUpdateStatus
 
   private def mergeWhoIsUpdating(
-    taxGroup: TaxServiceAccessGroup,
+    taxGroup: TaxGroup,
     whoIsUpdating: AgentUser
-  ): Future[TaxServiceAccessGroup] =
+  ): Future[TaxGroup] =
     Future.successful(taxGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
 
 }

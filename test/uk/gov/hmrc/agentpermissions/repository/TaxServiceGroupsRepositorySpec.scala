@@ -43,8 +43,8 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
     val client1: Client = Client("HMRC-MTD-VAT~VRN~101747641", "John Innes")
     val client2: Client = Client("HMRC-MTD-VAT~VRN~101746700", "Ann Von-Innes")
 
-    val accessGroup: TaxServiceAccessGroup =
-      TaxServiceAccessGroup(
+    val accessGroup: TaxGroup =
+      TaxGroup(
         dbId,
         arn,
         groupName,
@@ -154,7 +154,7 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
         s"return None" in new TestScope {
           groupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
-          val accessGroupHavingGroupNameOfDifferentCase: TaxServiceAccessGroup =
+          val accessGroupHavingGroupNameOfDifferentCase: TaxGroup =
             accessGroup.copy(groupName = accessGroup.groupName.toUpperCase)
 
           groupsRepository.insert(accessGroupHavingGroupNameOfDifferentCase).futureValue shouldBe None

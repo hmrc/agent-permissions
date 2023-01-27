@@ -45,7 +45,7 @@ class GroupsServiceSpec extends BaseSpec {
     val groupId: GroupId = GroupId(arn, groupName)
     val dbId: String = new ObjectId().toHexString
 
-    val taxGroup: TaxServiceAccessGroup = TaxServiceAccessGroup(
+    val taxGroup: TaxGroup = TaxGroup(
       arn,
       "VAT",
       now,
@@ -58,7 +58,7 @@ class GroupsServiceSpec extends BaseSpec {
       Some(Set(client1, client2))
     )
 
-    val accessGroup: AccessGroup = AccessGroup(
+    val accessGroup: CustomGroup = CustomGroup(
       arn,
       groupName,
       now,
@@ -73,8 +73,8 @@ class GroupsServiceSpec extends BaseSpec {
       id: ObjectId = new ObjectId(),
       name: String = groupName,
       taxService: Option[String] = None
-    ): AccessGroupSummary =
-      AccessGroupSummary(id.toHexString, name, if (taxService.isEmpty) Some(3) else None, 3, taxService)
+    ): GroupSummary =
+      GroupSummary(id.toHexString, name, if (taxService.isEmpty) Some(3) else None, 3, taxService)
 
     val taxSummaries = Seq(
       groupSummary(name = "Capital Gains Tax", taxService = Some(serviceCgt)),
@@ -110,17 +110,17 @@ class GroupsServiceSpec extends BaseSpec {
     lazy val now: LocalDateTime = LocalDateTime.now()
 
     def mockTaxGroupsRepositoryGetByService(
-      maybeAccessGroup: Option[TaxServiceAccessGroup],
+      maybeAccessGroup: Option[TaxGroup],
       service: String = serviceCgt
-    ): CallHandler2[Arn, String, Future[Option[TaxServiceAccessGroup]]] =
+    ): CallHandler2[Arn, String, Future[Option[TaxGroup]]] =
       (mockTaxGroupsRepository
         .getByService(_: Arn, _: String))
         .expects(arn, service)
         .returning(Future.successful(maybeAccessGroup))
 
     def mockTaxGroupsServiceGetAllGroups(
-      groups: Seq[TaxServiceAccessGroup]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxServiceAccessGroup]]] =
+      groups: Seq[TaxGroup]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxGroup]]] =
       (mockTaxGroupsService
         .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
@@ -135,16 +135,16 @@ class GroupsServiceSpec extends BaseSpec {
         .returning(Future.successful(clientsCounts))
 
     def mockCustomGroupsServiceGetAllGroups(
-      groups: Seq[AccessGroup]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroup]]] =
+      groups: Seq[CustomGroup]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[CustomGroup]]] =
       (mockCustomGroupsService
         .getAllCustomGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.successful(groups))
 
     def mockCustomGroupsServiceGetGroupSummariesForClient(
-      accessGroupSummaries: Seq[AccessGroupSummary]
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      accessGroupSummaries: Seq[GroupSummary]
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockCustomGroupsService
         .getCustomGroupSummariesForClient(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
@@ -152,15 +152,15 @@ class GroupsServiceSpec extends BaseSpec {
 
     def mockCustomGroupsServiceGetGroupSummariesForClientWithException(
       ex: Exception
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockCustomGroupsService
         .getCustomGroupSummariesForClient(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
     def mockCustomGroupsServiceGetGroupSummariesForTeamMember(
-      accessGroupSummaries: Seq[AccessGroupSummary]
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      accessGroupSummaries: Seq[GroupSummary]
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockCustomGroupsService
         .getCustomGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
@@ -168,15 +168,15 @@ class GroupsServiceSpec extends BaseSpec {
 
     def mockCustomServiceGetGroupSummariesForTeamMemberWithException(
       ex: Exception
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockCustomGroupsService
         .getCustomGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
     def mockTaxGroupsServiceGetGroupSummariesForTeamMember(
-      accessGroupSummaries: Seq[AccessGroupSummary]
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      accessGroupSummaries: Seq[GroupSummary]
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockTaxGroupsService
         .getTaxGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
@@ -184,7 +184,7 @@ class GroupsServiceSpec extends BaseSpec {
 
     def mockTaxGroupsServiceGetGroupSummariesForTeamMemberWithException(
       ex: Exception
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockTaxGroupsService
         .getTaxGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
@@ -196,9 +196,9 @@ class GroupsServiceSpec extends BaseSpec {
 
     "both group types found" should {
       "return corresponding summaries sorted by group name" in new TestScope {
-        val ag1: AccessGroup = accessGroup
-        val tg1: TaxServiceAccessGroup = taxGroup
-        val tg2: TaxServiceAccessGroup =
+        val ag1: CustomGroup = accessGroup
+        val tg1: TaxGroup = taxGroup
+        val tg2: TaxGroup =
           taxGroup.copy(service = serviceCgt, groupName = "Capital Gains Tax", teamMembers = Some(Set(user3)))
 
         mockCustomGroupsServiceGetAllGroups(Seq(ag1))
@@ -207,15 +207,15 @@ class GroupsServiceSpec extends BaseSpec {
 
         groupsService.getAllGroupSummaries(arn).futureValue shouldBe
           Seq(
-            AccessGroupSummary(
+            GroupSummary(
               taxGroup._id.toHexString,
               "Capital Gains Tax",
               Some(10),
               1,
               taxService = Some(serviceCgt)
             ),
-            AccessGroupSummary(accessGroup._id.toHexString, "some group", Some(3), 3),
-            AccessGroupSummary(taxGroup._id.toHexString, "VAT", Some(5), 3, taxService = Some(serviceVat))
+            GroupSummary(accessGroup._id.toHexString, "some group", Some(3), 3),
+            GroupSummary(taxGroup._id.toHexString, "VAT", Some(5), 3, taxService = Some(serviceVat))
           )
       }
     }
@@ -252,7 +252,7 @@ class GroupsServiceSpec extends BaseSpec {
         mockTaxGroupsRepositoryGetByService(Some(taxGroup))
 
         groupsService.getAllGroupSummariesForClient(arn, clientCgt.enrolmentKey).futureValue shouldBe
-          customSummaries ++ Seq(AccessGroupSummary.convertTaxServiceGroup(taxGroup))
+          customSummaries ++ Seq(GroupSummary.fromAccessGroup(taxGroup))
       }
 
       "custom summaries found but no tax group found" in new TestScope {
@@ -268,7 +268,7 @@ class GroupsServiceSpec extends BaseSpec {
         mockTaxGroupsRepositoryGetByService(Some(taxGroup))
 
         groupsService.getAllGroupSummariesForClient(arn, clientCgt.enrolmentKey).futureValue shouldBe
-          Seq(AccessGroupSummary.convertTaxServiceGroup(taxGroup))
+          Seq(GroupSummary.fromAccessGroup(taxGroup))
       }
     }
 

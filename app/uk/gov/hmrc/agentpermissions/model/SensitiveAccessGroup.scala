@@ -17,12 +17,12 @@
 package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json._
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, CustomGroup}
 import uk.gov.hmrc.crypto._
 
-/** Variant of AccessGroup suitable to be stored partially encrypted in Mongo. (APB-6461)
+/** Variant of CustomGroup suitable to be stored partially encrypted in Mongo. (APB-6461)
   */
-case class SensitiveAccessGroup(override val decryptedValue: AccessGroup) extends Sensitive[AccessGroup]
+case class SensitiveAccessGroup(override val decryptedValue: CustomGroup) extends Sensitive[CustomGroup]
 
 object SensitiveAccessGroup {
   private def encryptAgentUser(plainTextAgentUser: AgentUser)(implicit crypto: Encrypter): AgentUser =
@@ -35,12 +35,12 @@ object SensitiveAccessGroup {
       id = crypto.decrypt(Crypted(cryptedAgentUser.id)).value,
       name = crypto.decrypt(Crypted(cryptedAgentUser.name)).value
     )
-  private def encryptFields(accessGroup: AccessGroup)(implicit crypto: Encrypter): AccessGroup = accessGroup.copy(
+  private def encryptFields(accessGroup: CustomGroup)(implicit crypto: Encrypter): CustomGroup = accessGroup.copy(
     createdBy = encryptAgentUser(accessGroup.createdBy),
     lastUpdatedBy = encryptAgentUser(accessGroup.lastUpdatedBy),
     teamMembers = accessGroup.teamMembers.map(_.map(encryptAgentUser))
   )
-  private def decryptFields(securedAccessGroup: AccessGroup)(implicit crypto: Decrypter): AccessGroup =
+  private def decryptFields(securedAccessGroup: CustomGroup)(implicit crypto: Decrypter): CustomGroup =
     securedAccessGroup.copy(
       createdBy = decryptAgentUser(securedAccessGroup.createdBy),
       lastUpdatedBy = decryptAgentUser(securedAccessGroup.lastUpdatedBy),
@@ -50,7 +50,7 @@ object SensitiveAccessGroup {
   implicit def format(implicit crypto: Encrypter with Decrypter): Format[SensitiveAccessGroup] =
     new Format[SensitiveAccessGroup] {
       def reads(json: JsValue): JsResult[SensitiveAccessGroup] =
-        Json.fromJson[AccessGroup](json).map(o => SensitiveAccessGroup(decryptFields(o)))
+        Json.fromJson[CustomGroup](json).map(o => SensitiveAccessGroup(decryptFields(o)))
       def writes(o: SensitiveAccessGroup): JsValue =
         Json.toJson(encryptFields(o.decryptedValue))
     }

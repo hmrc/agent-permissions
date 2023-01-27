@@ -17,13 +17,12 @@
 package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.{Format, JsResult, JsValue, Json}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, TaxServiceAccessGroup}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, TaxGroup}
 import uk.gov.hmrc.crypto._
 
-/** Variant of TaxServiceAccessGroup suitable to be stored partially encrypted in Mongo.
+/** Variant of TaxGroup suitable to be stored partially encrypted in Mongo.
   */
-case class SensitiveTaxServiceGroup(override val decryptedValue: TaxServiceAccessGroup)
-    extends Sensitive[TaxServiceAccessGroup]
+case class SensitiveTaxServiceGroup(override val decryptedValue: TaxGroup) extends Sensitive[TaxGroup]
 
 object SensitiveTaxServiceGroup {
   private def encryptAgentUser(plainTextAgentUser: AgentUser)(implicit crypto: Encrypter): AgentUser =
@@ -36,15 +35,15 @@ object SensitiveTaxServiceGroup {
       id = crypto.decrypt(Crypted(cryptedAgentUser.id)).value,
       name = crypto.decrypt(Crypted(cryptedAgentUser.name)).value
     )
-  private def encryptFields(accessGroup: TaxServiceAccessGroup)(implicit crypto: Encrypter): TaxServiceAccessGroup =
+  private def encryptFields(accessGroup: TaxGroup)(implicit crypto: Encrypter): TaxGroup =
     accessGroup.copy(
       createdBy = encryptAgentUser(accessGroup.createdBy),
       lastUpdatedBy = encryptAgentUser(accessGroup.lastUpdatedBy),
       teamMembers = accessGroup.teamMembers.map(_.map(encryptAgentUser))
     )
-  private def decryptFields(securedAccessGroup: TaxServiceAccessGroup)(implicit
+  private def decryptFields(securedAccessGroup: TaxGroup)(implicit
     crypto: Decrypter
-  ): TaxServiceAccessGroup =
+  ): TaxGroup =
     securedAccessGroup.copy(
       createdBy = decryptAgentUser(securedAccessGroup.createdBy),
       lastUpdatedBy = decryptAgentUser(securedAccessGroup.lastUpdatedBy),
@@ -54,7 +53,7 @@ object SensitiveTaxServiceGroup {
   implicit def format(implicit crypto: Encrypter with Decrypter): Format[SensitiveTaxServiceGroup] =
     new Format[SensitiveTaxServiceGroup] {
       def reads(json: JsValue): JsResult[SensitiveTaxServiceGroup] =
-        Json.fromJson[TaxServiceAccessGroup](json).map(o => SensitiveTaxServiceGroup(decryptFields(o)))
+        Json.fromJson[TaxGroup](json).map(o => SensitiveTaxServiceGroup(decryptFields(o)))
       def writes(o: SensitiveTaxServiceGroup): JsValue =
         Json.toJson(encryptFields(o.decryptedValue))
     }

@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.{Json, OFormat}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, TaxServiceAccessGroup}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, TaxGroup}
 
 import java.time.LocalDateTime
 
@@ -31,10 +31,10 @@ case class CreateTaxServiceGroupRequest(
   def buildTaxServiceGroup(
     arn: Arn,
     agentUser: AgentUser
-  ): TaxServiceAccessGroup = {
+  ): TaxGroup = {
     val now = LocalDateTime.now()
 
-    TaxServiceAccessGroup(
+    TaxGroup(
       arn,
       Option(groupName).map(_.trim).getOrElse(""),
       now,
@@ -61,7 +61,7 @@ case class UpdateTaxServiceGroupRequest(
   excludedClients: Option[Set[Client]] = None
 ) {
 
-  def merge(existingGroup: TaxServiceAccessGroup): TaxServiceAccessGroup = {
+  def merge(existingGroup: TaxGroup): TaxGroup = {
     val withMergedGroupName =
       groupName.fold(existingGroup)(name => existingGroup.copy(groupName = Option(name).map(_.trim).getOrElse("")))
 

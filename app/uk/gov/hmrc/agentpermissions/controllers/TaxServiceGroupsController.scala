@@ -75,7 +75,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         taxGroupsService
           .getAllTaxServiceGroups(arn)
-          .map(groups => Ok(Json.toJson(groups.map(group => AccessGroupSummary.convertTaxServiceGroup(group)))))
+          .map(groups => Ok(Json.toJson(groups.map(group => GroupSummary.fromAccessGroup(group)))))
       }
     } transformWith failureHandler
   }
@@ -201,7 +201,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
 
   // TODO move to separate GroupAction
   private def withGroupId(gid: String, authorisedArn: Arn)(
-    body: (GroupId, TaxServiceAccessGroup) => Future[Result]
+    body: (GroupId, TaxGroup) => Future[Result]
   )(implicit hc: HeaderCarrier): Future[Result] =
     taxGroupsService.getById(gid) flatMap {
       case None =>

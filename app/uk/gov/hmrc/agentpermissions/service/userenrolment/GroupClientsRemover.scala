@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Client}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -30,23 +30,23 @@ import scala.concurrent.ExecutionContext
 trait GroupClientsRemover {
 
   def removeClientsFromGroup(
-    accessGroup: AccessGroup,
+    accessGroup: CustomGroup,
     removalEnrolmentKeys: Set[String],
     whoIsUpdating: AgentUser
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): AccessGroup
+  ): CustomGroup
 }
 
 @Singleton
 class GroupClientsRemoverImpl @Inject() (auditService: AuditService) extends GroupClientsRemover with Logging {
 
   override def removeClientsFromGroup(
-    accessGroup: AccessGroup,
+    accessGroup: CustomGroup,
     removalEnrolmentKeys: Set[String],
     whoIsUpdating: AgentUser
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): AccessGroup =
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): CustomGroup =
     accessGroup.clients match {
       case None =>
         accessGroup
@@ -78,11 +78,11 @@ class GroupClientsRemoverImpl @Inject() (auditService: AuditService) extends Gro
     }
 
   private def modifyAccessGroupWithClientsRemoved(
-    accessGroup: AccessGroup,
+    accessGroup: CustomGroup,
     clientsOfAccessGroup: Set[Client],
     clientsToRemoveFromAccessGroup: Set[Client],
     whoIsUpdating: AgentUser
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): AccessGroup = {
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): CustomGroup = {
 
     val (clientsToRemove, clientsToKeep): (Set[Client], Set[Client]) =
       clientsOfAccessGroup.partition(client =>

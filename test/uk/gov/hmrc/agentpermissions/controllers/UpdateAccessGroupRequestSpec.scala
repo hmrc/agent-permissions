@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, CustomGroup}
 import uk.gov.hmrc.agentpermissions.model.UpdateAccessGroupRequest
 
 import uk.gov.hmrc.agentpermissions.BaseSpec
@@ -36,7 +36,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
   val groupNameToUpdate = "name to update"
   val teamMembersToUpdate: Set[AgentUser] = Set(user1, user2)
   val clientsToUpdate: Set[Client] = Set(client1, client2)
-  val accessGroup: AccessGroup = AccessGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
+  val accessGroup: CustomGroup = CustomGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
 
   "Merge" when {
 

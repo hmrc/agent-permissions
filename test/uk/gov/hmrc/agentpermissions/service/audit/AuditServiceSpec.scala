@@ -31,7 +31,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
 
   "Access group creation" should {
     "audit event correctly" in new TestScope {
-      val accessGroup: AccessGroup =
+      val accessGroup: CustomGroup =
         buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat, clientPpt, clientCgt)))
 
       mockAppConfigAccessGroupChunkSize(1000)
@@ -43,7 +43,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
 
   "Access group update" should {
     "audit event correctly" in new TestScope {
-      val accessGroup: AccessGroup =
+      val accessGroup: CustomGroup =
         buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat, clientPpt, clientCgt)))
 
       mockAppConfigAccessGroupChunkSize(1000)
@@ -55,7 +55,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
 
   "Access group deletion" should {
     "audit event correctly" in new TestScope {
-      val accessGroup: AccessGroup =
+      val accessGroup: CustomGroup =
         buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat, clientPpt, clientCgt)))
 
       mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted", 1)
@@ -91,7 +91,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
 
   "Access group clients removal" should {
     "audit event correctly" in new TestScope {
-      val accessGroup: AccessGroup =
+      val accessGroup: CustomGroup =
         buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat, clientPpt, clientCgt)))
 
       val chunkSize = 1000
@@ -105,7 +105,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
 
   "Access group team members removal" should {
     "audit event correctly" in new TestScope {
-      val accessGroup: AccessGroup =
+      val accessGroup: CustomGroup =
         buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat, clientPpt, clientCgt)))
 
       val chunkSize = 1000
@@ -149,8 +149,8 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): AccessGroup =
-      AccessGroup(
+    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): CustomGroup =
+      CustomGroup(
         arn,
         groupName,
         now,

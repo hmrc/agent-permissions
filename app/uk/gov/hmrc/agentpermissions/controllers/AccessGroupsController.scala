@@ -134,7 +134,7 @@ class AccessGroupsController @Inject() (
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         accessGroupsService
           .getAllCustomGroups(arn)
-          .map(groups => Ok(Json.toJson(groups.map(AccessGroupSummary.convertCustomGroup))))
+          .map(groups => Ok(Json.toJson(groups.map(GroupSummary.fromAccessGroup))))
       }
     } transformWith failureHandler
   }
@@ -167,7 +167,7 @@ class AccessGroupsController @Inject() (
             logger.info("ARN obtained from provided group id did not match with that identified by auth")
             Forbidden
           } else {
-            Ok(Json.toJson(AccessGroupSummary.convertCustomGroup(accessGroup)))
+            Ok(Json.toJson(GroupSummary.fromAccessGroup(accessGroup)))
           }
       }
     } transformWith failureHandler
@@ -297,7 +297,7 @@ class AccessGroupsController @Inject() (
   }
 
   private def withGroupId(gid: String, authorisedArn: Arn)(
-    body: (GroupId, AccessGroup) => Future[Result]
+    body: (GroupId, CustomGroup) => Future[Result]
   )(implicit hc: HeaderCarrier): Future[Result] =
     accessGroupsService.getById(gid) flatMap {
       case None =>
