@@ -43,8 +43,8 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
 
     val clientTrust: Client = Client(s"$serviceTrust~$serviceIdentifierKeyTrust~0123456789", "Trust Client")
 
-    def buildAccessGroup(teamMembers: Set[AgentUser], clients: Set[Client]): AccessGroup =
-      AccessGroup(arn, groupName, now, now, userA, userA, Some(teamMembers), Some(clients))
+    def buildAccessGroup(teamMembers: Set[AgentUser], clients: Set[Client]): CustomGroup =
+      CustomGroup(arn, groupName, now, now, userA, userA, Some(teamMembers), Some(clients))
 
     val userEnrolmentAssignmentCalculator = new UserEnrolmentAssignmentCalculatorImpl
 
@@ -53,12 +53,12 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
 
   "For group creation" should {
     "correctly calculate assigns and unassigns" in new TestScope {
-      val accessGroupToCreate: AccessGroup =
+      val accessGroupToCreate: CustomGroup =
         buildAccessGroup(Set(userA, userB, userC), Set(clientVat, clientPpt, clientCgt))
 
-      val existingAccessGroup1: AccessGroup =
+      val existingAccessGroup1: CustomGroup =
         buildAccessGroup(Set(userA, userD, userE), Set(clientVat, clientPpt, clientMtdit))
-      val existingAccessGroup2: AccessGroup =
+      val existingAccessGroup2: CustomGroup =
         buildAccessGroup(Set(userA, userD, userE), Set(clientVat, clientCgt, clientTrust))
 
       val expectedAssigns: Set[UserEnrolment] = Set(
@@ -82,16 +82,16 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
 
   "For group update" should {
     "correctly calculate assigns and unassigns" in new TestScope {
-      val accessGroupToUpdate: AccessGroup =
+      val accessGroupToUpdate: CustomGroup =
         buildAccessGroup(Set(userA, userB, userC), Set(clientVat, clientPpt, clientCgt))
 
-      val accessGroupToUpdatePreviousVersion: AccessGroup = accessGroupToUpdate.copy(
+      val accessGroupToUpdatePreviousVersion: CustomGroup = accessGroupToUpdate.copy(
         groupName = accessGroupToUpdate.groupName.toUpperCase,
         teamMembers = Some(Set(userA, userB, userD)),
         clients = Some(Set(clientVat, clientPpt, clientMtdit))
       )
 
-      val existingAccessGroup2: AccessGroup =
+      val existingAccessGroup2: CustomGroup =
         buildAccessGroup(Set(userA, userD, userE), Set(clientVat, clientPpt, clientMtdit))
 
       val expectedAssigns: Set[UserEnrolment] = Set(
@@ -116,10 +116,10 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
 
   "For group deletion" should {
     "correctly calculate assigns and unassigns" in new TestScope {
-      val accessGroupToDelete: AccessGroup =
+      val accessGroupToDelete: CustomGroup =
         buildAccessGroup(Set(userA, userB, userC), Set(clientVat, clientPpt, clientCgt))
 
-      val existingAccessGroup2: AccessGroup =
+      val existingAccessGroup2: CustomGroup =
         buildAccessGroup(Set(userA, userD, userE), Set(clientVat, clientPpt, clientMtdit))
 
       val expectedAssigns: Set[UserEnrolment] = Set.empty

@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.service.audit
 
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, Arn}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, CustomGroup}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 
 import java.time.LocalDateTime
@@ -27,7 +27,7 @@ class AccessGroupSplitterSpec extends BaseSpec with AuditTestSupport {
     "create chunks correctly" in {
       val chunkSize = 50
 
-      val accessGroup: AccessGroup = AccessGroup(
+      val accessGroup: CustomGroup = CustomGroup(
         Arn("KARN1234567"),
         "some group",
         LocalDateTime.now(),

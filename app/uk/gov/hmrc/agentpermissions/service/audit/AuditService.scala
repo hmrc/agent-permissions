@@ -34,9 +34,9 @@ import scala.concurrent.ExecutionContext
 @ImplementedBy(classOf[AuditServiceImpl])
 trait AuditService {
 
-  def auditAccessGroupCreation(accessGroup: AccessGroup)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
+  def auditAccessGroupCreation(accessGroup: CustomGroup)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
 
-  def auditAccessGroupUpdate(accessGroup: AccessGroup)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
+  def auditAccessGroupUpdate(accessGroup: CustomGroup)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
 
   def auditAccessGroupDeletion(arn: Arn, groupName: String, agentUser: AgentUser)(implicit
     hc: HeaderCarrier,
@@ -51,12 +51,12 @@ trait AuditService {
 
   def auditOptOutEvent(arn: Arn, agentUser: AgentUser)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
 
-  def auditAccessGroupClientsRemoval(accessGroup: AccessGroup, clientsToRemove: Set[Client])(implicit
+  def auditAccessGroupClientsRemoval(accessGroup: CustomGroup, clientsToRemove: Set[Client])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit
 
-  def auditAccessGroupTeamMembersRemoval(accessGroup: AccessGroup, teamMembersToRemove: Set[AgentUser])(implicit
+  def auditAccessGroupTeamMembersRemoval(accessGroup: CustomGroup, teamMembersToRemove: Set[AgentUser])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit
@@ -86,7 +86,7 @@ case class AuditAccessGroup(
 
 object AuditAccessGroup {
 
-  implicit val objectIdFormat: Format[ObjectId] = AccessGroup.objectIdFormat
+  implicit val objectIdFormat: Format[ObjectId] = CustomGroup.objectIdFormat
 
   implicit val formatAccessGroup: OFormat[AuditAccessGroup] = Json.format[AuditAccessGroup]
 }
@@ -96,7 +96,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
     extends AuditService with Logging {
 
   override def auditAccessGroupCreation(
-    accessGroup: AccessGroup
+    accessGroup: CustomGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit =
     sendChunkedAuditEvents(
       "GranularPermissionsAccessGroupCreated",
@@ -118,7 +118,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
     )
 
   override def auditAccessGroupUpdate(
-    accessGroup: AccessGroup
+    accessGroup: CustomGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit =
     sendChunkedAuditEvents(
       "GranularPermissionsAccessGroupUpdated",
@@ -180,7 +180,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       Json.obj("agentReferenceNumber" -> s"${arn.value}", "user" -> agentUser)
     )
 
-  override def auditAccessGroupClientsRemoval(accessGroup: AccessGroup, clientsToRemove: Set[Client])(implicit
+  override def auditAccessGroupClientsRemoval(accessGroup: CustomGroup, clientsToRemove: Set[Client])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit =
@@ -197,7 +197,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
     )
 
   override def auditAccessGroupTeamMembersRemoval(
-    accessGroup: AccessGroup,
+    accessGroup: CustomGroup,
     teamMembersToRemove: Set[AgentUser]
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit =
     sendChunkedAuditEvents(

@@ -50,8 +50,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
   trait TestScope {
 
-    val taxServiceGroup: TaxServiceAccessGroup =
-      TaxServiceAccessGroup(
+    val taxServiceGroup: TaxGroup =
+      TaxGroup(
         dbId,
         arn,
         groupName,
@@ -91,23 +91,23 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
     def mockTaxGroupsServiceCreate(
       groupCreationStatus: TaxServiceGroupCreationStatus
-    ): CallHandler3[TaxServiceAccessGroup, HeaderCarrier, ExecutionContext, Future[TaxServiceGroupCreationStatus]] =
+    ): CallHandler3[TaxGroup, HeaderCarrier, ExecutionContext, Future[TaxServiceGroupCreationStatus]] =
       (mockTaxGroupsService
-        .create(_: TaxServiceAccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .create(_: TaxGroup)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.successful(groupCreationStatus))
 
     def mockTaxGroupsServiceCreateWithException(
       ex: Exception
-    ): CallHandler3[TaxServiceAccessGroup, HeaderCarrier, ExecutionContext, Future[TaxServiceGroupCreationStatus]] =
+    ): CallHandler3[TaxGroup, HeaderCarrier, ExecutionContext, Future[TaxServiceGroupCreationStatus]] =
       (mockTaxGroupsService
-        .create(_: TaxServiceAccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .create(_: TaxGroup)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
     def mockTaxGroupsServiceGetGroups(
-      groups: Seq[TaxServiceAccessGroup]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxServiceAccessGroup]]] =
+      groups: Seq[TaxGroup]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxGroup]]] =
       (mockTaxGroupsService
         .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
@@ -115,15 +115,15 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
     def mockTaxGroupsServiceGetGroupsWithException(
       ex: Exception
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxServiceAccessGroup]]] =
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxGroup]]] =
       (mockTaxGroupsService
         .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.failed(ex))
 
     def mockTaxGroupsServiceGetGroupById(
-      maybeGroup: Option[TaxServiceAccessGroup]
-    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
+      maybeGroup: Option[TaxGroup]
+    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[TaxGroup]]] =
       (mockTaxGroupsService
         .getById(_: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
@@ -131,7 +131,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
     def mockTaxGroupsServiceGetGroupByIdWithException(
       ex: Exception
-    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
+    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[TaxGroup]]] =
       (mockTaxGroupsService
         .getById(_: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
@@ -139,8 +139,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
     def mockTaxGroupsServiceGetGroupByService(
       service: String,
-      maybeGroup: Option[TaxServiceAccessGroup]
-    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
+      maybeGroup: Option[TaxGroup]
+    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Option[TaxGroup]]] =
       (mockTaxGroupsService
         .get(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, service, *, *)
@@ -148,7 +148,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
     def mockTaxGroupsServiceGetGroupByServiceWithException(
       ex: Exception
-    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Option[TaxServiceAccessGroup]]] =
+    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Option[TaxGroup]]] =
       (mockTaxGroupsService
         .get(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, serviceVat, *, *)
@@ -156,11 +156,11 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
     def mockTaxGroupsServiceUpdate(
       groupUpdateStatus: TaxServiceGroupUpdateStatus
-    ): CallHandler5[GroupId, TaxServiceAccessGroup, AgentUser, HeaderCarrier, ExecutionContext, Future[
+    ): CallHandler5[GroupId, TaxGroup, AgentUser, HeaderCarrier, ExecutionContext, Future[
       TaxServiceGroupUpdateStatus
     ]] =
       (mockTaxGroupsService
-        .update(_: GroupId, _: TaxServiceAccessGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .update(_: GroupId, _: TaxGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *, *)
         .returning(Future.successful(groupUpdateStatus))
 
@@ -523,8 +523,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
           val result = controller.groups(arn)(baseRequest)
 
           status(result) shouldBe OK
-          contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Vector(
-            AccessGroupSummary(
+          contentAsJson(result).as[Seq[GroupSummary]] shouldBe Vector(
+            GroupSummary(
               taxServiceGroup._id.toHexString,
               taxServiceGroup.groupName,
               None,

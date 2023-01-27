@@ -45,7 +45,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
     val groupId: GroupId = GroupId(arn, groupName)
     val dbId: String = new ObjectId().toHexString
 
-    val taxGroup: TaxServiceAccessGroup = TaxServiceAccessGroup(
+    val taxGroup: TaxGroup = TaxGroup(
       arn,
       groupName,
       now,
@@ -92,43 +92,43 @@ class TaxGroupsServiceSpec extends BaseSpec {
         .returning(Future.successful(clientCountMap))
 
     def mockTaxGroupsRepositoryGet(
-      maybeAccessGroup: Option[TaxServiceAccessGroup]
-    ): CallHandler2[Arn, String, Future[Option[TaxServiceAccessGroup]]] =
+      maybeAccessGroup: Option[TaxGroup]
+    ): CallHandler2[Arn, String, Future[Option[TaxGroup]]] =
       (mockTaxServiceGroupsRepository
         .get(_: Arn, _: String))
         .expects(arn, groupName)
         .returning(Future.successful(maybeAccessGroup))
 
     def mockTaxGroupsRepositoryGetByService(
-      maybeAccessGroup: Option[TaxServiceAccessGroup]
-    ): CallHandler2[Arn, String, Future[Option[TaxServiceAccessGroup]]] =
+      maybeAccessGroup: Option[TaxGroup]
+    ): CallHandler2[Arn, String, Future[Option[TaxGroup]]] =
       (mockTaxServiceGroupsRepository
         .getByService(_: Arn, _: String))
         .expects(arn, vatService)
         .returning(Future.successful(maybeAccessGroup))
 
     def mockTaxGroupsRepositoryGetById(
-      maybeAccessGroup: Option[TaxServiceAccessGroup]
-    ): CallHandler1[String, Future[Option[TaxServiceAccessGroup]]] =
+      maybeAccessGroup: Option[TaxGroup]
+    ): CallHandler1[String, Future[Option[TaxGroup]]] =
       (mockTaxServiceGroupsRepository
         .findById(_: String))
         .expects(dbId)
         .returning(Future.successful(maybeAccessGroup))
 
     def mockTaxGroupsRepositoryGetAll(
-      accessGroups: Seq[TaxServiceAccessGroup]
-    ): CallHandler1[Arn, Future[Seq[TaxServiceAccessGroup]]] =
+      accessGroups: Seq[TaxGroup]
+    ): CallHandler1[Arn, Future[Seq[TaxGroup]]] =
       (mockTaxServiceGroupsRepository
         .get(_: Arn))
         .expects(arn)
         .returning(Future.successful(accessGroups))
 
     def mockTaxServiceGroupsRepositoryInsert(
-      accessGroup: TaxServiceAccessGroup,
+      accessGroup: TaxGroup,
       maybeCreationId: Option[String]
-    ): CallHandler1[TaxServiceAccessGroup, Future[Option[String]]] =
+    ): CallHandler1[TaxGroup, Future[Option[String]]] =
       (mockTaxServiceGroupsRepository
-        .insert(_: TaxServiceAccessGroup))
+        .insert(_: TaxGroup))
         .expects(accessGroup)
         .returning(Future.successful(maybeCreationId))
 
@@ -142,9 +142,9 @@ class TaxGroupsServiceSpec extends BaseSpec {
 
     def mockTaxServiceGroupsRepositoryUpdate(
       maybeModifiedCount: Option[Long]
-    ): CallHandler3[Arn, String, TaxServiceAccessGroup, Future[Option[Long]]] =
+    ): CallHandler3[Arn, String, TaxGroup, Future[Option[Long]]] =
       (mockTaxServiceGroupsRepository
-        .update(_: Arn, _: String, _: TaxServiceAccessGroup))
+        .update(_: Arn, _: String, _: TaxGroup))
         .expects(arn, groupName, *)
         .returning(Future.successful(maybeModifiedCount))
 
@@ -288,13 +288,13 @@ class TaxGroupsServiceSpec extends BaseSpec {
     "groups found" should {
       "return corresponding summaries" in new TestScope {
 
-        val ag1: TaxServiceAccessGroup = taxGroup
-        val ag2: TaxServiceAccessGroup = taxGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
+        val ag1: TaxGroup = taxGroup
+        val ag2: TaxGroup = taxGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
 
         mockTaxGroupsRepositoryGetAll(Seq(ag1, ag2))
 
         taxGroupsService.getTaxGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
-          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", None, 1, taxService = Some(serviceVat)))
+          Seq(GroupSummary(ag2._id.toHexString, "group 2", None, 1, taxService = Some(serviceVat)))
       }
     }
   }

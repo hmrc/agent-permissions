@@ -44,8 +44,8 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
     val client2: Client = Client("HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345", "Frank Wright")
     val client3: Client = Client("HMRC-CGT-PD~CgtRef~XMCGTP123456789", "George Candy")
 
-    val accessGroup: AccessGroup =
-      AccessGroup(
+    val accessGroup: CustomGroup =
+      CustomGroup(
         dbId,
         arn,
         groupName,
@@ -144,7 +144,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
         s"return None" in new TestScope {
           accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
-          val accessGroupHavingGroupNameOfDifferentCase: AccessGroup =
+          val accessGroupHavingGroupNameOfDifferentCase: CustomGroup =
             accessGroup.copy(groupName = accessGroup.groupName.toUpperCase)
 
           accessGroupsRepository.insert(accessGroupHavingGroupNameOfDifferentCase).futureValue shouldBe None

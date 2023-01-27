@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, CustomGroup}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -30,26 +30,26 @@ import scala.concurrent.ExecutionContext
 trait GroupTeamMembersRemover {
 
   def removeTeamMembersFromGroup(
-    accessGroup: AccessGroup,
+    accessGroup: CustomGroup,
     removalUserIds: Set[String],
     whoIsUpdating: AgentUser
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): AccessGroup
+  ): CustomGroup
 }
 
 @Singleton
 class GroupTeamMembersRemoverImpl @Inject() (auditService: AuditService) extends GroupTeamMembersRemover with Logging {
 
   override def removeTeamMembersFromGroup(
-    accessGroup: AccessGroup,
+    accessGroup: CustomGroup,
     removalUserIds: Set[String],
     whoIsUpdating: AgentUser
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): AccessGroup =
+  ): CustomGroup =
     accessGroup.teamMembers match {
       case None =>
         accessGroup
@@ -81,14 +81,14 @@ class GroupTeamMembersRemoverImpl @Inject() (auditService: AuditService) extends
     }
 
   private def modifyAccessGroupWithTeamMembersRemoved(
-    accessGroup: AccessGroup,
+    accessGroup: CustomGroup,
     teamMembersOfAccessGroup: Set[AgentUser],
     teamMembersToRemoveFromAccessGroup: Set[AgentUser],
     whoIsUpdating: AgentUser
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): AccessGroup = {
+  ): CustomGroup = {
 
     val (teamMembersToRemove, teamMembersToKeep): (Set[AgentUser], Set[AgentUser]) =
       teamMembersOfAccessGroup.partition(agentUser =>

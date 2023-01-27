@@ -46,7 +46,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
     val groupId: GroupId = GroupId(arn, groupName)
     val dbId: String = new ObjectId().toHexString
 
-    val accessGroup: AccessGroup = AccessGroup(
+    val accessGroup: CustomGroup = CustomGroup(
       arn,
       groupName,
       now,
@@ -59,7 +59,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     val clients = Seq(clientVat, clientPpt, clientCgt)
 
-    val accessGroupInMongo: AccessGroup = withClientNamesRemoved(accessGroup)
+    val accessGroupInMongo: CustomGroup = withClientNamesRemoved(accessGroup)
 
     val assignedClient: AssignedClient = AssignedClient("service~key~value", None, "user")
 
@@ -89,42 +89,42 @@ class AccessGroupsServiceSpec extends BaseSpec {
     lazy val now: LocalDateTime = LocalDateTime.now()
 
     def mockAccessGroupsRepositoryGet(
-      maybeAccessGroup: Option[AccessGroup]
-    ): CallHandler2[Arn, String, Future[Option[AccessGroup]]] =
+      maybeAccessGroup: Option[CustomGroup]
+    ): CallHandler2[Arn, String, Future[Option[CustomGroup]]] =
       (mockAccessGroupsRepository
         .get(_: Arn, _: String))
         .expects(arn, groupName)
         .returning(Future.successful(maybeAccessGroup))
 
     def mockAccessGroupsRepositoryGetById(
-      maybeAccessGroup: Option[AccessGroup]
-    ): CallHandler1[String, Future[Option[AccessGroup]]] =
+      maybeAccessGroup: Option[CustomGroup]
+    ): CallHandler1[String, Future[Option[CustomGroup]]] =
       (mockAccessGroupsRepository
         .findById(_: String))
         .expects(dbId)
         .returning(Future.successful(maybeAccessGroup))
 
     def mockAccessGroupsRepositoryGetAll(
-      accessGroups: Seq[AccessGroup]
-    ): CallHandler1[Arn, Future[Seq[AccessGroup]]] =
+      accessGroups: Seq[CustomGroup]
+    ): CallHandler1[Arn, Future[Seq[CustomGroup]]] =
       (mockAccessGroupsRepository
         .get(_: Arn))
         .expects(arn)
         .returning(Future.successful(accessGroups))
 
     def mockAccessGroupsRepositoryInsert(
-      accessGroup: AccessGroup,
+      accessGroup: CustomGroup,
       maybeCreationId: Option[String]
-    ): CallHandler1[AccessGroup, Future[Option[String]]] = (mockAccessGroupsRepository
-      .insert(_: AccessGroup))
+    ): CallHandler1[CustomGroup, Future[Option[String]]] = (mockAccessGroupsRepository
+      .insert(_: CustomGroup))
       .expects(accessGroup)
       .returning(Future.successful(maybeCreationId))
 
     def mockUserEnrolmentAssignmentServiceCalculateForCreatingGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[AccessGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+    ): CallHandler2[CustomGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForGroupCreation(_: AccessGroup)(_: ExecutionContext))
+        .calculateForGroupCreation(_: CustomGroup)(_: ExecutionContext))
         .expects(accessGroup, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
@@ -138,9 +138,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     def mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler3[GroupId, AccessGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+    ): CallHandler3[GroupId, CustomGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForGroupUpdate(_: GroupId, _: AccessGroup)(_: ExecutionContext))
+        .calculateForGroupUpdate(_: GroupId, _: CustomGroup)(_: ExecutionContext))
         .expects(groupId, accessGroup, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
@@ -154,9 +154,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     def mockAccessGroupsRepositoryUpdate(
       maybeModifiedCount: Option[Long]
-    ): CallHandler3[Arn, String, AccessGroup, Future[Option[Long]]] =
+    ): CallHandler3[Arn, String, CustomGroup, Future[Option[Long]]] =
       (mockAccessGroupsRepository
-        .update(_: Arn, _: String, _: AccessGroup))
+        .update(_: Arn, _: String, _: CustomGroup))
         .expects(arn, groupName, *)
         .returning(Future.successful(maybeModifiedCount))
 
@@ -201,15 +201,15 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .expects(*, *, *)
         .returning(())
 
-    def mockAuditServiceAuditAccessGroupCreation(): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Unit] =
+    def mockAuditServiceAuditAccessGroupCreation(): CallHandler3[CustomGroup, HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupCreation(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupCreation(_: CustomGroup)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(())
 
-    def mockAuditServiceAuditAccessGroupUpdate(): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Unit] =
+    def mockAuditServiceAuditAccessGroupUpdate(): CallHandler3[CustomGroup, HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupUpdate(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupUpdate(_: CustomGroup)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(())
 
@@ -220,7 +220,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .expects(*, *, *, *, *)
         .returning(())
 
-    def withClientNamesRemoved(accessGroup: AccessGroup): AccessGroup =
+    def withClientNamesRemoved(accessGroup: CustomGroup): CustomGroup =
       accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = ""))))
   }
 
@@ -354,8 +354,8 @@ class AccessGroupsServiceSpec extends BaseSpec {
     "groups found" should {
       "return corresponding summaries" in new TestScope {
 
-        val ag1: AccessGroup = accessGroup
-        val ag2: AccessGroup = accessGroup.copy(groupName = "group 2", clients = Some(Set(clientVat)))
+        val ag1: CustomGroup = accessGroup
+        val ag2: CustomGroup = accessGroup.copy(groupName = "group 2", clients = Some(Set(clientVat)))
 
         mockAccessGroupsRepositoryGetAll(
           Seq(withClientNamesRemoved(ag1), withClientNamesRemoved(ag2))
@@ -364,7 +364,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         accessGroupsService
           .getCustomGroupSummariesForClient(arn, s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789")
           .futureValue shouldBe
-          Seq(AccessGroupSummary(ag1._id.toHexString, "some group", Some(3), 3))
+          Seq(GroupSummary(ag1._id.toHexString, "some group", Some(3), 3))
       }
     }
   }
@@ -374,15 +374,15 @@ class AccessGroupsServiceSpec extends BaseSpec {
     "groups found" should {
       "return corresponding summaries" in new TestScope {
 
-        val ag1: AccessGroup = accessGroup
-        val ag2: AccessGroup = accessGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
+        val ag1: CustomGroup = accessGroup
+        val ag2: CustomGroup = accessGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
 
         mockAccessGroupsRepositoryGetAll(
           Seq(withClientNamesRemoved(ag1), withClientNamesRemoved(ag2))
         )
 
         accessGroupsService.getCustomGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
-          Seq(AccessGroupSummary(ag2._id.toHexString, "group 2", Some(3), 1))
+          Seq(GroupSummary(ag2._id.toHexString, "group 2", Some(3), 1))
       }
     }
   }

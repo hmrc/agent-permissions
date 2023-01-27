@@ -64,7 +64,7 @@ class AccessGroupSynchronizerImpl @Inject() (
     } yield groupUpdateStatuses
 
   def calculateRemovalSet(
-    accessGroups: Seq[AccessGroup],
+    accessGroups: Seq[CustomGroup],
     groupDelegatedEnrolments: GroupDelegatedEnrolments
   ): RemovalSet = {
     val globalGroupView: Set[UserEnrolment] = userEnrolmentsOf(accessGroups)
@@ -79,13 +79,13 @@ class AccessGroupSynchronizerImpl @Inject() (
   }
 
   def applyRemovalsOnAccessGroups(
-    existingAccessGroups: Seq[AccessGroup],
+    existingAccessGroups: Seq[CustomGroup],
     removalSet: RemovalSet,
     whoIsUpdating: AgentUser
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Seq[AccessGroup]] = {
+  ): Future[Seq[CustomGroup]] = {
 
     val removalEnrolmentKeys: Set[String] = removalSet.enrolmentKeysToRemove
     val removalUserIds: Set[String] = removalSet.userIdsToRemove
@@ -95,7 +95,7 @@ class AccessGroupSynchronizerImpl @Inject() (
       .map(groupTeamMembersRemover.removeTeamMembersFromGroup(_, removalUserIds, whoIsUpdating))
   }
 
-  def persistAccessGroups(accessGroups: Seq[AccessGroup])(implicit
+  def persistAccessGroups(accessGroups: Seq[CustomGroup])(implicit
     ec: ExecutionContext
   ): Future[Seq[AccessGroupUpdateStatus]] =
     Future.sequence(accessGroups.map { accessGroup =>
@@ -114,7 +114,7 @@ class AccessGroupSynchronizerImpl @Inject() (
         }
     })
 
-  private def userEnrolmentsOf(accessGroups: Seq[AccessGroup]): Set[UserEnrolment] =
+  private def userEnrolmentsOf(accessGroups: Seq[CustomGroup]): Set[UserEnrolment] =
     (for {
       accessGroup <- accessGroups
       client      <- accessGroup.clients.toSet.flatten

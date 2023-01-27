@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, GroupId, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentmtdidentifiers.model.{CustomGroup, GroupId, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.http.HeaderCarrier
@@ -29,7 +29,7 @@ import scala.concurrent.{ExecutionContext, Future}
 @ImplementedBy(classOf[UserEnrolmentAssignmentServiceImpl])
 trait UserEnrolmentAssignmentService {
 
-  def calculateForGroupCreation(accessGroup: AccessGroup)(implicit
+  def calculateForGroupCreation(accessGroup: CustomGroup)(implicit
     ec: ExecutionContext
   ): Future[Option[UserEnrolmentAssignments]]
 
@@ -39,7 +39,7 @@ trait UserEnrolmentAssignmentService {
 
   def calculateForGroupUpdate(
     groupId: GroupId,
-    accessGroupToUpdate: AccessGroup
+    accessGroupToUpdate: CustomGroup
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
 
   def pushCalculatedAssignments(
@@ -55,7 +55,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
 ) extends UserEnrolmentAssignmentService with Logging {
 
   override def calculateForGroupCreation(
-    accessGroup: AccessGroup
+    accessGroup: CustomGroup
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
       existingAccessGroups <- accessGroupsRepository.get(accessGroup.arn)
@@ -77,7 +77,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
 
   override def calculateForGroupUpdate(
     groupId: GroupId,
-    accessGroupToUpdate: AccessGroup
+    accessGroupToUpdate: CustomGroup
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
       existingAccessGroups <- accessGroupsRepository.get(groupId.arn)

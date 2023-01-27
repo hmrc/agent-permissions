@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.Json
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, CustomGroup}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
@@ -30,7 +30,7 @@ class SensitiveAccessGroupSpec extends BaseSpec {
   val client1 = Client("HMRC-MTD-VAT~VRN~123456789", "")
   val client2 = Client("HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345", "")
 
-  val accessGroup = AccessGroup(
+  val accessGroup = CustomGroup(
     arn = Arn("KARN1234567"),
     groupName = "My Group",
     created = LocalDateTime.now().minusDays(1),

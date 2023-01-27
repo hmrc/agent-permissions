@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, UserEnrolment, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentmtdidentifiers.model.{CustomGroup, UserEnrolment, UserEnrolmentAssignments}
 
 import javax.inject.Singleton
 
@@ -26,18 +26,18 @@ import javax.inject.Singleton
 trait UserEnrolmentAssignmentCalculator {
 
   def forGroupCreation(
-    accessGroupToProcess: AccessGroup,
-    existingAccessGroups: Seq[AccessGroup]
+    accessGroupToProcess: CustomGroup,
+    existingAccessGroups: Seq[CustomGroup]
   ): Option[UserEnrolmentAssignments]
 
   def forGroupUpdate(
-    accessGroupToProcess: AccessGroup,
-    existingAccessGroups: Seq[AccessGroup]
+    accessGroupToProcess: CustomGroup,
+    existingAccessGroups: Seq[CustomGroup]
   ): Option[UserEnrolmentAssignments]
 
   def forGroupDeletion(
-    accessGroupToProcess: AccessGroup,
-    existingAccessGroups: Seq[AccessGroup]
+    accessGroupToProcess: CustomGroup,
+    existingAccessGroups: Seq[CustomGroup]
   ): Option[UserEnrolmentAssignments]
 }
 
@@ -45,8 +45,8 @@ trait UserEnrolmentAssignmentCalculator {
 class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalculator with Logging {
 
   override def forGroupCreation(
-    accessGroupToProcess: AccessGroup,
-    existingAccessGroups: Seq[AccessGroup]
+    accessGroupToProcess: CustomGroup,
+    existingAccessGroups: Seq[CustomGroup]
   ): Option[UserEnrolmentAssignments] = {
 
     val seedAssigns = explodeUserEnrolments(accessGroupToProcess)
@@ -57,8 +57,8 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
   }
 
   override def forGroupUpdate(
-    accessGroupToProcess: AccessGroup,
-    existingAccessGroups: Seq[AccessGroup]
+    accessGroupToProcess: CustomGroup,
+    existingAccessGroups: Seq[CustomGroup]
   ): Option[UserEnrolmentAssignments] =
     existingAccessGroups.find(_.groupName.equalsIgnoreCase(accessGroupToProcess.groupName)) map {
       accessGroupToProcessPreviousVersion =>
@@ -72,8 +72,8 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     }
 
   override def forGroupDeletion(
-    accessGroupToProcess: AccessGroup,
-    existingAccessGroups: Seq[AccessGroup]
+    accessGroupToProcess: CustomGroup,
+    existingAccessGroups: Seq[CustomGroup]
   ): Option[UserEnrolmentAssignments] = {
 
     val seedAssigns = Set.empty[UserEnrolment]
@@ -83,14 +83,14 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     Option(optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns))
   }
 
-  private def explodeUserEnrolments(accessGroup: AccessGroup): Set[UserEnrolment] = for {
+  private def explodeUserEnrolments(accessGroup: CustomGroup): Set[UserEnrolment] = for {
     userId       <- accessGroup.teamMembers.toSet.flatten.map(_.id);
     enrolmentKey <- accessGroup.clients.toSet.flatten.map(_.enrolmentKey)
   } yield UserEnrolment(userId, enrolmentKey)
 
   private def optimiseUserEnrolmentAssignments(
-    accessGroupToProcess: AccessGroup,
-    existingAccessGroups: Seq[AccessGroup],
+    accessGroupToProcess: CustomGroup,
+    existingAccessGroups: Seq[CustomGroup],
     seedAssigns: Set[UserEnrolment],
     seedUnassigns: Set[UserEnrolment]
   ): UserEnrolmentAssignments =

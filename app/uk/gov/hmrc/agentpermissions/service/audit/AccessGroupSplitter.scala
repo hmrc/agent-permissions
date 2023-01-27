@@ -16,11 +16,11 @@
 
 package uk.gov.hmrc.agentpermissions.service.audit
 
-import uk.gov.hmrc.agentmtdidentifiers.model.AccessGroup
+import uk.gov.hmrc.agentmtdidentifiers.model.CustomGroup
 
 object AccessGroupSplitter {
 
-  def split(accessGroup: AccessGroup, chunkSize: Int): Seq[AccessGroup] = {
+  def split(accessGroup: CustomGroup, chunkSize: Int): Seq[CustomGroup] = {
 
     val chunkedAccessGroupsWithClients = accessGroup.clients.toSeq.flatMap(_.grouped(chunkSize).map { chunkedClients =>
       accessGroup.copy(clients = Option(chunkedClients), teamMembers = None)

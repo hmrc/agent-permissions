@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import org.scalamock.handlers.CallHandler4
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, Client}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, CustomGroup}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.http.HeaderCarrier
@@ -31,14 +31,14 @@ class GroupTeamMembersRemoverSpec extends BaseSpec {
 
     "removal user ids contain some that exist in access group" should {
       "remove only those matching user ids of access group" in new TestScope {
-        val accessGroup: AccessGroup =
+        val accessGroup: CustomGroup =
           buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat)))
 
         val removalUserIds: Set[String] = Set(agentUser2.id)
 
         mockAuditServiceAuditAccessGroupTeamMembersRemoval()
 
-        val accessGroupWithClientsRemoved: AccessGroup =
+        val accessGroupWithClientsRemoved: CustomGroup =
           groupTeamMembersRemover.removeTeamMembersFromGroup(accessGroup, removalUserIds, agentUser1)
 
         accessGroupWithClientsRemoved.clients shouldBe accessGroup.clients
@@ -48,12 +48,12 @@ class GroupTeamMembersRemoverSpec extends BaseSpec {
 
     "removal user ids do not contain any that exist in access group" should {
       "not remove any user ids of access group" in new TestScope {
-        val accessGroup: AccessGroup =
+        val accessGroup: CustomGroup =
           buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat)))
 
         val removalUserIds: Set[String] = Set("unknown")
 
-        val accessGroupWithClientsRemoved: AccessGroup =
+        val accessGroupWithClientsRemoved: CustomGroup =
           groupTeamMembersRemover.removeTeamMembersFromGroup(accessGroup, removalUserIds, agentUser1)
 
         accessGroupWithClientsRemoved.clients shouldBe accessGroup.clients
@@ -79,8 +79,8 @@ class GroupTeamMembersRemoverSpec extends BaseSpec {
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): AccessGroup =
-      AccessGroup(
+    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): CustomGroup =
+      CustomGroup(
         arn,
         groupName,
         now,
@@ -92,9 +92,9 @@ class GroupTeamMembersRemoverSpec extends BaseSpec {
       )
 
     def mockAuditServiceAuditAccessGroupTeamMembersRemoval()
-      : CallHandler4[AccessGroup, Set[AgentUser], HeaderCarrier, ExecutionContext, Unit] =
+      : CallHandler4[CustomGroup, Set[AgentUser], HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupTeamMembersRemoval(_: AccessGroup, _: Set[AgentUser])(_: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupTeamMembersRemoval(_: CustomGroup, _: Set[AgentUser])(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(())
 

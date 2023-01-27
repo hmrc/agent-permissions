@@ -24,7 +24,7 @@ import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
 import org.mongodb.scala.model.{DeleteOptions, IndexModel, ReplaceOptions}
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, TaxServiceAccessGroup}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, TaxGroup}
 import uk.gov.hmrc.agentpermissions.model.SensitiveTaxServiceGroup
 import uk.gov.hmrc.agentpermissions.repository.TaxServiceGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, FIELD_SERVICE, caseInsensitiveCollation}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
@@ -36,13 +36,13 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[TaxServiceGroupsRepositoryImpl])
 trait TaxServiceGroupsRepository {
-  def findById(id: String): Future[Option[TaxServiceAccessGroup]]
-  def get(arn: Arn): Future[Seq[TaxServiceAccessGroup]]
-  def get(arn: Arn, groupName: String): Future[Option[TaxServiceAccessGroup]]
-  def getByService(arn: Arn, service: String): Future[Option[TaxServiceAccessGroup]]
-  def insert(accessGroup: TaxServiceAccessGroup): Future[Option[String]]
+  def findById(id: String): Future[Option[TaxGroup]]
+  def get(arn: Arn): Future[Seq[TaxGroup]]
+  def get(arn: Arn, groupName: String): Future[Option[TaxGroup]]
+  def getByService(arn: Arn, service: String): Future[Option[TaxGroup]]
+  def insert(accessGroup: TaxGroup): Future[Option[String]]
   def delete(arn: Arn, groupName: String): Future[Option[Long]]
-  def update(arn: Arn, groupName: String, accessGroup: TaxServiceAccessGroup): Future[Option[Long]]
+  def update(arn: Arn, groupName: String, accessGroup: TaxGroup): Future[Option[Long]]
 }
 
 @Singleton
@@ -66,13 +66,13 @@ class TaxServiceGroupsRepositoryImpl @Inject() (
       )
     ) with TaxServiceGroupsRepository with Logging {
 
-  override def findById(id: String): Future[Option[TaxServiceAccessGroup]] =
+  override def findById(id: String): Future[Option[TaxGroup]] =
     collection
       .find(new BasicDBObject("_id", id))
       .headOption()
       .map(_.map(_.decryptedValue))
 
-  override def get(arn: Arn): Future[Seq[TaxServiceAccessGroup]] =
+  override def get(arn: Arn): Future[Seq[TaxGroup]] =
     collection
       .find(equal(FIELD_ARN, arn.value))
       .collation(caseInsensitiveCollation)
@@ -81,21 +81,21 @@ class TaxServiceGroupsRepositoryImpl @Inject() (
       .map(_.map(_.decryptedValue))
 
   // check usage
-  override def get(arn: Arn, groupName: String): Future[Option[TaxServiceAccessGroup]] =
+  override def get(arn: Arn, groupName: String): Future[Option[TaxGroup]] =
     collection
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)))
       .collation(caseInsensitiveCollation)
       .headOption()
       .map(_.map(_.decryptedValue))
 
-  override def getByService(arn: Arn, service: String): Future[Option[TaxServiceAccessGroup]] =
+  override def getByService(arn: Arn, service: String): Future[Option[TaxGroup]] =
     collection
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_SERVICE, service)))
       .collation(caseInsensitiveCollation)
       .headOption()
       .map(_.map(_.decryptedValue))
 
-  override def insert(accessGroup: TaxServiceAccessGroup): Future[Option[String]] =
+  override def insert(accessGroup: TaxGroup): Future[Option[String]] =
     collection
       .insertOne(SensitiveTaxServiceGroup(accessGroup))
       .headOption()
@@ -113,7 +113,7 @@ class TaxServiceGroupsRepositoryImpl @Inject() (
       .headOption()
       .map(_.map(result => result.getDeletedCount))
 
-  override def update(arn: Arn, groupName: String, accessGroup: TaxServiceAccessGroup): Future[Option[Long]] =
+  override def update(arn: Arn, groupName: String, accessGroup: TaxGroup): Future[Option[Long]] =
     collection
       .replaceOne(
         and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),

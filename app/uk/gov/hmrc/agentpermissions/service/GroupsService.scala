@@ -28,14 +28,14 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[GroupsServiceImpl])
 trait GroupsService {
-  def getAllGroupSummaries(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[AccessGroupSummary]]
+  def getAllGroupSummaries(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]]
   def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupSummary]]
+  ): Future[Seq[GroupSummary]]
   def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupSummary]]
+  ): Future[Seq[GroupSummary]]
 
 }
 
@@ -48,15 +48,15 @@ class GroupsServiceImpl @Inject() (
 
   override def getAllGroupSummaries(
     arn: Arn
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[AccessGroupSummary]] =
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]] =
     for {
       customGroups <- customGroupsService.getAllCustomGroups(arn)
-      customSummaries = customGroups.map(AccessGroupSummary.convertCustomGroup)
+      customSummaries = customGroups.map(GroupSummary.fromAccessGroup)
       taxGroups           <- taxGroupsService.getAllTaxServiceGroups(arn)
       taxGroupClientCount <- taxGroupsService.clientCountForTaxGroups(arn)
       taxSummaries = taxGroups.map(group =>
-                       AccessGroupSummary
-                         .convertTaxServiceGroup(group)
+                       GroupSummary
+                         .fromAccessGroup(group)
                          .copy(clientCount = Option(taxGroupClientCount(group.service)))
                      )
       combinedSorted = (customSummaries ++ taxSummaries).sortBy(_.groupName.toLowerCase())
@@ -65,20 +65,18 @@ class GroupsServiceImpl @Inject() (
   override def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupSummary]] =
+  ): Future[Seq[GroupSummary]] =
     for {
       customSummaries <- customGroupsService.getCustomGroupSummariesForClient(arn, enrolmentKey)
       maybeTaxGroup   <- taxServiceGroupsRepo.getByService(arn, enrolmentKey.split('~').head)
       maybeTaxGroupSummary =
-        maybeTaxGroup.fold(Seq.empty[AccessGroupSummary])(group =>
-          Seq(AccessGroupSummary.convertTaxServiceGroup(group))
-        )
+        maybeTaxGroup.fold(Seq.empty[GroupSummary])(group => Seq(GroupSummary.fromAccessGroup(group)))
       combinedSummaries = customSummaries ++ maybeTaxGroupSummary
     } yield combinedSummaries
 
   override def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupSummary]] =
+  ): Future[Seq[GroupSummary]] =
     for {
       customSummaries <- customGroupsService.getCustomGroupSummariesForTeamMember(arn, userId)
       taxSummaries    <- taxGroupsService.getTaxGroupSummariesForTeamMember(arn, userId)

@@ -50,10 +50,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
   trait TestScope {
 
-    val accessGroup: AccessGroup =
-      AccessGroup(dbId, arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
-    val taxServiceGroup: TaxServiceAccessGroup =
-      TaxServiceAccessGroup(
+    val accessGroup: CustomGroup =
+      CustomGroup(dbId, arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
+    val taxServiceGroup: TaxGroup =
+      TaxGroup(
         dbId,
         arn,
         groupName,
@@ -71,8 +71,8 @@ class AccessGroupsControllerSpec extends BaseSpec {
       id: ObjectId = dbId,
       name: String = groupName,
       taxService: Option[String] = None
-    ): AccessGroupSummary =
-      AccessGroupSummary(id.toHexString, name, if (taxService.isEmpty) Some(3) else None, 3, taxService)
+    ): GroupSummary =
+      GroupSummary(id.toHexString, name, if (taxService.isEmpty) Some(3) else None, 3, taxService)
 
     val groupSummaries = Seq(
       groupSummary(),
@@ -108,23 +108,23 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAccessGroupsServiceCreate(
       accessGroupCreationStatus: AccessGroupCreationStatus
-    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
+    ): CallHandler3[CustomGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
       (mockAccessGroupsService
-        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .create(_: CustomGroup)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.successful(accessGroupCreationStatus))
 
     def mockAccessGroupsServiceCreateWithException(
       ex: Exception
-    ): CallHandler3[AccessGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
+    ): CallHandler3[CustomGroup, HeaderCarrier, ExecutionContext, Future[AccessGroupCreationStatus]] =
       (mockAccessGroupsService
-        .create(_: AccessGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .create(_: CustomGroup)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
     def mockAccessGroupsServiceGetGroups(
-      groups: Seq[AccessGroup]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroup]]] =
+      groups: Seq[CustomGroup]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[CustomGroup]]] =
       (mockAccessGroupsService
         .getAllCustomGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
@@ -132,15 +132,15 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAccessGroupsServiceGetGroupsWithException(
       ex: Exception
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroup]]] =
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[CustomGroup]]] =
       (mockAccessGroupsService
         .getAllCustomGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.failed(ex))
 
     def mockAccessGroupsServiceGetGroupById(
-      maybeAccessGroup: Option[AccessGroup]
-    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
+      maybeAccessGroup: Option[CustomGroup]
+    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[CustomGroup]]] =
       (mockAccessGroupsService
         .getById(_: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
@@ -148,15 +148,15 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAccessGroupsServiceGetGroupByIdWithException(
       ex: Exception
-    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
+    ): CallHandler3[String, HeaderCarrier, ExecutionContext, Future[Option[CustomGroup]]] =
       (mockAccessGroupsService
         .getById(_: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future failed ex)
 
     def mockAccessGroupsServiceGetGroup(
-      maybeAccessGroup: Option[AccessGroup]
-    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
+      maybeAccessGroup: Option[CustomGroup]
+    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[Option[CustomGroup]]] =
       (mockAccessGroupsService
         .get(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
         .expects(GroupId(arn, groupName), *, *)
@@ -164,7 +164,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAccessGroupsServiceGetGroupWithException(
       ex: Exception
-    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[Option[AccessGroup]]] =
+    ): CallHandler3[GroupId, HeaderCarrier, ExecutionContext, Future[Option[CustomGroup]]] =
       (mockAccessGroupsService
         .get(_: GroupId)(_: HeaderCarrier, _: ExecutionContext))
         .expects(GroupId(arn, groupName), *, *)
@@ -172,9 +172,9 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockAccessGroupsServiceUpdate(
       accessGroupUpdateStatus: AccessGroupUpdateStatus
-    ): CallHandler5[GroupId, AccessGroup, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
+    ): CallHandler5[GroupId, CustomGroup, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
       (mockAccessGroupsService
-        .update(_: GroupId, _: AccessGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .update(_: GroupId, _: CustomGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *, *)
         .returning(Future.successful(accessGroupUpdateStatus))
 
@@ -227,8 +227,8 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .returning(Future failed ex)
 
     def mockGroupsServiceGetGroupSummariesForClient(
-      accessGroupSummaries: Seq[AccessGroupSummary]
-    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      accessGroupSummaries: Seq[GroupSummary]
+    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockGroupsService
         .getAllGroupSummariesForClient(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
@@ -236,15 +236,15 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockGroupsServiceGetGroupSummariesForClientWithException(
       ex: Exception
-    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+    ): CallHandler4[Arn, String, HeaderCarrier, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockGroupsService
         .getAllGroupSummariesForClient(_: Arn, _: String)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(Future.failed(ex))
 
     def mockGroupsServiceGetGroupSummariesForTeamMember(
-      accessGroupSummaries: Seq[AccessGroupSummary]
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      accessGroupSummaries: Seq[GroupSummary]
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockGroupsService
         .getAllGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
@@ -252,15 +252,15 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockGroupsServiceGetGroupSummariesForTeamMemberWithException(
       ex: Exception
-    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockGroupsService
         .getAllGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
     def mockGroupsServiceGetGroupSummaries(
-      summaries: Seq[AccessGroupSummary]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+      summaries: Seq[GroupSummary]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockGroupsService
         .getAllGroupSummaries(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
@@ -268,7 +268,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockGroupsServiceGetGroupSummariesWithException(
       ex: Exception
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupSummary]]] =
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockGroupsService
         .getAllGroupSummaries(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
@@ -481,10 +481,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
           val result = controller.getAllGroupSummaries(arn)(baseRequest)
 
           status(result) shouldBe OK
-          contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
-            AccessGroupSummary(taxServiceGroup._id.toHexString, "Capital Gains Tax", None, 3, Some(serviceCgt)),
-            AccessGroupSummary(dbId2.toHexString, "Over done", Some(3), 3),
-            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(3), 3)
+          contentAsJson(result).as[Seq[GroupSummary]] shouldBe Seq(
+            GroupSummary(taxServiceGroup._id.toHexString, "Capital Gains Tax", None, 3, Some(serviceCgt)),
+            GroupSummary(dbId2.toHexString, "Over done", Some(3), 3),
+            GroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(3), 3)
           )
         }
       }
@@ -559,8 +559,8 @@ class AccessGroupsControllerSpec extends BaseSpec {
           val result = controller.groups(arn)(baseRequest)
 
           status(result) shouldBe OK
-          contentAsJson(result).as[Seq[AccessGroupSummary]] shouldBe Seq(
-            AccessGroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(0), 0)
+          contentAsJson(result).as[Seq[GroupSummary]] shouldBe Seq(
+            GroupSummary(accessGroup._id.toHexString, accessGroup.groupName, Some(0), 0)
           )
         }
       }
