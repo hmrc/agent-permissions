@@ -59,6 +59,7 @@ Even though custom access groups and tax service groups are separate, they canno
 |------------|------------------------|-------------------------|---------------------|
 | GET   | /arn/:arn/client/:enrolmentKey/groups  |   Gets all group summaries that contain a given client   | false |
 | GET   | /arn/:arn/team-member/:userId/groups   |   Gets all group summaries that contain a given team member  | true |
+| GET   | /arn/:arn/unassigned-clients           |   Gets all clients not assigned to any access group, can paginate, search and filter | true |
 
 ### Other
 | **Method** | **Path**                       | **Description**                           |Allows Assistant user|
