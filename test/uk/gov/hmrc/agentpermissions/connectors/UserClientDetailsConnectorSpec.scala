@@ -16,19 +16,24 @@
 
 package uk.gov.hmrc.agentpermissions.connectors
 
+import akka.actor.ActorSystem
+import akka.stream.Materializer
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
 import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
 import com.kenshoo.play.metrics.Metrics
 import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2}
 import play.api.http.Status._
 import play.api.libs.json.{Json, Writes}
-import play.api.libs.ws.WSRequest
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, Client, GroupDelegatedEnrolments, UserEnrolmentAssignments}
+import play.api.libs.ws.{WSClient, WSRequest, WSResponse}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, AssignedClient, Client, GroupDelegatedEnrolments, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.http.client.{HttpClientV2, RequestBuilder}
-import uk.gov.hmrc.http.{HeaderCarrier, HttpClient, HttpReads, HttpResponse, UpstreamErrorResponse}
+import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpClient, HttpReads, HttpResponse, UpstreamErrorResponse}
 
 import java.net.URL
+import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 
 class UserClientDetailsConnectorSpec extends BaseSpec {
@@ -39,11 +44,14 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
   val mockHttpClientV2: HttpClientV2 = mock[HttpClientV2]
   val mockRequestBuilder: RequestBuilder = mock[RequestBuilder]
   val mockMetrics: Metrics = mock[Metrics]
+  val mockWSClient: WSClient = mock[WSClient]
+  val mockWSRequest: WSRequest = mock[WSRequest]
+  val mockResponse: WSResponse = mock[WSResponse]
   val noopMetricRegistry = new NoopMetricRegistry
 
   implicit val mockAppConfig: AppConfig = mock[AppConfig]
 
-  implicit val hc: HeaderCarrier = HeaderCarrier()
+  implicit val hc: HeaderCarrier = HeaderCarrier(authorization = Option(Authorization("Bearer XYZ")))
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
   "agentSize" when {
@@ -443,16 +451,44 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       "return some value" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
         mockMetricsDefaultRegistry
-        mockHttpGetV2(
-          new URL(
+
+        (mockWSClient
+          .url(_: String))
+          .expects(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users"
           )
-        )
-        mockRequestBuilderTransform
-        mockRequestBuilderExecuteWithoutException(GroupDelegatedEnrolments(Seq.empty))
+          .returning(mockWSRequest)
+
+        (mockWSRequest
+          .withRequestTimeout(_: Duration))
+          .expects(*)
+          .returning(mockWSRequest)
+
+        (mockWSRequest
+          .withMethod(_: String))
+          .expects("GET")
+          .returning(mockWSRequest)
+
+        ((xs: Seq[(String, String)]) => mockWSRequest.withHttpHeaders(xs: _*))
+          .expects(Seq("Authorization" -> "Bearer XYZ"))
+          .returning(mockWSRequest)
+
+        (() => mockWSRequest.stream())
+          .expects()
+          .returning(Future successful mockResponse)
+
+        (() => mockResponse.bodyAsSource)
+          .expects()
+          .returning(
+            Source.future(
+              Future successful ByteString(
+                "[][{\"clientEnrolmentKey\": \"service~key~value\", \"assignedTo\": \"userid\"}][]"
+              )
+            )
+          )
 
         userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe Some(
-          GroupDelegatedEnrolments(Seq.empty)
+          GroupDelegatedEnrolments(Seq(AssignedClient("service~key~value", None, "userid")))
         )
       }
     }
@@ -462,13 +498,31 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
           mockMetricsDefaultRegistry
-          mockHttpGetV2(
-            new URL(
+
+          (mockWSClient
+            .url(_: String))
+            .expects(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users"
             )
-          )
-          mockRequestBuilderTransform
-          mockRequestBuilderExecuteWithException(UpstreamErrorResponse("boo boo", statusCode))
+            .returning(mockWSRequest)
+
+          (mockWSRequest
+            .withRequestTimeout(_: Duration))
+            .expects(*)
+            .returning(mockWSRequest)
+
+          (mockWSRequest
+            .withMethod(_: String))
+            .expects("GET")
+            .returning(mockWSRequest)
+
+          ((xs: Seq[(String, String)]) => mockWSRequest.withHttpHeaders(xs: _*))
+            .expects(Seq("Authorization" -> "Bearer XYZ"))
+            .returning(mockWSRequest)
+
+          (() => mockWSRequest.stream())
+            .expects()
+            .returning(Future failed UpstreamErrorResponse("boo boo", statusCode))
 
           userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe None
         }
@@ -478,7 +532,9 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
 
   trait TestScope {
     lazy val userClientDetailsConnector: UserClientDetailsConnector =
-      new UserClientDetailsConnectorImpl(mockHttpClient, mockHttpClientV2, mockMetrics)
+      new UserClientDetailsConnectorImpl(mockHttpClient, mockHttpClientV2, mockWSClient, mockMetrics)
+
+    implicit val materializer: Materializer = Materializer(ActorSystem())
 
     def mockAppConfigAgentUserClientDetailsBaseUrl: CallHandler0[String] =
       (mockAppConfig.agentUserClientDetailsBaseUrl _)

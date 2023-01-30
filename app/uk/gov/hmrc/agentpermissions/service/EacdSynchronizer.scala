@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
+import akka.stream.Materializer
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn}
@@ -42,7 +43,8 @@ class EacdSynchronizerImpl @Inject() (
   accessGroupSynchronizer: AccessGroupSynchronizer,
   eacdSyncRepository: EacdSyncRepository,
   appConfig: AppConfig
-) extends EacdSynchronizer with Logging {
+)(implicit materializer: Materializer)
+    extends EacdSynchronizer with Logging {
 
   override def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,

@@ -16,8 +16,9 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
+import akka.stream.Materializer
 import org.bson.types.ObjectId
-import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler5}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4, CallHandler5}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
@@ -180,10 +181,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     def mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
       maybeGroupDelegatedEnrolments: Option[GroupDelegatedEnrolments]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[GroupDelegatedEnrolments]]] =
+    ): CallHandler4[Arn, HeaderCarrier, ExecutionContext, Materializer, Future[Option[GroupDelegatedEnrolments]]] =
       (mockUserClientDetailsConnector
-        .getClientsWithAssignedUsers(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *)
+        .getClientsWithAssignedUsers(_: Arn)(_: HeaderCarrier, _: ExecutionContext, _: Materializer))
+        .expects(arn, *, *, *)
         .returning(Future successful maybeGroupDelegatedEnrolments)
 
     def mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(
