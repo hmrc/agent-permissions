@@ -284,13 +284,12 @@ class AccessGroupsController @Inject() (
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         eacdSynchronizer.syncWithEacd(matchedArn, authorisedAgent.agentUser).onComplete {
-          case Success(_) =>
-            logger.info(s"EACD Sync request processed for ${arn.value}")
+          case Success(updateStatuses) =>
+            logger.debug(s"EACD Sync request processed for ${arn.value}: $updateStatuses")
           case Failure(ex) =>
             logger.error(s"Error during EACD Sync for ${arn.value}: ${ex.getMessage}")
         }
 
-        logger.info(s"EACD Sync initiated for ${arn.value}")
         Future successful Ok
       }
     } transformWith failureHandler

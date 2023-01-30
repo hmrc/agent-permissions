@@ -16,7 +16,9 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import org.scalamock.handlers.{CallHandler0, CallHandler2, CallHandler3, CallHandler5}
+import akka.actor.ActorSystem
+import akka.stream.Materializer
+import org.scalamock.handlers.{CallHandler0, CallHandler2, CallHandler3, CallHandler4, CallHandler5}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
@@ -111,6 +113,7 @@ class EacdSynchronizerSpec extends BaseSpec {
     val assignedClient: AssignedClient = AssignedClient("service~key~value", None, "user")
 
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    implicit val materializer: Materializer = Materializer(ActorSystem())
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
     val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
@@ -137,10 +140,10 @@ class EacdSynchronizerSpec extends BaseSpec {
 
     def mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
       maybeGroupDelegatedEnrolments: Option[GroupDelegatedEnrolments]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[GroupDelegatedEnrolments]]] =
+    ): CallHandler4[Arn, HeaderCarrier, ExecutionContext, Materializer, Future[Option[GroupDelegatedEnrolments]]] =
       (mockUserClientDetailsConnector
-        .getClientsWithAssignedUsers(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *)
+        .getClientsWithAssignedUsers(_: Arn)(_: HeaderCarrier, _: ExecutionContext, _: Materializer))
+        .expects(arn, *, *, *)
         .returning(Future successful maybeGroupDelegatedEnrolments)
 
     def mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(
