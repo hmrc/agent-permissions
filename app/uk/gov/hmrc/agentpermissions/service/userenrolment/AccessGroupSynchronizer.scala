@@ -33,6 +33,7 @@ trait AccessGroupSynchronizer {
   def syncWithEacd(
     arn: Arn,
     groupDelegatedEnrolments: GroupDelegatedEnrolments,
+    accessGroups: Seq[CustomGroup],
     whoIsUpdating: AgentUser
   )(implicit
     hc: HeaderCarrier,
@@ -50,18 +51,24 @@ class AccessGroupSynchronizerImpl @Inject() (
   override def syncWithEacd(
     arn: Arn,
     groupDelegatedEnrolments: GroupDelegatedEnrolments,
+    accessGroups: Seq[CustomGroup],
     whoIsUpdating: AgentUser
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupUpdateStatus]] =
-    for {
-      accessGroups <- accessGroupsRepository.get(arn)
-      removalSet = calculateRemovalSet(accessGroups, groupDelegatedEnrolments)
-      accessGroupsWithUpdates <-
-        applyRemovalsOnAccessGroups(accessGroups, removalSet, whoIsUpdating)
-      groupUpdateStatuses <- persistAccessGroups(accessGroupsWithUpdates)
-    } yield groupUpdateStatuses
+  ): Future[Seq[AccessGroupUpdateStatus]] = {
+    val removalSet = calculateRemovalSet(accessGroups, groupDelegatedEnrolments)
+
+    if (removalSet.enrolmentKeysToRemove.isEmpty && removalSet.userIdsToRemove.isEmpty) {
+      Future successful Seq.empty[AccessGroupUpdateStatus]
+    } else {
+      for {
+        accessGroupsWithUpdates <-
+          applyRemovalsOnAccessGroups(accessGroups, removalSet, whoIsUpdating)
+        groupUpdateStatuses <- persistAccessGroups(accessGroupsWithUpdates)
+      } yield groupUpdateStatuses
+    }
+  }
 
   def calculateRemovalSet(
     accessGroups: Seq[CustomGroup],
@@ -99,7 +106,7 @@ class AccessGroupSynchronizerImpl @Inject() (
     ec: ExecutionContext
   ): Future[Seq[AccessGroupUpdateStatus]] =
     Future.sequence(accessGroups.map { accessGroup =>
-      logger.info(s"Updating access group of ${accessGroup.arn} having name '${accessGroup.groupName}'")
+      logger.info(s"Updating access group of ${accessGroup.arn.value} having name '${accessGroup.groupName}'")
       accessGroupsRepository
         .update(accessGroup.arn, accessGroup.groupName, accessGroup)
         .map {

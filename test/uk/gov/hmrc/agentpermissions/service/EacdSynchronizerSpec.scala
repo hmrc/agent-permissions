@@ -18,12 +18,12 @@ package uk.gov.hmrc.agentpermissions.service
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import org.scalamock.handlers.{CallHandler0, CallHandler2, CallHandler3, CallHandler4, CallHandler5}
+import org.scalamock.handlers._
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
-import uk.gov.hmrc.agentpermissions.repository.{EacdSyncRecord, EacdSyncRepository}
+import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, EacdSyncRecord, EacdSyncRepository}
 import uk.gov.hmrc.agentpermissions.service.userenrolment.AccessGroupSynchronizer
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -67,33 +67,57 @@ class EacdSynchronizerSpec extends BaseSpec {
 
         "eacd sync token is acquired" when {
 
-          "call to fetch assigned users returns nothing" should {
+          "custom access groups do not exist" should {
             "not attempt to sync with EACD" in new TestScope {
               mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
 
               mockAppConfigEacdSyncNotBeforeSeconds(10)
               mockEacdSyncRepositoryAcquire(Option(EacdSyncRecord(arn, Instant.now())))
 
-              mockUserClientDetailsConnectorGetClientsWithAssignedUsers(None)
+              mockAccessGroupsRepositoryGetAll(Seq.empty)
 
               eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
             }
           }
 
-          "call to fetch assigned users returns a value" should {
-            "attempt to sync with EACD" in new TestScope {
-              mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
+          "custom access groups exist" when {
 
-              mockAppConfigEacdSyncNotBeforeSeconds(10)
-              mockEacdSyncRepositoryAcquire(Option(EacdSyncRecord(arn, Instant.now())))
+            "call to fetch assigned users returns nothing" should {
+              "not attempt to sync with EACD" in new TestScope {
+                mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
 
-              mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
-                Some(GroupDelegatedEnrolments(Seq(assignedClient)))
-              )
+                mockAppConfigEacdSyncNotBeforeSeconds(10)
+                mockEacdSyncRepositoryAcquire(Option(EacdSyncRecord(arn, Instant.now())))
 
-              mockAccessGroupSynchronizerSyncWithEacd(Seq(AccessGroupUpdated))
+                val accessGroups: Seq[CustomGroup] =
+                  Seq(buildAccessGroup(Some(Set(user)), Some(Set(clientVat, clientPpt, clientCgt))))
+                mockAccessGroupsRepositoryGetAll(accessGroups)
 
-              eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq(AccessGroupUpdated)
+                mockUserClientDetailsConnectorGetClientsWithAssignedUsers(None)
+
+                eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
+              }
+            }
+
+            "call to fetch assigned users returns a value" should {
+              "attempt to sync with EACD" in new TestScope {
+                mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(Some(false))
+
+                mockAppConfigEacdSyncNotBeforeSeconds(10)
+                mockEacdSyncRepositoryAcquire(Option(EacdSyncRecord(arn, Instant.now())))
+
+                val accessGroups: Seq[CustomGroup] =
+                  Seq(buildAccessGroup(Some(Set(user)), Some(Set(clientVat, clientPpt, clientCgt))))
+                mockAccessGroupsRepositoryGetAll(accessGroups)
+
+                mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
+                  Some(GroupDelegatedEnrolments(Seq(assignedClient)))
+                )
+
+                mockAccessGroupSynchronizerSyncWithEacd(Seq(AccessGroupUpdated))
+
+                eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq(AccessGroupUpdated)
+              }
             }
           }
 
@@ -104,6 +128,7 @@ class EacdSynchronizerSpec extends BaseSpec {
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
+    val groupName: String = "groupName"
     val user: AgentUser = AgentUser("userId", "userName")
     val clientVat: Client = Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "John Innes")
     val clientPpt: Client = Client(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", "Frank Wright")
@@ -119,6 +144,7 @@ class EacdSynchronizerSpec extends BaseSpec {
     val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
     val mockAccessGroupSynchronizer: AccessGroupSynchronizer = mock[AccessGroupSynchronizer]
     val mockEacdSyncRepository: EacdSyncRepository = mock[EacdSyncRepository]
+    val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
     val mockAppConfig: AppConfig = mock[AppConfig]
 
     val eacdSynchronizer: EacdSynchronizer =
@@ -126,6 +152,7 @@ class EacdSynchronizerSpec extends BaseSpec {
         mockUserClientDetailsConnector,
         mockAccessGroupSynchronizer,
         mockEacdSyncRepository,
+        mockAccessGroupsRepository,
         mockAppConfig
       )
 
@@ -137,6 +164,18 @@ class EacdSynchronizerSpec extends BaseSpec {
     val maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments] = Some(userEnrolmentAssignments)
 
     lazy val now: LocalDateTime = LocalDateTime.now()
+
+    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): CustomGroup =
+      CustomGroup(
+        arn,
+        groupName,
+        now,
+        now,
+        user,
+        user,
+        teamMembers,
+        clients
+      )
 
     def mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
       maybeGroupDelegatedEnrolments: Option[GroupDelegatedEnrolments]
@@ -156,12 +195,15 @@ class EacdSynchronizerSpec extends BaseSpec {
 
     def mockAccessGroupSynchronizerSyncWithEacd(
       accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
-    ): CallHandler5[Arn, GroupDelegatedEnrolments, AgentUser, HeaderCarrier, ExecutionContext, Future[
+    ): CallHandler6[Arn, GroupDelegatedEnrolments, Seq[CustomGroup], AgentUser, HeaderCarrier, ExecutionContext, Future[
       Seq[AccessGroupUpdateStatus]
     ]] =
       (mockAccessGroupSynchronizer
-        .syncWithEacd(_: Arn, _: GroupDelegatedEnrolments, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, *, *, *, *)
+        .syncWithEacd(_: Arn, _: GroupDelegatedEnrolments, _: Seq[CustomGroup], _: AgentUser)(
+          _: HeaderCarrier,
+          _: ExecutionContext
+        ))
+        .expects(arn, *, *, *, *, *)
         .returning(Future successful accessGroupUpdateStatuses)
 
     def mockAppConfigEacdSyncNotBeforeSeconds(notBeforeSeconds: Int): CallHandler0[Int] =
@@ -173,6 +215,14 @@ class EacdSynchronizerSpec extends BaseSpec {
       .acquire(_: Arn, _: Int))
       .expects(arn, *)
       .returning(Future successful maybeEacdSyncRecord)
+
+    def mockAccessGroupsRepositoryGetAll(
+      accessGroups: Seq[CustomGroup]
+    ): CallHandler1[Arn, Future[Seq[CustomGroup]]] =
+      (mockAccessGroupsRepository
+        .get(_: Arn))
+        .expects(arn)
+        .returning(Future.successful(accessGroups))
 
   }
 
