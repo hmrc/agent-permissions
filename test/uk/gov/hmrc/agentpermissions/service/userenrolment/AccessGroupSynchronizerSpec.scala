@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
-import org.scalamock.handlers.{CallHandler1, CallHandler3, CallHandler5}
+import org.scalamock.handlers.{CallHandler3, CallHandler5}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
@@ -30,29 +30,56 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
   "Syncing With EACD" when {
 
-    "synchronization happens successfully" should {
-      "indicate access groups were updated" in new TestScope {
-        val accessGroup1: CustomGroup =
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
+    "synchronization happens" when {
 
-        val accessGroups: Seq[CustomGroup] = Seq(accessGroup1)
+      "removal set indicates differences between EACD and AG" should {
+        "update access groups" in new TestScope {
+          val accessGroup1: CustomGroup =
+            buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
 
-        mockAccessGroupsRepositoryGetAll(accessGroups)
-        mockRemoveClientsFromGroup(accessGroup1, Set(clientPpt, clientCgt).map(_.enrolmentKey), agentUser1)
-        mockRemoveTeamMembersFromGroup(accessGroup1, Set.empty, agentUser1)
-        mockAccessGroupsRepositoryUpdate(Some(1))
+          val accessGroups: Seq[CustomGroup] = Seq(accessGroup1)
 
-        accessGroupSynchronizer
-          .syncWithEacd(
-            arn,
-            GroupDelegatedEnrolments(
-              Seq(
-                AssignedClient(s"$serviceVat~$serviceIdentifierKeyVat~101747641", None, agentUser1.id)
-              )
-            ),
-            agentUser1
-          )
-          .futureValue shouldBe Seq(AccessGroupUpdated)
+          mockRemoveClientsFromGroup(accessGroup1, Set(clientPpt, clientCgt).map(_.enrolmentKey), agentUser1)
+          mockRemoveTeamMembersFromGroup(accessGroup1, Set.empty, agentUser1)
+          mockAccessGroupsRepositoryUpdate(Some(1))
+
+          accessGroupSynchronizer
+            .syncWithEacd(
+              arn,
+              GroupDelegatedEnrolments(
+                Seq(
+                  AssignedClient(s"$serviceVat~$serviceIdentifierKeyVat~101747641", None, agentUser1.id)
+                )
+              ),
+              accessGroups,
+              agentUser1
+            )
+            .futureValue shouldBe Seq(AccessGroupUpdated)
+        }
+      }
+
+      "removal set indicates no differences between EACD and AG" should {
+        "not update access groups" in new TestScope {
+          val accessGroup1: CustomGroup =
+            buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
+
+          val accessGroups: Seq[CustomGroup] = Seq(accessGroup1)
+
+          accessGroupSynchronizer
+            .syncWithEacd(
+              arn,
+              GroupDelegatedEnrolments(
+                Seq(
+                  AssignedClient(s"$serviceVat~$serviceIdentifierKeyVat~101747641", None, agentUser1.id),
+                  AssignedClient(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", None, agentUser1.id),
+                  AssignedClient(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", None, agentUser1.id)
+                )
+              ),
+              accessGroups,
+              agentUser1
+            )
+            .futureValue shouldBe Seq.empty
+        }
       }
     }
   }
@@ -222,14 +249,6 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
         teamMembers,
         clients
       )
-
-    def mockAccessGroupsRepositoryGetAll(
-      accessGroups: Seq[CustomGroup]
-    ): CallHandler1[Arn, Future[Seq[CustomGroup]]] =
-      (mockAccessGroupsRepository
-        .get(_: Arn))
-        .expects(arn)
-        .returning(Future.successful(accessGroups))
 
     def mockAccessGroupsRepositoryUpdate(
       maybeModifiedCount: Option[Long]
