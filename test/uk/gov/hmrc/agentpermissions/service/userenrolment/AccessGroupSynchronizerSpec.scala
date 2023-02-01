@@ -37,7 +37,6 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
 
         val accessGroups: Seq[CustomGroup] = Seq(accessGroup1)
 
-        mockAccessGroupsRepositoryGetAll(accessGroups)
         mockRemoveClientsFromGroup(accessGroup1, Set(clientPpt, clientCgt).map(_.enrolmentKey), agentUser1)
         mockRemoveTeamMembersFromGroup(accessGroup1, Set.empty, agentUser1)
         mockAccessGroupsRepositoryUpdate(Some(1))
@@ -50,6 +49,7 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
                 AssignedClient(s"$serviceVat~$serviceIdentifierKeyVat~101747641", None, agentUser1.id)
               )
             ),
+            accessGroups,
             agentUser1
           )
           .futureValue shouldBe Seq(AccessGroupUpdated)
@@ -222,14 +222,6 @@ class AccessGroupSynchronizerSpec extends BaseSpec {
         teamMembers,
         clients
       )
-
-    def mockAccessGroupsRepositoryGetAll(
-      accessGroups: Seq[CustomGroup]
-    ): CallHandler1[Arn, Future[Seq[CustomGroup]]] =
-      (mockAccessGroupsRepository
-        .get(_: Arn))
-        .expects(arn)
-        .returning(Future.successful(accessGroups))
 
     def mockAccessGroupsRepositoryUpdate(
       maybeModifiedCount: Option[Long]

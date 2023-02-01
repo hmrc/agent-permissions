@@ -33,6 +33,7 @@ trait AccessGroupSynchronizer {
   def syncWithEacd(
     arn: Arn,
     groupDelegatedEnrolments: GroupDelegatedEnrolments,
+    accessGroups: Seq[CustomGroup],
     whoIsUpdating: AgentUser
   )(implicit
     hc: HeaderCarrier,
@@ -50,18 +51,20 @@ class AccessGroupSynchronizerImpl @Inject() (
   override def syncWithEacd(
     arn: Arn,
     groupDelegatedEnrolments: GroupDelegatedEnrolments,
+    accessGroups: Seq[CustomGroup],
     whoIsUpdating: AgentUser
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupUpdateStatus]] =
+  ): Future[Seq[AccessGroupUpdateStatus]] = {
+    val removalSet = calculateRemovalSet(accessGroups, groupDelegatedEnrolments)
+
     for {
-      accessGroups <- accessGroupsRepository.get(arn)
-      removalSet = calculateRemovalSet(accessGroups, groupDelegatedEnrolments)
       accessGroupsWithUpdates <-
         applyRemovalsOnAccessGroups(accessGroups, removalSet, whoIsUpdating)
       groupUpdateStatuses <- persistAccessGroups(accessGroupsWithUpdates)
     } yield groupUpdateStatuses
+  }
 
   def calculateRemovalSet(
     accessGroups: Seq[CustomGroup],

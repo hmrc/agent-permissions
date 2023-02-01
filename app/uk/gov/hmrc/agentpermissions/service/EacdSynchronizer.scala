@@ -19,10 +19,10 @@ package uk.gov.hmrc.agentpermissions.service
 import akka.stream.Materializer
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, CustomGroup, GroupDelegatedEnrolments}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
-import uk.gov.hmrc.agentpermissions.repository.EacdSyncRepository
+import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, EacdSyncRepository}
 import uk.gov.hmrc.agentpermissions.service.userenrolment.AccessGroupSynchronizer
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -42,6 +42,7 @@ class EacdSynchronizerImpl @Inject() (
   userClientDetailsConnector: UserClientDetailsConnector,
   accessGroupSynchronizer: AccessGroupSynchronizer,
   eacdSyncRepository: EacdSyncRepository,
+  accessGroupsRepository: AccessGroupsRepository,
   appConfig: AppConfig
 )(implicit materializer: Materializer)
     extends EacdSynchronizer with Logging {
@@ -61,21 +62,41 @@ class EacdSynchronizerImpl @Inject() (
                                  else eacdSyncRepository.acquire(arn, appConfig.eacdSyncNotBeforeSeconds)
                              }
 
-      maybeGroupDelegatedEnrolments <- maybeEacdSyncRecord match {
-                                         case None =>
-                                           logger.debug(s"Skipping EACD sync for '${arn.value}'")
-                                           Future successful None
-                                         case _ =>
-                                           logger.info(s"Calling EACD sync for '${arn.value}'")
-                                           userClientDetailsConnector.getClientsWithAssignedUsers(arn)
+      (accessGroups, maybeGroupDelegatedEnrolments) <- maybeEacdSyncRecord match {
+                                                         case None =>
+                                                           Future successful (Seq.empty[CustomGroup] -> None)
+                                                         case _ =>
+                                                           logger.info(
+                                                             s"Acquired record for EACD Sync for '${arn.value}'"
+                                                           )
 
-                                       }
+                                                           for {
+                                                             accessGroups <- accessGroupsRepository.get(arn)
+                                                             maybeGroupDelegatedEnrolments <-
+                                                               if (accessGroups.isEmpty) {
+                                                                 Future successful Option
+                                                                   .empty[GroupDelegatedEnrolments]
+                                                               } else {
+                                                                 logger.info(
+                                                                   s"Fetching assigned users for EACD sync of '${arn.value}'"
+                                                                 )
+                                                                 userClientDetailsConnector.getClientsWithAssignedUsers(
+                                                                   arn
+                                                                 )
+                                                               }
+                                                           } yield (accessGroups, maybeGroupDelegatedEnrolments)
+                                                       }
 
       updateStatuses <- maybeGroupDelegatedEnrolments match {
                           case None =>
                             Future successful Seq.empty[AccessGroupUpdateStatus]
                           case Some(groupDelegatedEnrolments) =>
-                            accessGroupSynchronizer.syncWithEacd(arn, groupDelegatedEnrolments, whoIsUpdating)
+                            accessGroupSynchronizer.syncWithEacd(
+                              arn,
+                              groupDelegatedEnrolments,
+                              accessGroups,
+                              whoIsUpdating
+                            )
                         }
     } yield updateStatuses
 
