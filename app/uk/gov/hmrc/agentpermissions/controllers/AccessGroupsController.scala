@@ -34,6 +34,7 @@ import scala.util.{Failure, Success, Try}
 class AccessGroupsController @Inject() (
   accessGroupsService: AccessGroupsService, // TODO rename to customGroupsService
   groupsService: GroupsService,
+  taxGroupsService: TaxGroupsService,
   eacdSynchronizer: EacdSynchronizer
 )(implicit authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
     extends BackendController(cc) with AuthorisedAgentSupport {
@@ -86,15 +87,60 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  // TODO - need to account for Tax Service Groups
-  def unassignedClients(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  private def filterBySearchTermAndService(
+    clients: Set[Client],
+    search: Option[String],
+    filter: Option[String]
+  ): Set[Client] = {
+    val clientsMatchingSearch = search.fold(clients) { searchTerm =>
+      clients.filter(c => c.friendlyName.toLowerCase.contains(searchTerm.toLowerCase))
+    }
+    val taxServiceFilteredClients = filter.fold(clientsMatchingSearch) { term =>
+      if (term == "TRUST") clientsMatchingSearch.filter(_.enrolmentKey.contains("HMRC-TERS"))
+      else clientsMatchingSearch.filter(_.enrolmentKey.contains(term))
+    }
+    taxServiceFilteredClients
+  }
+
+  def unassignedClients(
+    arn: Arn,
+    page: Int = 1,
+    pageSize: Int = 20,
+    search: Option[String] = None,
+    filter: Option[String] = None
+  ): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
-        accessGroupsService
-          .getUnassignedClients(arn)
-          .map(clients => Ok(Json.toJson(clients)))
-      }
-    } transformWith failureHandler
+        for {
+          unfilteredClients <- accessGroupsService.getUnassignedClients(arn)
+          taxServiceGroups  <- taxGroupsService.getAllTaxServiceGroups(arn)
+          taxServicesToFilterOut = taxServiceGroups.map(_.service)
+          clientsExcludedFromTaxServiceGroups = taxServiceGroups.flatMap(_.excludedClients.getOrElse(Set.empty).toSeq)
+          filteredClients = filterBySearchTermAndService(unfilteredClients, search, filter).filter { client =>
+                              val serviceKey = EnrolmentKey.deconstruct(client.enrolmentKey) match {
+                                case ("HMRC-TERS-ORG", _) =>
+                                  "HMRC-TERS" // both types of trusts are represented by the same key in tax service groups
+                                case ("HMRC-TERSNT-ORG", _) =>
+                                  "HMRC-TERS" // both types of trusts are represented by the same key in tax service groups
+                                case (sk, _) => sk
+                              }
+                              // if a client is already part of a tax service group, do not list them as unassigned
+                              // but if a tax service group exists but the client is excluded from it, do list them as unassigned
+                              !taxServicesToFilterOut.contains(serviceKey) || clientsExcludedFromTaxServiceGroups
+                                .exists(_.enrolmentKey == client.enrolmentKey)
+                            }
+          sortedClients = filteredClients.toSeq.sortBy(c => c.friendlyName.toLowerCase)
+        } yield Ok(
+          Json.toJson(
+            PaginatedListBuilder.build[Client](
+              page,
+              pageSize,
+              sortedClients
+            )
+          )
+        )
+      } transformWith failureHandler
+    }
   }
 
   def createGroup(arn: Arn): Action[JsValue] = Action.async(parse.json) { implicit request =>

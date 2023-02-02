@@ -81,6 +81,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     val mockAccessGroupsService: AccessGroupsService = mock[AccessGroupsService]
     val mockGroupsService: GroupsService = mock[GroupsService]
+    val mockTaxGroupsService: TaxGroupsService = mock[TaxGroupsService]
     val mockEacdSynchronizer: EacdSynchronizer = mock[EacdSynchronizer]
     implicit val mockAuthAction: AuthAction = mock[AuthAction]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
@@ -88,7 +89,8 @@ class AccessGroupsControllerSpec extends BaseSpec {
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
     implicit val actorSystem: ActorSystem = ActorSystem()
 
-    val controller = new AccessGroupsController(mockAccessGroupsService, mockGroupsService, mockEacdSynchronizer)
+    val controller =
+      new AccessGroupsController(mockAccessGroupsService, mockGroupsService, mockTaxGroupsService, mockEacdSynchronizer)
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
@@ -209,6 +211,14 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
+
+    def mockTaxGroupsServiceGetGroups(
+      groups: Seq[TaxGroup]
+    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxGroup]]] =
+      (mockTaxGroupsService
+        .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(Future.successful(groups))
 
     def mockEacdSynchronizerSyncWithEacdNoException(
       accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
@@ -699,28 +709,80 @@ class AccessGroupsControllerSpec extends BaseSpec {
         s"return $NOT_FOUND" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetUnassignedClients(Set.empty)
+          mockTaxGroupsServiceGetGroups(Seq.empty)
 
           val result = controller.unassignedClients(arn)(baseRequest)
 
           status(result) shouldBe OK
-          contentAsJson(result).as[Seq[Client]] shouldBe Seq.empty
-
+          contentAsJson(result).as[PaginatedList[Client]].pageContent shouldBe Seq.empty
         }
       }
 
-      "calls to fetch clients returns data collections" should {
+      "calls to fetch unassigned clients returns data collections" should {
 
         s"return $OK" in new TestScope {
-          val enrolmentKey = "key"
+          val enrolmentKey = "HMRC-MTD-VAT~VRN~123456789"
           val friendlyName = "friendly name"
 
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetUnassignedClients(Set(Client(enrolmentKey, friendlyName)))
+          mockTaxGroupsServiceGetGroups(Seq.empty)
 
           val result = controller.unassignedClients(arn)(baseRequest)
 
           status(result) shouldBe OK
-          contentAsJson(result).as[Seq[Client]] shouldBe Seq(Client(enrolmentKey, friendlyName))
+          contentAsJson(result).as[PaginatedList[Client]].pageContent shouldBe Seq(Client(enrolmentKey, friendlyName))
+        }
+
+        s"exclude clients already in tax service groups" in new TestScope {
+          val enrolmentKeyVAT = "HMRC-MTD-VAT~VRN~123456789"
+          val enrolmentKeyPPT = "HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345"
+          val enrolmentKeyTrust = "HMRC-TERS-ORG~SAUTR~1731139143"
+          val enrolmentKeyTrustNT = "HMRC-TERSNT-ORG~URN~XATRUST73113914"
+
+          val taxServiceAccessGroupPPT = taxServiceGroup.copy(service = "HMRC-PPT-ORG")
+          val taxServiceAccessGroupTrust = taxServiceGroup.copy(service =
+            "HMRC-TERS"
+          ) // This should include both taxable (TERS) and non-taxable (TERSNT) trusts
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetUnassignedClients(
+            Set(
+              Client(enrolmentKeyVAT, "foo"),
+              Client(enrolmentKeyPPT, "bar"),
+              Client(enrolmentKeyTrust, "baz"),
+              Client(enrolmentKeyTrustNT, "bazNT")
+            )
+          )
+          mockTaxGroupsServiceGetGroups(Seq(taxServiceAccessGroupPPT, taxServiceAccessGroupTrust))
+
+          val result = controller.unassignedClients(arn)(baseRequest)
+
+          status(result) shouldBe OK
+          contentAsJson(result).as[PaginatedList[Client]].pageContent shouldBe Seq(
+            Client(enrolmentKeyVAT, "foo")
+          ) // don't show neither the PPT nor the trust enrolments as there are already tax service groups for that
+        }
+
+        s"not exclude clients already in tax service groups but who are excluded from them" in new TestScope {
+          val enrolmentKeyVAT = "HMRC-MTD-VAT~VRN~123456789"
+          val enrolmentKeyPPT = "HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345"
+          val taxServiceAccessGroup =
+            taxServiceGroup.copy(service = "HMRC-PPT-ORG", excludedClients = Some(Set(Client(enrolmentKeyPPT, "bar"))))
+
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetUnassignedClients(
+            Set(Client(enrolmentKeyVAT, "foo"), Client(enrolmentKeyPPT, "bar"))
+          )
+          mockTaxGroupsServiceGetGroups(Seq(taxServiceAccessGroup))
+
+          val result = controller.unassignedClients(arn)(baseRequest)
+
+          status(result) shouldBe OK
+          contentAsJson(result).as[PaginatedList[Client]].pageContent.toSet shouldBe Set(
+            Client(enrolmentKeyVAT, "foo"),
+            Client(enrolmentKeyPPT, "bar")
+          ) // do show the PPT enrolment as it's excluded from the tax service group
         }
       }
 
@@ -733,6 +795,51 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
           status(result) shouldBe INTERNAL_SERVER_ERROR
         }
+      }
+
+      "requesting unassigned clients" should {
+        val client1 = Client("HMRC-MTD-VAT~VRN~123456789", "Friendly Bob")
+        val client2 = Client("HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345", "Friendly Jane")
+
+        s"paginate correctly" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetUnassignedClients(Set(client1, client2))
+          mockTaxGroupsServiceGetGroups(Seq.empty)
+
+          val result = controller.unassignedClients(arn, page = 1, pageSize = 1)(baseRequest)
+
+          status(result) shouldBe OK
+          val paginatedList = contentAsJson(result).as[PaginatedList[Client]]
+          paginatedList.pageContent shouldBe Seq(client1)
+          paginatedList.paginationMetaData.totalPages shouldBe 2
+        }
+
+        s"search correctly" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetUnassignedClients(Set(client1, client2))
+          mockTaxGroupsServiceGetGroups(Seq.empty)
+
+          val result = controller.unassignedClients(arn, search = Some("bob"))(baseRequest)
+
+          status(result) shouldBe OK
+          val paginatedList = contentAsJson(result).as[PaginatedList[Client]]
+          paginatedList.pageContent shouldBe Seq(client1)
+          paginatedList.paginationMetaData.totalSize shouldBe 1
+        }
+
+        s"filter correctly" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetUnassignedClients(Set(client1, client2))
+          mockTaxGroupsServiceGetGroups(Seq.empty)
+
+          val result = controller.unassignedClients(arn, filter = Some("HMRC-MTD-VAT"))(baseRequest)
+
+          status(result) shouldBe OK
+          val paginatedList = contentAsJson(result).as[PaginatedList[Client]]
+          paginatedList.pageContent shouldBe Seq(client1)
+          paginatedList.paginationMetaData.totalSize shouldBe 1
+        }
+
       }
 
     }
