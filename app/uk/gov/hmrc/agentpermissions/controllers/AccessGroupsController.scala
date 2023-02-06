@@ -34,7 +34,6 @@ import scala.util.{Failure, Success, Try}
 class AccessGroupsController @Inject() (
   accessGroupsService: AccessGroupsService, // TODO rename to customGroupsService
   groupsService: GroupsService,
-  taxGroupsService: TaxGroupsService,
   eacdSynchronizer: EacdSynchronizer
 )(implicit authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
     extends BackendController(cc) with AuthorisedAgentSupport {
@@ -113,22 +112,7 @@ class AccessGroupsController @Inject() (
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         for {
           unfilteredClients <- accessGroupsService.getUnassignedClients(arn)
-          taxServiceGroups  <- taxGroupsService.getAllTaxServiceGroups(arn)
-          taxServicesToFilterOut = taxServiceGroups.map(_.service)
-          clientsExcludedFromTaxServiceGroups = taxServiceGroups.flatMap(_.excludedClients.getOrElse(Set.empty).toSeq)
-          filteredClients = filterBySearchTermAndService(unfilteredClients, search, filter).filter { client =>
-                              val serviceKey = EnrolmentKey.deconstruct(client.enrolmentKey) match {
-                                case ("HMRC-TERS-ORG", _) =>
-                                  "HMRC-TERS" // both types of trusts are represented by the same key in tax service groups
-                                case ("HMRC-TERSNT-ORG", _) =>
-                                  "HMRC-TERS" // both types of trusts are represented by the same key in tax service groups
-                                case (sk, _) => sk
-                              }
-                              // if a client is already part of a tax service group, do not list them as unassigned
-                              // but if a tax service group exists but the client is excluded from it, do list them as unassigned
-                              !taxServicesToFilterOut.contains(serviceKey) || clientsExcludedFromTaxServiceGroups
-                                .exists(_.enrolmentKey == client.enrolmentKey)
-                            }
+          filteredClients = filterBySearchTermAndService(unfilteredClients, search, filter)
           sortedClients = filteredClients.toSeq.sortBy(c => c.friendlyName.toLowerCase)
         } yield Ok(
           Json.toJson(
