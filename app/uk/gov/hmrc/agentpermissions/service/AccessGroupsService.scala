@@ -71,6 +71,7 @@ trait AccessGroupsService {
 class AccessGroupsServiceImpl @Inject() (
   accessGroupsRepository: AccessGroupsRepository,
   userEnrolmentAssignmentService: UserEnrolmentAssignmentService,
+  taxGroupsService: TaxGroupsService,
   userClientDetailsConnector: UserClientDetailsConnector,
   auditService: AuditService
 ) extends AccessGroupsService with Logging {
@@ -211,9 +212,22 @@ class AccessGroupsServiceImpl @Inject() (
     for {
       clients      <- userClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
       accessGroups <- if (clients.nonEmpty) accessGroupsRepository.get(arn) else Future.successful(Seq.empty)
-      assignedEnrolmentKeys = accessGroups.flatMap(_.clients).toSet.flatten.map(_.enrolmentKey)
+      enrolmentKeysInCustomGroups = accessGroups.flatMap(_.clients).toSet.flatten.map(_.enrolmentKey)
+      taxServiceGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
     } yield clients.foldLeft(ClientList(Set.empty, Set.empty)) { (clientList, client) =>
-      if (assignedEnrolmentKeys.contains(client.enrolmentKey)) {
+      val serviceKey = EnrolmentKey.deconstruct(client.enrolmentKey) match {
+        case ("HMRC-TERS-ORG", _) | ("HMRC-TERSNT-ORG", _) =>
+          "HMRC-TERS" // both types of trusts are represented by the same key in tax service groups
+        case (sk, _) => sk
+      }
+      // The client is considered 'assigned' if: ...
+      if (
+        enrolmentKeysInCustomGroups.contains(client.enrolmentKey) || // ... they are in a custom access group, OR ...
+        taxServiceGroups.exists(tsg => // ... there is a tax service group AND they are not excluded from it.
+          tsg.service == serviceKey &&
+            !tsg.excludedClients.getOrElse(Set.empty).exists(_.enrolmentKey == client.enrolmentKey)
+        )
+      ) {
         clientList.copy(assigned = clientList.assigned + client)
       } else {
         clientList.copy(unassigned = clientList.unassigned + client)
