@@ -24,29 +24,24 @@ import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
 import com.kenshoo.play.metrics.Metrics
 import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2}
 import play.api.http.Status._
-import play.api.libs.json.{Json, Writes}
-import play.api.libs.ws.{BodyWritable, DefaultBodyWritables, WSClient, WSRequest, WSResponse}
+import play.api.libs.json.Json
+import play.api.libs.ws.{BodyWritable, DefaultBodyWritables, WSRequest}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.http.client.{HttpClientV2, RequestBuilder, StreamHttpReads}
-import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpClient, HttpReads, HttpResponse, UpstreamErrorResponse}
+import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpReads, HttpResponse, UpstreamErrorResponse}
 
 import java.net.URL
-import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 
 class UserClientDetailsConnectorSpec extends BaseSpec {
 
   val arn: Arn = Arn("TARN0000001")
 
-  val mockHttpClient: HttpClient = mock[HttpClient]
   val mockHttpClientV2: HttpClientV2 = mock[HttpClientV2]
   val mockRequestBuilder: RequestBuilder = mock[RequestBuilder]
   val mockMetrics: Metrics = mock[Metrics]
-  val mockWSClient: WSClient = mock[WSClient]
-  val mockWSRequest: WSRequest = mock[WSRequest]
-  val mockResponse: WSResponse = mock[WSResponse]
   val noopMetricRegistry = new NoopMetricRegistry
 
   implicit val mockAppConfig: AppConfig = mock[AppConfig]
@@ -458,8 +453,15 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
           mockMetricsDefaultRegistry
-          mockHttpPost(
-            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/user-enrolment-assignments",
+          mockHttpPostV2(
+            new URL(
+              s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/user-enrolment-assignments"
+            )
+          )
+
+          mockRequestBuilderWithBody(Json.toJson(UserEnrolmentAssignments(Set.empty, Set.empty, arn)))
+
+          mockRequestBuilderExecuteWithoutException(
             HttpResponse(statusCode, "")
           )
 
@@ -491,42 +493,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
             )
           )
         )
-
-//        (mockWSClient
-//          .url(_: String))
-//          .expects(
-//            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users"
-//          )
-//          .returning(mockWSRequest)
-//
-//        (mockWSRequest
-//          .withRequestTimeout(_: Duration))
-//          .expects(*)
-//          .returning(mockWSRequest)
-//
-//        (mockWSRequest
-//          .withMethod(_: String))
-//          .expects("GET")
-//          .returning(mockWSRequest)
-//
-//        ((xs: Seq[(String, String)]) => mockWSRequest.withHttpHeaders(xs: _*))
-//          .expects(Seq("Authorization" -> "Bearer XYZ"))
-//          .returning(mockWSRequest)
-//
-//        (() => mockWSRequest.stream())
-//          .expects()
-//          .returning(Future successful mockResponse)
-//
-//        (() => mockResponse.bodyAsSource)
-//          .expects()
-//          .returning(
-//            Source.future(
-//              Future successful ByteString(
-//                "[][{\"clientEnrolmentKey\": \"service~key~value\", \"assignedTo\": \"userid\"}][]"
-//              )
-//            )
-//          )
-
         userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe Some(
           GroupDelegatedEnrolments(Seq(AssignedClient("service~key~value", None, "userid")))
         )
@@ -539,30 +505,13 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
           mockAppConfigAgentUserClientDetailsBaseUrl
           mockMetricsDefaultRegistry
 
-          (mockWSClient
-            .url(_: String))
-            .expects(
+          mockHttpGetV2(
+            new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users"
             )
-            .returning(mockWSRequest)
+          )
 
-          (mockWSRequest
-            .withRequestTimeout(_: Duration))
-            .expects(*)
-            .returning(mockWSRequest)
-
-          (mockWSRequest
-            .withMethod(_: String))
-            .expects("GET")
-            .returning(mockWSRequest)
-
-          ((xs: Seq[(String, String)]) => mockWSRequest.withHttpHeaders(xs: _*))
-            .expects(Seq("Authorization" -> "Bearer XYZ"))
-            .returning(mockWSRequest)
-
-          (() => mockWSRequest.stream())
-            .expects()
-            .returning(Future failed UpstreamErrorResponse("boo boo", statusCode))
+          mockRequestBuilderStreamFailed(UpstreamErrorResponse("boo boo", statusCode))
 
           userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe None
         }
@@ -587,16 +536,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         .expects()
         .returning(noopMetricRegistry)
 
-    def mockHttpGet[A](url: String, response: A): Unit =
-      (mockHttpClient
-        .GET[A](_: String, _: Seq[(String, String)], _: Seq[(String, String)])(
-          _: HttpReads[A],
-          _: HeaderCarrier,
-          _: ExecutionContext
-        ))
-        .expects(url, *, *, *, *, *)
-        .returning(Future.successful(response))
-
     def mockHttpGetV2[A](url: URL): Unit =
       (mockHttpClientV2
         .get(_: URL)(_: HeaderCarrier))
@@ -604,17 +543,29 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         .returning(mockRequestBuilder)
 
     def mockRequestBuilderTransform: CallHandler1[WSRequest => WSRequest, RequestBuilder] =
-      (mockRequestBuilder.transform(_: WSRequest => WSRequest)).expects(*).returning(mockRequestBuilder)
+      (mockRequestBuilder
+        .transform(_: WSRequest => WSRequest))
+        .expects(*)
+        .returning(mockRequestBuilder)
 
     import scala.reflect.runtime.universe._
     def mockRequestBuilderWithBody[JsValue](body: JsValue) =
-      (mockRequestBuilder.withBody(_: JsValue)(_: ExecutionContext)).expects(body, *).returning(mockRequestBuilder)
+      (mockRequestBuilder
+        .withBody(_: JsValue)(_: BodyWritable[JsValue], _: TypeTag[JsValue], _: ExecutionContext))
+        .expects(body, *, *, *)
+        .returning(mockRequestBuilder)
 
     def mockRequestBuilderStream[A: StreamHttpReads](stream: A) =
       (mockRequestBuilder
         .stream(_: StreamHttpReads[A], _: ExecutionContext))
         .expects(*, *)
         .returning(Future successful stream)
+
+    def mockRequestBuilderStreamFailed[A](ex: Exception) =
+      (mockRequestBuilder
+        .stream(_: StreamHttpReads[A], _: ExecutionContext))
+        .expects(*, *)
+        .returning(Future failed ex)
 
     def mockRequestBuilderExecuteWithoutException[A](
       value: A
@@ -631,17 +582,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         .execute(_: HttpReads[A], _: ExecutionContext))
         .expects(*, *)
         .returning(Future failed ex)
-
-    def mockHttpPost[I, A](url: String, response: A): Unit =
-      (mockHttpClient
-        .POST[I, A](_: String, _: I, _: Seq[(String, String)])(
-          _: Writes[I],
-          _: HttpReads[A],
-          _: HeaderCarrier,
-          _: ExecutionContext
-        ))
-        .expects(url, *, *, *, *, *, *)
-        .returning(Future.successful(response))
 
     def mockHttpPostV2[A](url: URL): Unit =
       (mockHttpClientV2
