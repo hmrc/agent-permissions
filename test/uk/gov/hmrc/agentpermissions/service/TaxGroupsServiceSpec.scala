@@ -77,8 +77,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
     val taxGroupsService: TaxGroupsService =
       new TaxGroupsServiceImpl(
         mockTaxServiceGroupsRepository,
-        mockAUCDConnector,
-        mockAuditService
+        mockAUCDConnector
       )
 
     lazy val now: LocalDateTime = LocalDateTime.now()
@@ -122,6 +121,15 @@ class TaxGroupsServiceSpec extends BaseSpec {
         .get(_: Arn))
         .expects(arn)
         .returning(Future.successful(accessGroups))
+
+    def mockTaxGroupsRepositoryGroupExistsForService(
+      service: String,
+      result: Boolean
+    ): CallHandler2[Arn, String, Future[Boolean]] =
+      (mockTaxServiceGroupsRepository
+        .groupExistsForTaxService(_: Arn, _: String))
+        .expects(arn, service)
+        .returning(Future.successful(result))
 
     def mockTaxServiceGroupsRepositoryInsert(
       accessGroup: TaxGroup,
@@ -358,18 +366,30 @@ class TaxGroupsServiceSpec extends BaseSpec {
 
   }
 
+  private val VAT = "HMRC-MTD-VAT"
+  private val IT = "HMRC-MTD-IT"
+  private val CGT = "HMRC-CGT-PD"
+  private val PPT = "HMRC-PPT-ORG"
+  private val TERS = "HMRC-TERS-ORG"
+  private val TERSNT = "HMRC-TERSNT-ORG"
+
   "Client count for available tax services" when {
     "no existing tax groups" should {
       "return map with client count for all services" in new TestScope {
         mockAUCDGetClientCount(Some(fullCountMap))
-        mockTaxGroupsRepositoryGetAll(Seq.empty)
+        mockTaxGroupsRepositoryGroupExistsForService(VAT, false)
+        mockTaxGroupsRepositoryGroupExistsForService(IT, false)
+        mockTaxGroupsRepositoryGroupExistsForService(CGT, false)
+        mockTaxGroupsRepositoryGroupExistsForService(PPT, false)
+        mockTaxGroupsRepositoryGroupExistsForService(TERS, false)
+        mockTaxGroupsRepositoryGroupExistsForService(TERSNT, false)
 
         val expectedCount = Map(
-          "HMRC-MTD-VAT" -> 2,
-          "HMRC-CGT-PD"  -> 3,
-          "HMRC-PPT-ORG" -> 4,
-          "HMRC-MTD-IT"  -> 5,
-          "HMRC-TERS"    -> 7 // Combined trusts
+          "HMRC-MTD-VAT"  -> 2,
+          "HMRC-CGT-PD"   -> 3,
+          "HMRC-PPT-ORG"  -> 4,
+          "HMRC-MTD-IT"   -> 5,
+          "HMRC-TERS-ORG" -> 7 // Combined trusts
         )
 
         taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
@@ -379,13 +399,17 @@ class TaxGroupsServiceSpec extends BaseSpec {
     "some existing tax groups" should {
       "return map with client count for available services" in new TestScope {
         mockAUCDGetClientCount(Some(fullCountMap))
-        mockTaxGroupsRepositoryGetAll(Seq(taxGroup)) // vat group
+        mockTaxGroupsRepositoryGroupExistsForService(VAT, true)
+        mockTaxGroupsRepositoryGroupExistsForService(IT, false)
+        mockTaxGroupsRepositoryGroupExistsForService(CGT, false)
+        mockTaxGroupsRepositoryGroupExistsForService(PPT, true)
+        mockTaxGroupsRepositoryGroupExistsForService(TERS, false)
+        mockTaxGroupsRepositoryGroupExistsForService(TERSNT, false)
 
         val expectedCount = Map(
-          "HMRC-CGT-PD"  -> 3,
-          "HMRC-PPT-ORG" -> 4,
-          "HMRC-MTD-IT"  -> 5,
-          "HMRC-TERS"    -> 7 // Combined trusts
+          "HMRC-CGT-PD"   -> 3,
+          "HMRC-MTD-IT"   -> 5,
+          "HMRC-TERS-ORG" -> 7 // Combined trusts
         )
 
         taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
@@ -394,18 +418,39 @@ class TaxGroupsServiceSpec extends BaseSpec {
 
     "all tax groups exist" should {
       "return empty map" in new TestScope {
-        val allTaxGroups = Seq(
-          taxGroup, // vat group
-          taxGroup.copy(service = serviceCgt),
-          taxGroup.copy(service = servicePpt),
-          taxGroup.copy(service = serviceMtdit),
-          taxGroup.copy(service = "HMRC-TERS")
-        )
 
         mockAUCDGetClientCount(Some(fullCountMap))
-        mockTaxGroupsRepositoryGetAll(allTaxGroups)
+        mockTaxGroupsRepositoryGroupExistsForService(VAT, true)
+        mockTaxGroupsRepositoryGroupExistsForService(IT, true)
+        mockTaxGroupsRepositoryGroupExistsForService(CGT, true)
+        mockTaxGroupsRepositoryGroupExistsForService(PPT, true)
+        mockTaxGroupsRepositoryGroupExistsForService(TERS, true)
+        mockTaxGroupsRepositoryGroupExistsForService(TERSNT, true)
 
         val expectedCount = Map.empty[String, Int]
+
+        taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
+      }
+    }
+
+    "agent has only some types of clients" should {
+      "return tax service groups for only those types of clients" in new TestScope {
+        mockAUCDGetClientCount(Some(Map("HMRC-MTD-VAT" -> 12, "HMRC-MTD-IT" -> 3)))
+        mockTaxGroupsRepositoryGroupExistsForService(VAT, false)
+        mockTaxGroupsRepositoryGroupExistsForService(IT, false)
+
+        val expectedCount = Map("HMRC-MTD-VAT" -> 12, "HMRC-MTD-IT" -> 3)
+
+        taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
+      }
+
+      "return tax service groups for only services where a group does not already exist" in new TestScope {
+        mockAUCDGetClientCount(Some(Map("HMRC-MTD-VAT" -> 12, "HMRC-MTD-IT" -> 3, "HMRC-TERSNT-ORG" -> 8)))
+        mockTaxGroupsRepositoryGroupExistsForService(VAT, false)
+        mockTaxGroupsRepositoryGroupExistsForService(IT, false)
+        mockTaxGroupsRepositoryGroupExistsForService(TERSNT, true)
+
+        val expectedCount = Map("HMRC-MTD-VAT" -> 12, "HMRC-MTD-IT" -> 3)
 
         taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
       }
@@ -414,7 +459,6 @@ class TaxGroupsServiceSpec extends BaseSpec {
     "AUCD fails to return full client count" should {
       "return empty map" in new TestScope {
         mockAUCDGetClientCount(None)
-        mockTaxGroupsRepositoryGetAll(Seq.empty) // does not matter
 
         taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe Map.empty[String, Int]
       }

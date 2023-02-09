@@ -70,7 +70,7 @@ class AccessGroupsController @Inject() (
   // gets all group summaries for client
   def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
     implicit request =>
-      withAuthorisedAgent() { _ =>
+      withAuthorisedAgent(allowStandardUser = true) { _ =>
         groupsService
           .getAllGroupSummariesForClient(arn, enrolmentKey)
           .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
