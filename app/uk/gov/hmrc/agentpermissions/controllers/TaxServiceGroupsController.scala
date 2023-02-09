@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.controllers
 import play.api.libs.json._
 import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model._
-import uk.gov.hmrc.agentpermissions.model.{AddMembersToTaxServiceGroupRequest, CreateTaxServiceGroupRequest, UpdateTaxServiceGroupRequest}
+import uk.gov.hmrc.agentpermissions.model.{AddMembersToTaxServiceGroupRequest, AddOneTeamMemberToGroupRequest, CreateTaxServiceGroupRequest, UpdateTaxServiceGroupRequest}
 import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.auth.core.AuthorisationException
 import uk.gov.hmrc.http.HeaderCarrier
@@ -177,6 +177,19 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
         }
       }
     } transformWith failureHandler
+  }
+
+  def addTeamMemberToGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+    withAuthorisedAgent() { _ =>
+      withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
+        taxGroupsService.addMemberToGroup(gid, addRequest.teamMember) map {
+          case TaxServiceGroupNotUpdated =>
+            logger.info(s"Tax Service Group with id '$gid' was not updated it probably doesn't exist")
+            NotFound
+          case TaxServiceGroupUpdated => Ok
+        }
+      }
+    }
   }
 
   def clientCountForAvailableTaxServices(arn: Arn): Action[AnyContent] = Action.async { implicit request =>

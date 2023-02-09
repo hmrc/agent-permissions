@@ -25,7 +25,7 @@ import uk.gov.hmrc.crypto._
 case class SensitiveTaxServiceGroup(override val decryptedValue: TaxGroup) extends Sensitive[TaxGroup]
 
 object SensitiveTaxServiceGroup {
-  private def encryptAgentUser(plainTextAgentUser: AgentUser)(implicit crypto: Encrypter): AgentUser =
+  def encryptAgentUser(plainTextAgentUser: AgentUser)(implicit crypto: Encrypter): AgentUser =
     plainTextAgentUser.copy(
       id = crypto.encrypt(PlainText(plainTextAgentUser.id)).value,
       name = crypto.encrypt(PlainText(plainTextAgentUser.name)).value

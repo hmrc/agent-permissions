@@ -19,9 +19,10 @@ package uk.gov.hmrc.agentpermissions.repository
 import org.bson.types.ObjectId
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
+import org.mongodb.scala.result.UpdateResult
 import uk.gov.hmrc.agentmtdidentifiers.model._
-import uk.gov.hmrc.agentpermissions.model.SensitiveAccessGroup
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.model.SensitiveAccessGroup
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 
@@ -174,6 +175,30 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
       "access group corresponding to group name provided does not exist in DB" should {
         "indicate the correct update count" in new TestScope {
           accessGroupsRepository.update(arn, groupName, accessGroup).futureValue shouldBe Some(0)
+        }
+      }
+
+    }
+
+    "adding a team member" when {
+
+      "group exists and can be added" should {
+        "return the group" in new TestScope {
+          // given
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+          val agentToAdd: AgentUser = AgentUser("user10", "Bob Smith")
+
+          // when
+          val updateResult: UpdateResult = accessGroupsRepository.addTeamMember(dbId.toString, agentToAdd).futureValue
+
+          // then
+          updateResult.getModifiedCount shouldBe 1
+
+          // and
+          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(dbId.toString).futureValue
+          updatedGroup.get.teamMembers.isDefined shouldBe true
+          updatedGroup.get.teamMembers.get.contains(agentToAdd) shouldBe true
+          updatedGroup.get.teamMembers.get.size shouldBe 4
         }
       }
 
