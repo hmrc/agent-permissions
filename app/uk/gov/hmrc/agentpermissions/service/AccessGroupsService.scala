@@ -31,6 +31,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[AccessGroupsServiceImpl])
 trait AccessGroupsService {
+  def addMemberToGroup(gid: String, teamMember: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[AccessGroupUpdateStatus]
+
   def getById(id: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]]
 
   def create(
@@ -308,6 +313,17 @@ class AccessGroupsServiceImpl @Inject() (
             )
         }
     }
+
+  override def addMemberToGroup(groupId: String, teamMember: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[AccessGroupUpdateStatus] =
+    accessGroupsRepository
+      .addTeamMember(groupId, teamMember)
+      .map(_.getMatchedCount match {
+        case 1 => AccessGroupUpdated
+        case _ => AccessGroupNotUpdated
+      })
 }
 
 sealed trait AccessGroupCreationStatus
