@@ -23,7 +23,6 @@ import org.mongodb.scala.result.UpdateResult
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.model.SensitiveAccessGroup
-import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 
@@ -62,7 +61,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
     def now: LocalDateTime = LocalDateTime.now()
 
     val accessGroupsRepositoryImpl: AccessGroupsRepositoryImpl = repository.asInstanceOf[AccessGroupsRepositoryImpl]
-    val repository: AccessGroupsRepository =
+    val accessGroupsRepository: AccessGroupsRepository =
       accessGroupsRepositoryImpl // trying to use trait interface as much as possible
   }
 
@@ -93,7 +92,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "no groups exist for Arn" should {
         "return nothing" in new TestScope {
-          repository.get(arn).futureValue shouldBe empty
+          accessGroupsRepository.get(arn).futureValue shouldBe empty
         }
       }
     }
@@ -102,7 +101,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "group of that name does not exist" should {
         "return nothing" in new TestScope {
-          repository.findById(dbId.toHexString).futureValue shouldBe None
+          accessGroupsRepository.findById(dbId.toHexString).futureValue shouldBe None
         }
       }
     }
@@ -111,7 +110,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "group of that name does not exist" should {
         "return nothing" in new TestScope {
-          repository.get(arn, groupName).futureValue shouldBe None
+          accessGroupsRepository.get(arn, groupName).futureValue shouldBe None
         }
       }
     }
@@ -120,10 +119,10 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "inserting a non-existing access group" should {
         s"return an id" in new TestScope {
-          repository.insert(accessGroup).futureValue.get shouldBe a[String]
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
         }
         s"store the access group with field-level-encryption" in new TestScope {
-          repository.insert(accessGroup).futureValue
+          accessGroupsRepository.insert(accessGroup).futureValue
           // checking at the raw Document level that the relevant fields have been encrypted
           val document = accessGroupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
           document.toString should include(accessGroup.groupName) // the group name should be in plaintext
@@ -137,19 +136,19 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "inserting an existing access group" should {
         s"return None" in new TestScope {
-          repository.insert(accessGroup).futureValue.get shouldBe a[String]
-          repository.insert(accessGroup).futureValue shouldBe None
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+          accessGroupsRepository.insert(accessGroup).futureValue shouldBe None
         }
       }
 
       "inserting an access group with a group name differing only in case-sensitiveness" should {
         s"return None" in new TestScope {
-          repository.insert(accessGroup).futureValue.get shouldBe a[String]
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
           val accessGroupHavingGroupNameOfDifferentCase: CustomGroup =
             accessGroup.copy(groupName = accessGroup.groupName.toUpperCase)
 
-          repository.insert(accessGroupHavingGroupNameOfDifferentCase).futureValue shouldBe None
+          accessGroupsRepository.insert(accessGroupHavingGroupNameOfDifferentCase).futureValue shouldBe None
         }
       }
     }
@@ -158,15 +157,15 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "access group corresponding to group name provided does not exist in DB" should {
         s"indicate the correct deletion count" in new TestScope {
-          repository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(0L)
+          accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(0L)
         }
       }
 
       "group name provided is different than that existing in DB only case-sensitively" should {
         s"indicate the correct deletion count" in new TestScope {
-          repository.insert(accessGroup).futureValue.get shouldBe a[String]
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
-          repository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(1L)
+          accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(1L)
         }
       }
     }
@@ -175,7 +174,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "access group corresponding to group name provided does not exist in DB" should {
         "indicate the correct update count" in new TestScope {
-          repository.update(arn, groupName, accessGroup).futureValue shouldBe Some(0)
+          accessGroupsRepository.update(arn, groupName, accessGroup).futureValue shouldBe Some(0)
         }
       }
 
@@ -186,17 +185,17 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
       "group exists and can be added" should {
         "return the group" in new TestScope {
           // given
-          repository.insert(accessGroup).futureValue.get shouldBe a[String]
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
           val agentToAdd: AgentUser = AgentUser("user10", "Bob Smith")
 
           // when
-          val updateResult: UpdateResult = repository.addTeamMember(dbId.toString, agentToAdd).futureValue
+          val updateResult: UpdateResult = accessGroupsRepository.addTeamMember(dbId.toString, agentToAdd).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 1
 
           // and
-          val updatedGroup: Option[CustomGroup] = repository.findById(dbId.toString).futureValue
+          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(dbId.toString).futureValue
           updatedGroup.get.teamMembers.isDefined shouldBe true
           updatedGroup.get.teamMembers.get.contains(agentToAdd) shouldBe true
           updatedGroup.get.teamMembers.get.size shouldBe 4

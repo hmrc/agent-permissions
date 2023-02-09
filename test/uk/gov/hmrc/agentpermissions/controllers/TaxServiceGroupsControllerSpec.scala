@@ -25,6 +25,7 @@ import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.model.AddOneTeamMemberToGroupRequest
 import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.auth.core.InvalidBearerToken
 import uk.gov.hmrc.http.HeaderCarrier
@@ -72,6 +73,15 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
     implicit val actorSystem: ActorSystem = ActorSystem()
 
     val controller = new TaxServiceGroupsController(mockTaxGroupsService)
+
+    def expectAddTeamMemberToGroup(
+      accessGroupUpdateStatus: TaxServiceGroupUpdateStatus
+    ): CallHandler4[String, AgentUser, HeaderCarrier, ExecutionContext, Future[TaxServiceGroupUpdateStatus]] =
+      (mockTaxGroupsService
+        .addMemberToGroup(_: String, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.successful(accessGroupUpdateStatus))
+        .once()
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
@@ -999,6 +1009,45 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
         }
 
       }
+    }
+  }
+
+  "agent not identified by auth" should {
+    s"return $FORBIDDEN" in new TestScope {
+      // given
+      mockAuthActionGetAuthorisedAgent(None)
+
+      // when
+      val result =
+        controller.addTeamMemberToGroup(dbId.toHexString)(baseRequest.withBody(jsonPayloadForUpdatingGroup(groupName)))
+
+      // then
+      status(result) shouldBe FORBIDDEN
+    }
+
+    s"return $OK when payload is good" in new TestScope {
+      // given
+      mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+      val request: AddOneTeamMemberToGroupRequest = AddOneTeamMemberToGroupRequest(user)
+      expectAddTeamMemberToGroup(TaxServiceGroupUpdated)
+
+      // when
+      val result = controller.addTeamMemberToGroup(dbId.toHexString)(baseRequest.withBody(Json.toJson(request)))
+      // then
+      status(result) shouldBe OK
+    }
+
+    s"return $OK when payload is not good" in new TestScope {
+      // given
+      mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+      // when
+      val request: AddOneTeamMemberToGroupRequest = AddOneTeamMemberToGroupRequest(user)
+
+      // then
+      expectAddTeamMemberToGroup(TaxServiceGroupNotUpdated)
+      val result = controller.addTeamMemberToGroup(dbId.toHexString)(baseRequest.withBody(Json.toJson(request)))
+      status(result) shouldBe NOT_FOUND
     }
   }
 

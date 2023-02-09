@@ -25,6 +25,7 @@ import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.model.AddOneTeamMemberToGroupRequest
 import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.auth.core.InvalidBearerToken
 import uk.gov.hmrc.http.HeaderCarrier
@@ -88,8 +89,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
     implicit val actorSystem: ActorSystem = ActorSystem()
 
-    val controller =
-      new AccessGroupsController(mockAccessGroupsService, mockGroupsService, mockEacdSynchronizer)
+    val controller = new AccessGroupsController(mockAccessGroupsService, mockGroupsService, mockEacdSynchronizer)
 
     def mockAuthActionGetAuthorisedAgent(
       maybeAuthorisedAgent: Option[AuthorisedAgent]
@@ -178,6 +178,15 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .update(_: GroupId, _: CustomGroup, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *, *)
         .returning(Future.successful(accessGroupUpdateStatus))
+
+    def expectAddTeamMemberToGroup(
+      accessGroupUpdateStatus: AccessGroupUpdateStatus
+    ): CallHandler4[String, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
+      (mockAccessGroupsService
+        .addMemberToGroup(_: String, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.successful(accessGroupUpdateStatus))
+        .once()
 
     def mockAccessGroupsServiceDelete(
       accessGroupDeletionStatus: AccessGroupDeletionStatus
@@ -1130,6 +1139,145 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
         val result = controller.updateGroup(dbId.toHexString)(baseRequest.withBody(JsString("")))
         status(result) shouldBe BAD_REQUEST
+      }
+    }
+
+    "request contains correct json payload" when {
+
+      implicit val request = baseRequest.withBody(jsonPayloadForUpdatingGroup(groupName))
+
+      "group id is not in the expected format" should {
+        s"return $BAD_REQUEST" in new TestScope {
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          mockAccessGroupsServiceGetGroupById(None)
+
+          val result = controller.updateGroup("bad")(request)
+          status(result) shouldBe BAD_REQUEST
+        }
+      }
+
+      "group id is in the expected format" when {
+
+        "auth identifies a different arn than that obtained from provided group id" should {
+          s"return $FORBIDDEN" in new TestScope {
+            val nonMatchingArn: Arn = Arn("FARN3782960")
+
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
+            mockAccessGroupsServiceGetGroupById(Some(accessGroup))
+
+            val result = controller.updateGroup(dbId.toHexString)(request)
+
+            status(result) shouldBe FORBIDDEN
+          }
+        }
+
+        "group for provided id does not exist" should {
+          s"return $BAD_REQUEST" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceGetGroupById(None)
+
+            val result = controller.updateGroup(dbId.toHexString)(request)
+
+            status(result) shouldBe BAD_REQUEST
+          }
+        }
+
+        "provided group name length is more than the maximum allowed" should {
+          s"return $BAD_REQUEST" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceGetGroupById(Some(accessGroup))
+
+            val result = controller.updateGroup(dbId.toHexString)(
+              baseRequest
+                .withBody(jsonPayloadForUpdatingGroup("0123456789012345678901234567890123456789012345678901"))
+            )
+
+            status(result) shouldBe BAD_REQUEST
+          }
+        }
+
+        "provided group name length is less than the maximum allowed" when {
+
+          s"access groups service returns $AccessGroupNotUpdated" should {
+            s"return $NOT_FOUND" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceGetGroupById(Some(accessGroup))
+              mockAccessGroupsServiceUpdate(AccessGroupNotUpdated)
+
+              val result = controller.updateGroup(dbId.toHexString)(request)
+
+              status(result) shouldBe NOT_FOUND
+            }
+          }
+
+          s"access groups service returns $AccessGroupUpdated" should {
+            s"return $OK" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceGetGroupById(Some(accessGroup))
+              mockAccessGroupsServiceUpdate(AccessGroupUpdated)
+
+              val result = controller.updateGroup(dbId.toHexString)(request)
+
+              status(result) shouldBe OK
+            }
+          }
+
+          s"access groups service returns $AccessGroupUpdatedWithoutAssignmentsPushed" should {
+            s"return $OK" in new TestScope {
+              mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+              mockAccessGroupsServiceGetGroupById(Some(accessGroup))
+              mockAccessGroupsServiceUpdate(AccessGroupUpdatedWithoutAssignmentsPushed)
+
+              val result = controller.updateGroup(dbId.toHexString)(request)
+
+              status(result) shouldBe OK
+            }
+          }
+        }
+      }
+    }
+  }
+
+  "Call to add team member to a group" when {
+
+    "agent not identified by auth" should {
+      s"return $FORBIDDEN" in new TestScope {
+        // given
+        mockAuthActionGetAuthorisedAgent(None)
+        // when
+        val result =
+          controller.addTeamMemberToGroup(dbId.toHexString)(
+            baseRequest.withBody(jsonPayloadForUpdatingGroup(groupName))
+          )
+
+        // then
+        status(result) shouldBe FORBIDDEN
+      }
+
+      s"return $OK when payload is good" in new TestScope {
+        // given
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        // when
+        val request: AddOneTeamMemberToGroupRequest = AddOneTeamMemberToGroupRequest(user)
+
+        // then
+        expectAddTeamMemberToGroup(AccessGroupUpdated)
+        val result = controller.addTeamMemberToGroup(dbId.toHexString)(baseRequest.withBody(Json.toJson(request)))
+        status(result) shouldBe OK
+      }
+
+      s"return $OK when payload is not good" in new TestScope {
+        // given
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+        // when
+        val request: AddOneTeamMemberToGroupRequest = AddOneTeamMemberToGroupRequest(user)
+
+        // then
+        expectAddTeamMemberToGroup(AccessGroupNotUpdated)
+        val result = controller.addTeamMemberToGroup(dbId.toHexString)(baseRequest.withBody(Json.toJson(request)))
+        status(result) shouldBe NOT_FOUND
       }
     }
 

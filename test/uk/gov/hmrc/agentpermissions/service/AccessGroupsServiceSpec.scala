@@ -17,6 +17,7 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import akka.stream.Materializer
+import com.mongodb.client.result.UpdateResult
 import org.bson.types.ObjectId
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4, CallHandler5}
 import uk.gov.hmrc.agentmtdidentifiers.model._
@@ -177,6 +178,16 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .update(_: Arn, _: String, _: CustomGroup))
         .expects(arn, groupName, *)
         .returning(Future.successful(maybeModifiedCount))
+
+    def mockAddTeamMemberToGroup(
+      groupId: String,
+      member: AgentUser,
+      updatedCount: Int = 1
+    ): CallHandler2[String, AgentUser, Future[UpdateResult]] =
+      (mockAccessGroupsRepository
+        .addTeamMember(_: String, _: AgentUser))
+        .expects(groupId, member)
+        .returning(Future.successful(UpdateResult.acknowledged(updatedCount, updatedCount, null)))
 
     def mockTaxGroupsServiceGetGroups(
       groups: Seq[TaxGroup]
@@ -677,6 +688,24 @@ class AccessGroupsServiceSpec extends BaseSpec {
         ) // do show the PPT enrolment as it's excluded from the tax service group
       }
     }
+  }
+
+  "Adding team member to a group" when {
+
+    "works as expected when successful " should {
+      s"return $AccessGroupUpdated" in new TestScope {
+        mockAddTeamMemberToGroup(dbId.toString, user, 1)
+        accessGroupsService.addMemberToGroup(dbId.toString, user).futureValue shouldBe AccessGroupUpdated
+      }
+    }
+
+    "works as expected when no update made due to group not found or something " should {
+      s"return $AccessGroupNotUpdated" in new TestScope {
+        mockAddTeamMemberToGroup(dbId.toString, user, 0)
+        accessGroupsService.addMemberToGroup(dbId.toString, user).futureValue shouldBe AccessGroupNotUpdated
+      }
+    }
+
   }
 
 }

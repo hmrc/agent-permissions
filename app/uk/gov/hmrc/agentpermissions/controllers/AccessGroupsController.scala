@@ -313,7 +313,8 @@ class AccessGroupsController @Inject() (
   def addTeamMemberToGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { _ =>
       withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
-        accessGroupsService.addMemberToGroup(gid, addRequest.teamMember) map {
+        accessGroupsService
+          .addMemberToGroup(gid, addRequest.teamMember) map {
           case AccessGroupUpdated => Ok
           case AccessGroupNotUpdated =>
             logger.info(s"Tax Service Group with id '$gid' was not updated it probably doesn't exist")
