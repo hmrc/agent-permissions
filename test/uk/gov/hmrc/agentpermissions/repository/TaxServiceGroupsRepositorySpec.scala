@@ -19,9 +19,11 @@ package uk.gov.hmrc.agentpermissions.repository
 import org.bson.types.ObjectId
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
+import org.mongodb.scala.result.UpdateResult
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.model.SensitiveTaxServiceGroup
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 
@@ -61,8 +63,8 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
     def now: LocalDateTime = LocalDateTime.now()
 
     val groupsRepositoryImpl: TaxServiceGroupsRepositoryImpl = repository.asInstanceOf[TaxServiceGroupsRepositoryImpl]
-    val groupsRepository: TaxServiceGroupsRepository =
-      groupsRepositoryImpl // trying to use trait interface as much as possible
+    // trying to use trait interface as much as possible
+    val groupsRepository: TaxServiceGroupsRepository = groupsRepositoryImpl
   }
 
   "TaxServiceGroupsRepository" when {
@@ -184,6 +186,31 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
       "access group corresponding to group name provided does not exist in DB" should {
         "indicate the correct update count" in new TestScope {
           groupsRepository.update(arn, groupName, accessGroup).futureValue shouldBe Some(0)
+        }
+      }
+
+    }
+
+    "adding a team member" when {
+
+      "group exists and can be added" should {
+        "return the group" in new TestScope {
+          // given
+          groupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+          val agentToAdd: AgentUser = AgentUser("user10", "Bob Smith")
+
+          // when
+          val updateResult: UpdateResult = groupsRepository.addTeamMember(dbId.toString, agentToAdd).futureValue
+
+          // then
+          updateResult.getModifiedCount shouldBe 1
+
+          // and
+          val updatedGroup: Option[TaxGroup] = groupsRepository.findById(dbId.toString).futureValue
+          updatedGroup.get.teamMembers.isDefined shouldBe true
+          updatedGroup.get.teamMembers.get.contains(agentToAdd) shouldBe true
+          updatedGroup.get.teamMembers.get.size shouldBe 4
+
         }
       }
 

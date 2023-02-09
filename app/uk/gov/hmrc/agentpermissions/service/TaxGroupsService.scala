@@ -67,6 +67,11 @@ trait TaxGroupsService {
     ec: ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus]
 
+  def addMemberToGroup(groupId: String, agentUser: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[TaxServiceGroupUpdateStatus]
+
   // TODO getExcludedClients
 
 }
@@ -223,6 +228,17 @@ class TaxGroupsServiceImpl @Inject() (
     whoIsUpdating: AgentUser
   ): Future[TaxGroup] =
     Future.successful(taxGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
+
+  override def addMemberToGroup(groupId: String, agentUser: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[TaxServiceGroupUpdateStatus] =
+    taxServiceGroupsRepository
+      .addTeamMember(groupId, agentUser)
+      .map(_.getMatchedCount match {
+        case 1 => TaxServiceGroupUpdated
+        case _ => TaxServiceGroupNotUpdated
+      })
 
 }
 

@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
+import com.mongodb.client.result.UpdateResult
 import org.bson.types.ObjectId
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
 import uk.gov.hmrc.agentmtdidentifiers.model._
@@ -130,6 +131,16 @@ class TaxGroupsServiceSpec extends BaseSpec {
         .groupExistsForTaxService(_: Arn, _: String))
         .expects(arn, service)
         .returning(Future.successful(result))
+
+    def mockAddTeamMemberToGroup(
+      groupId: String,
+      member: AgentUser,
+      updatedCount: Int = 1
+    ): CallHandler2[String, AgentUser, Future[UpdateResult]] =
+      (mockTaxServiceGroupsRepository
+        .addTeamMember(_: String, _: AgentUser))
+        .expects(groupId, member)
+        .returning(Future.successful(UpdateResult.acknowledged(updatedCount, updatedCount, null)))
 
     def mockTaxServiceGroupsRepositoryInsert(
       accessGroup: TaxGroup,
@@ -518,6 +529,23 @@ class TaxGroupsServiceSpec extends BaseSpec {
         mockTaxGroupsRepositoryGetAll(Seq.empty) // does not matter
 
         taxGroupsService.clientCountForTaxGroups(arn).futureValue shouldBe Map.empty[String, Int]
+      }
+    }
+
+    "Adding team member to a group" when {
+
+      "works as expected when successful " should {
+        s"return $TaxServiceGroupUpdated" in new TestScope {
+          mockAddTeamMemberToGroup(dbId, user, 1)
+          taxGroupsService.addMemberToGroup(dbId, user).futureValue shouldBe TaxServiceGroupUpdated
+        }
+      }
+
+      "works as expected when no update made due to group not found or something " should {
+        s"return $TaxServiceGroupNotUpdated" in new TestScope {
+          mockAddTeamMemberToGroup(dbId, user, 0)
+          taxGroupsService.addMemberToGroup(dbId, user).futureValue shouldBe TaxServiceGroupNotUpdated
+        }
       }
     }
   }
