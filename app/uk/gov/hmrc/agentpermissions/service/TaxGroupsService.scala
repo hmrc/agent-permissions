@@ -21,7 +21,6 @@ import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.TaxServiceGroupsRepository
-import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -80,22 +79,41 @@ trait TaxGroupsService {
 @Singleton
 class TaxGroupsServiceImpl @Inject() (
   taxServiceGroupsRepository: TaxServiceGroupsRepository,
-  userClientDetailsConnector: UserClientDetailsConnector,
-  auditService: AuditService
+  userClientDetailsConnector: UserClientDetailsConnector
 ) extends TaxGroupsService with Logging {
 
   override def clientCountForAvailableTaxServices(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]] =
-    for {
-      fullCount         <- userClientDetailsConnector.clientCountByTaxService(arn)
-      existingTaxGroups <- getAllTaxServiceGroups(arn)
+    userClientDetailsConnector.clientCountByTaxService(arn).flatMap {
+      case Some(fullMap) =>
+        Future
+          .sequence(
+            fullMap.map { entry =>
+              taxServiceGroupsRepository.groupExistsForTaxService(arn, entry._1).map {
+                case true  => None
+                case false => Some(entry)
+              }
+            }.toList
+          )
+          .map(_.flatten)
+          .map(_.toMap)
+          .map(consolidateTrustClients)
+      case None => Future successful Map[String, Int]()
+    }
 
-      taxServiceIds = existingTaxGroups.map(groups => groups.service)
-      combinedCount = fullCount.fold(Map.empty[String, Int])(fc => combineTrustCount(fc))
+  private val TERS = "HMRC-TERS-ORG"
+  private val TERSNT = "HMRC-TERSNT-ORG"
 
-      availableCount = combinedCount.filterNot(m => taxServiceIds.contains(m._1))
-    } yield availableCount
+  private def consolidateTrustClients(in: Map[String, Int]): Map[String, Int] = {
+    val tersCount = in.getOrElse(TERS, 0)
+    val tersntCount = in.getOrElse(TERSNT, 0)
+    val combinedCount = tersCount + tersntCount
+    val withoutTrustnt = in - TERSNT
+    if (combinedCount > 0)
+      withoutTrustnt + (TERS -> combinedCount)
+    else withoutTrustnt
+  }
 
   override def clientCountForTaxGroups(
     arn: Arn
@@ -111,8 +129,8 @@ class TaxGroupsServiceImpl @Inject() (
     } yield groupCount
 
   private def combineTrustCount(fullCount: Map[String, Int]): Map[String, Int] = {
-    val trustCounts = fullCount.filter(m => m._1.contains("HMRC-TERS"))
-    val combinedTrustCountValue = trustCounts.values.sum // total
+    val taxableTrustCounts = fullCount.filter(m => m._1.contains("HMRC-TERS"))
+    val combinedTrustCountValue = taxableTrustCounts.values.sum // total
 
     fullCount.filterNot(m => m._1.contains("HMRC-TERS")) ++ Map("HMRC-TERS" -> combinedTrustCountValue)
   }

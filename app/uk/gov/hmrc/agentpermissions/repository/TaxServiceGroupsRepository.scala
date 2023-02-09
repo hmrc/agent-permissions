@@ -45,6 +45,7 @@ trait TaxServiceGroupsRepository {
   def get(arn: Arn, groupName: String): Future[Option[TaxGroup]]
 
   def getByService(arn: Arn, service: String): Future[Option[TaxGroup]]
+  def groupExistsForTaxService(arn: Arn, service: String): Future[Boolean]
 
   def insert(accessGroup: TaxGroup): Future[Option[String]]
 
@@ -104,6 +105,15 @@ class TaxServiceGroupsRepositoryImpl @Inject() (
       .collation(caseInsensitiveCollation)
       .headOption()
       .map(_.map(_.decryptedValue))
+
+  def groupExistsForTaxService(arn: Arn, service: String): Future[Boolean] = {
+    val svc = if (service == "HMRC-TERSNT-ORG") "HMRC-TERS-ORG" else service // only TERS-ORG are stored
+    collection
+      .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_SERVICE, svc)))
+      .collation(caseInsensitiveCollation)
+      .toFuture()
+      .map(_.nonEmpty)
+  }
 
   override def insert(accessGroup: TaxGroup): Future[Option[String]] =
     collection
