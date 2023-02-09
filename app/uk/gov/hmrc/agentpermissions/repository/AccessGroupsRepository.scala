@@ -22,14 +22,16 @@ import com.mongodb.{BasicDBObject, MongoWriteException}
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
-import org.mongodb.scala.model.{DeleteOptions, IndexModel, ReplaceOptions}
+import org.mongodb.scala.model.{DeleteOptions, Filters, IndexModel, ReplaceOptions, Updates}
+import org.mongodb.scala.result.UpdateResult
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, CustomGroup}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, CustomGroup}
 import uk.gov.hmrc.agentpermissions.model.SensitiveAccessGroup
+import uk.gov.hmrc.agentpermissions.model.SensitiveTaxServiceGroup.encryptAgentUser
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
-import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
+import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
@@ -42,6 +44,7 @@ trait AccessGroupsRepository {
   def insert(accessGroup: CustomGroup): Future[Option[String]]
   def delete(arn: Arn, groupName: String): Future[Option[Long]]
   def update(arn: Arn, groupName: String, accessGroup: CustomGroup): Future[Option[Long]]
+  def addTeamMember(id: String, toAdd: AgentUser): Future[UpdateResult]
 }
 
 @Singleton
@@ -119,6 +122,15 @@ class AccessGroupsRepositoryImpl @Inject() (
   private lazy val replaceOptions: ReplaceOptions =
     new ReplaceOptions().upsert(true).collation(caseInsensitiveCollation)
 
+  def addTeamMember(id: String, toAdd: AgentUser): Future[UpdateResult] = {
+    val encryptedAgent = encryptAgentUser(toAdd)(crypto)
+    collection
+      .updateOne(
+        filter = Filters.equal("_id", id),
+        update = Updates.addToSet("teamMembers", Codecs.toBson(encryptedAgent))
+      )
+      .head()
+  }
 }
 
 object AccessGroupsRepositoryImpl {

@@ -20,7 +20,7 @@ import play.api.libs.json._
 import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentmtdidentifiers.utils.PaginatedListBuilder
-import uk.gov.hmrc.agentpermissions.model.{AddMembersToAccessGroupRequest, CreateAccessGroupRequest, UpdateAccessGroupRequest}
+import uk.gov.hmrc.agentpermissions.model.{AddMembersToAccessGroupRequest, AddOneTeamMemberToGroupRequest, CreateAccessGroupRequest, UpdateAccessGroupRequest}
 import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.auth.core.AuthorisationException
 import uk.gov.hmrc.http.HeaderCarrier
@@ -308,6 +308,19 @@ class AccessGroupsController @Inject() (
         }
       }
     } transformWith failureHandler
+  }
+
+  def addTeamMemberToGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+    withAuthorisedAgent() { _ =>
+      withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
+        accessGroupsService.addMemberToGroup(gid, addRequest.teamMember) map {
+          case AccessGroupUpdated => Ok
+          case AccessGroupNotUpdated =>
+            logger.info(s"Tax Service Group with id '$gid' was not updated it probably doesn't exist")
+            NotFound
+        }
+      }
+    }
   }
 
   def syncWithEacd(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
