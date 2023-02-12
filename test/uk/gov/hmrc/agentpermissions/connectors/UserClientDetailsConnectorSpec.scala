@@ -486,6 +486,7 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
           )
         )
 
+        mockRequestBuilderTransform
         mockRequestBuilderStream[Source[ByteString, _]](
           Source.future(
             Future successful ByteString(
@@ -511,6 +512,7 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
             )
           )
 
+          mockRequestBuilderTransform
           mockRequestBuilderStreamFailed(UpstreamErrorResponse("boo boo", statusCode))
 
           userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe None
