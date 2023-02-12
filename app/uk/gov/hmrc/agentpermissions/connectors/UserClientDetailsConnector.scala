@@ -273,6 +273,9 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
 
       httpV2
         .get(url"$url")
+        .transform(req =>
+          req.withRequestTimeout(120.minutes)
+        ) // 120 minutes * 60 seconds * 20 reqs/sec = 144,000 clients
         .stream[Source[ByteString, _]]
         .flatMap(
           _.runWith(
