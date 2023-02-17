@@ -73,6 +73,8 @@ trait UserClientDetailsConnector {
   def clientCountByTaxService(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Map[String, Int]]]
+
+  def getTeamMembers(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[UserDetails]]
 }
 
 case class AgentClientSize(`client-count`: Int)
@@ -287,6 +289,19 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
     } recover { case UpstreamErrorResponse(message, upstreamResponseCode, _, _) =>
       logger.warn(s"Received $upstreamResponseCode status: $message")
       Option.empty[GroupDelegatedEnrolments]
+    }
+  }
+
+  def getTeamMembers(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[UserDetails]] = {
+    val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/team-members"
+    monitor("ConsumedAPI-team-members-GET") {
+      httpV2.get(url"$url").execute[HttpResponse].map { response =>
+        response.status match {
+          case ACCEPTED => Seq.empty[UserDetails]
+          case OK       => response.json.as[Seq[UserDetails]]
+          case e        => throw UpstreamErrorResponse(s"error getTeamMemberList for ${arn.value}", e)
+        }
+      }
     }
   }
 
