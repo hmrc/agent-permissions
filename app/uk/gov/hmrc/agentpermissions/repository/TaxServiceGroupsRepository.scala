@@ -107,7 +107,8 @@ class TaxServiceGroupsRepositoryImpl @Inject() (
       .map(_.map(_.decryptedValue))
 
   def groupExistsForTaxService(arn: Arn, service: String): Future[Boolean] = {
-    val svc = if (service.contains("HMRC-TERS")) "HMRC-TERS" else service // both trusts stored as one group HMRC-TERS
+    // both trust enrolments (HMRC-TERS-ORG & HMRC-TERSNT-ORG) stored as one group HMRC-TERS
+    val svc = if (service.contains("HMRC-TERS")) "HMRC-TERS" else service
     collection
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_SERVICE, svc)))
       .collation(caseInsensitiveCollation)
