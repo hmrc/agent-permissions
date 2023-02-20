@@ -219,12 +219,12 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
     "groupExistsForTaxService" when {
       "access group exists for HMRC-TERS-ORG" should {
         "return true when asked for HMRC-TERS-ORG" in new TestScope {
-          groupsRepository.insert(accessGroup.copy(service = "HMRC-TERS-ORG")).futureValue
+          groupsRepository.insert(accessGroup.copy(service = "HMRC-TERS")).futureValue
 
           groupsRepository.groupExistsForTaxService(arn, "HMRC-TERS-ORG").futureValue shouldBe true
         }
         "return true when asked for HMRC-TERSNT-ORG" in new TestScope {
-          groupsRepository.insert(accessGroup.copy(service = "HMRC-TERS-ORG")).futureValue
+          groupsRepository.insert(accessGroup.copy(service = "HMRC-TERS")).futureValue
 
           groupsRepository.groupExistsForTaxService(arn, "HMRC-TERSNT-ORG").futureValue shouldBe true
         }

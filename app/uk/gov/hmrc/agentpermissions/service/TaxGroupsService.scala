@@ -105,14 +105,15 @@ class TaxGroupsServiceImpl @Inject() (
   private val TERS = "HMRC-TERS-ORG"
   private val TERSNT = "HMRC-TERSNT-ORG"
 
+  // TODO merge/reuse combineTrustCount
   private def consolidateTrustClients(in: Map[String, Int]): Map[String, Int] = {
     val tersCount = in.getOrElse(TERS, 0)
     val tersntCount = in.getOrElse(TERSNT, 0)
     val combinedCount = tersCount + tersntCount
-    val withoutTrustnt = in - TERSNT
+    val withoutTrusts = in - TERSNT - TERS
     if (combinedCount > 0)
-      withoutTrustnt + (TERS -> combinedCount)
-    else withoutTrustnt
+      withoutTrusts + ("HMRC-TERS" -> combinedCount)
+    else withoutTrusts
   }
 
   override def clientCountForTaxGroups(

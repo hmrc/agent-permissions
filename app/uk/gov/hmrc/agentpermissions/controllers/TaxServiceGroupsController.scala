@@ -51,10 +51,10 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
                   .create(createGroupRequest.buildTaxServiceGroup(matchedArn, authorisedAgent.agentUser))
             } yield groupCreationStatus match {
               case TaxServiceGroupExistsForCreation =>
-                logger.info("Cannot create a group with a name that already exists")
+                logger.info("Cannot create a tax service group with a name that already exists")
                 Conflict
               case TaxServiceGroupCreated(groupId) =>
-                logger.info(s"Created group for '${matchedArn.value}': '$groupId'")
+                logger.info(s"Created tax service group for '${matchedArn.value}': '$groupId'")
                 Created(JsString(groupId))
               case TaxServiceGroupNotCreated =>
                 logger.warn("Unable to create access group")
