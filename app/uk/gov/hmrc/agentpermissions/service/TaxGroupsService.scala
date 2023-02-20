@@ -145,7 +145,7 @@ class TaxGroupsServiceImpl @Inject() (
           case None =>
             TaxServiceGroupNotCreated
           case Some(creationId) => // TODO add auditing via audit service
-            logger.info(s"Created tax service group. DB id: '$creationId")
+            logger.info(s"Created tax service group. Service: ${taxGroup.service} DB id: '$creationId")
             TaxServiceGroupCreated(creationId)
         }
     }
@@ -194,12 +194,12 @@ class TaxGroupsServiceImpl @Inject() (
                                        }
     } yield taxServiceGroupDeletionStatus
 
-  override def update(groupId: GroupId, accessGroup: TaxGroup, whoIsUpdating: AgentUser)(implicit
+  override def update(groupId: GroupId, taxGroup: TaxGroup, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus] =
     for {
-      accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
+      accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(taxGroup, whoIsUpdating)
       maybeUpdatedCount <-
         taxServiceGroupsRepository
           .update(groupId.arn, groupId.groupName, accessGroupWithWhoIsUpdating)
@@ -209,7 +209,7 @@ class TaxGroupsServiceImpl @Inject() (
 //                                                accessGroupWithWhoIsUpdating)
                                      Future.successful(TaxServiceGroupUpdated)
                                    case _ =>
-                                     logger.info(s"Access group '${accessGroup.groupName}' not updated")
+                                     logger.info(s"Tax service group '${taxGroup.groupName}' not updated. Service: ${taxGroup.service}")
                                      Future.successful(TaxServiceGroupNotUpdated)
                                  }
     } yield accessGroupUpdateStatus
