@@ -23,6 +23,7 @@ PATCH   /groups/:id/members/add          uk.gov.hmrc.agentpermissions.controller
 
 GET     /group/:gid/clients              uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForGroup(gid: String, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
 
+# TODO: Change PATCH to POST in below endpoint
 PATCH   /arn/:arn/sync                   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/unassigned-clients     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.unassignedClients(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, page: Int ?= 1, pageSize: Int ?= 20, search: Option[String] ?= None,filter: Option[String] ?= None)
 

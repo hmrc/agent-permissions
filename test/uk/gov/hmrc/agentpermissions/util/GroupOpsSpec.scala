@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.service.userenrolment
+package uk.gov.hmrc.agentpermissions.util
 
-import org.scalamock.handlers.CallHandler4
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, CustomGroup}
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext
 
-class GroupClientsRemoverSpec extends BaseSpec {
+class GroupOpsSpec extends BaseSpec {
 
   "Removing clients from access group" when {
 
@@ -36,13 +34,12 @@ class GroupClientsRemoverSpec extends BaseSpec {
 
         val removalEnrolmentKeys: Set[String] = Set(clientPpt, clientCgt, clientTrust).map(_.enrolmentKey)
 
-        mockAuditServiceAuditAccessGroupClientsRemoval()
-
-        val accessGroupWithClientsRemoved: CustomGroup =
-          groupClientsRemover.removeClientsFromGroup(accessGroup, removalEnrolmentKeys, agentUser1)
+        val (accessGroupWithClientsRemoved, removedClients) =
+          GroupOps.removeClientsFromGroup(accessGroup, removalEnrolmentKeys, agentUser1)
 
         accessGroupWithClientsRemoved.clients shouldBe Some(Set(clientVat))
         accessGroupWithClientsRemoved.teamMembers shouldBe accessGroup.teamMembers
+        removedClients shouldBe Set(clientPpt, clientCgt)
       }
     }
 
@@ -53,24 +50,23 @@ class GroupClientsRemoverSpec extends BaseSpec {
 
         val removalEnrolmentKeys: Set[String] = Set(clientTrust).map(_.enrolmentKey)
 
-        val accessGroupWithClientsRemoved: CustomGroup =
-          groupClientsRemover.removeClientsFromGroup(accessGroup, removalEnrolmentKeys, agentUser1)
+        val (accessGroupWithClientsRemoved, removedClients) =
+          GroupOps.removeClientsFromGroup(accessGroup, removalEnrolmentKeys, agentUser1)
 
         accessGroupWithClientsRemoved.clients shouldBe accessGroup.clients
         accessGroupWithClientsRemoved.teamMembers shouldBe accessGroup.teamMembers
+        removedClients shouldBe Set.empty
       }
     }
   }
 
   trait TestScope {
 
-    val mockAuditService: AuditService = mock[AuditService]
-
-    val groupClientsRemover = new GroupClientsRemoverImpl(mockAuditService)
-
     val arn: Arn = Arn("KARN1234567")
     val groupName: String = "groupName"
-    val agentUser1: AgentUser = AgentUser("userId1", "userName")
+    val agentUser1: AgentUser = AgentUser("userId1", "userName1")
+    val agentUser2: AgentUser = AgentUser("userId2", "userName2")
+
     val now: LocalDateTime = LocalDateTime.now()
 
     val clientVat: Client = Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "John Innes")
@@ -96,13 +92,41 @@ class GroupClientsRemoverSpec extends BaseSpec {
         clients
       )
 
-    def mockAuditServiceAuditAccessGroupClientsRemoval()
-      : CallHandler4[CustomGroup, Set[Client], HeaderCarrier, ExecutionContext, Unit] =
-      (mockAuditService
-        .auditAccessGroupClientsRemoval(_: CustomGroup, _: Set[Client])(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *)
-        .returning(())
+  }
 
+  "Removing team members from access group" when {
+
+    "removal user ids contain some that exist in access group" should {
+      "remove only those matching user ids of access group" in new TestScope {
+        val accessGroup: CustomGroup =
+          buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat)))
+
+        val removalUserIds: Set[String] = Set(agentUser2.id)
+
+        val (accessGroupWithMemberssRemoved, removedMembers) =
+          GroupOps.removeTeamMembersFromGroup(accessGroup, removalUserIds, agentUser1)
+
+        accessGroupWithMemberssRemoved.clients shouldBe accessGroup.clients
+        accessGroupWithMemberssRemoved.teamMembers shouldBe Some(Set(agentUser1))
+        removedMembers shouldBe Set(agentUser2)
+      }
+    }
+
+    "removal user ids do not contain any that exist in access group" should {
+      "not remove any user ids of access group" in new TestScope {
+        val accessGroup: CustomGroup =
+          buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat)))
+
+        val removalUserIds: Set[String] = Set("unknown")
+
+        val (accessGroupWithMembersRemoved, removedMembers) =
+          GroupOps.removeTeamMembersFromGroup(accessGroup, removalUserIds, agentUser1)
+
+        accessGroupWithMembersRemoved.clients shouldBe accessGroup.clients
+        accessGroupWithMembersRemoved.teamMembers shouldBe accessGroup.teamMembers
+        removedMembers shouldBe Set.empty
+      }
+    }
   }
 
 }
