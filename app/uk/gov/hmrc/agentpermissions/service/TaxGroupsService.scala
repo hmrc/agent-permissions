@@ -209,7 +209,9 @@ class TaxGroupsServiceImpl @Inject() (
 //                                                accessGroupWithWhoIsUpdating)
                                      Future.successful(TaxServiceGroupUpdated)
                                    case _ =>
-                                     logger.info(s"Tax service group '${taxGroup.groupName}' not updated. Service: ${taxGroup.service}")
+                                     logger.info(
+                                       s"Tax service group '${taxGroup.groupName}' not updated. Service: ${taxGroup.service}"
+                                     )
                                      Future.successful(TaxServiceGroupNotUpdated)
                                  }
     } yield accessGroupUpdateStatus

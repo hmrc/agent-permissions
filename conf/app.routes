@@ -12,16 +12,16 @@ GET     /arn/:arn/team-member/:userId/groups    uk.gov.hmrc.agentpermissions.con
 GET     /arn/:arn/all-groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getAllGroupSummaries(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 
 # Custom access groups
-POST    /arn/:arn/groups                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /arn/:arn/groups                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
-GET     /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
-GET     /custom-group/:gid               uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getCustomGroupSummary(gid: String)
-DELETE  /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
-PATCH   /groups/:gid                     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
-PUT     /groups/:gid/add-unassigned      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: String)
-PATCH   /groups/:id/members/add          uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addTeamMemberToGroup(id: String)
-
-GET     /group/:gid/clients              uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForGroup(gid: String, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
+POST    /arn/:arn/groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /arn/:arn/groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+GET     /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: String)
+GET     /custom-group/:gid                  uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getCustomGroupSummary(gid: String)
+DELETE  /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: String)
+PATCH   /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: String)
+PUT     /groups/:gid/add-unassigned         uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: String)
+PATCH   /groups/:id/members/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addTeamMemberToGroup(id: String)
+GET     /group/:gid/clients                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForGroup(gid: String, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
+DELETE  /groups/:gid/client/:clientId       uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeClient(gid: String, clientId: String)
 
 # TODO: Change PATCH to POST in below endpoint
 PATCH   /arn/:arn/sync                   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
