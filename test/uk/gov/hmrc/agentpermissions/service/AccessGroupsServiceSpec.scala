@@ -189,6 +189,18 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .expects(groupId, member)
         .returning(Future.successful(UpdateResult.acknowledged(updatedCount, updatedCount, null)))
 
+    def mockAddRemoveClientFromGroup(
+      groupId: String,
+      client: Client,
+      updatedCount: Int = 1
+    ): CallHandler2[String, String, Future[UpdateResult]] = {
+      val updateResult = UpdateResult.acknowledged(updatedCount, updatedCount, null)
+      (mockAccessGroupsRepository
+        .removeClient(_: String, _: String))
+        .expects(groupId, client.enrolmentKey)
+        .returning(Future.successful(updateResult))
+    }
+
     def mockTaxGroupsServiceGetGroups(
       groups: Seq[TaxGroup]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxGroup]]] =
@@ -706,6 +718,25 @@ class AccessGroupsServiceSpec extends BaseSpec {
       }
     }
 
+  }
+
+  "Removing a client from a group" when {
+
+    "works as expected when successful " should {
+      s"return $AccessGroupUpdated" in new TestScope {
+        mockAddRemoveClientFromGroup(dbId.toString, clientVat, 1)
+        accessGroupsService
+          .removeClient(dbId.toString, clientVat.enrolmentKey, user)
+          .futureValue shouldBe AccessGroupUpdated
+      }
+
+      s"return $AccessGroupNotUpdated" in new TestScope {
+        mockAddRemoveClientFromGroup(dbId.toString, clientVat, 0)
+        accessGroupsService
+          .removeClient(dbId.toString, clientVat.enrolmentKey, user)
+          .futureValue shouldBe AccessGroupNotUpdated
+      }
+    }
   }
 
 }

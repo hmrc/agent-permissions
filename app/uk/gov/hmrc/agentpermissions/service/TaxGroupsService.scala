@@ -85,22 +85,37 @@ class TaxGroupsServiceImpl @Inject() (
   override def clientCountForAvailableTaxServices(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]] =
-    userClientDetailsConnector.clientCountByTaxService(arn).flatMap {
-      case Some(fullMap) =>
-        Future
-          .sequence(
-            fullMap.map { entry =>
-              taxServiceGroupsRepository.groupExistsForTaxService(arn, entry._1).map {
-                case true  => None
-                case false => Some(entry)
-              }
-            }.toList
-          )
-          .map(_.flatten)
-          .map(_.toMap)
-          .map(combineTrustClientCount)
-      case None => Future successful Map[String, Int]()
-    }
+    userClientDetailsConnector
+      .clientCountByTaxService(arn)
+      .flatMap {
+        case Some(data) =>
+          Future
+            .sequence(
+              data.map { entry =>
+                taxServiceGroupsRepository.groupExistsForTaxService(arn, entry._1).map {
+                  case true  => None
+                  case false => Some(entry)
+                }
+              }.toList
+            )
+            .map(_.flatten)
+            .map(_.toMap)
+            .map(consolidateTrustClients)
+        case None => Future successful Map.empty
+      }
+
+  private val TERS = "HMRC-TERS-ORG"
+  private val TERSNT = "HMRC-TERSNT-ORG"
+
+  private def consolidateTrustClients(in: Map[String, Int]): Map[String, Int] = {
+    val tersCount = in.getOrElse(TERS, 0)
+    val tersntCount = in.getOrElse(TERSNT, 0)
+    val combinedCount = tersCount + tersntCount
+    val withoutTrustnt = in - TERSNT
+    if (combinedCount > 0)
+      withoutTrustnt + (TERS -> combinedCount)
+    else withoutTrustnt
+  }
 
   override def clientCountForTaxGroups(
     arn: Arn
@@ -110,20 +125,16 @@ class TaxGroupsServiceImpl @Inject() (
       existingTaxGroups <- getAllTaxServiceGroups(arn)
 
       taxServiceIds = existingTaxGroups.map(groups => groups.service)
-      combinedCount = fullCount.fold(Map.empty[String, Int])(fc => combineTrustClientCount(fc))
+      combinedCount = fullCount.fold(Map.empty[String, Int])(fc => combineTrustCount(fc))
 
       groupCount = combinedCount.filter(m => taxServiceIds.contains(m._1))
     } yield groupCount
 
-  private val TRUSTS = "HMRC-TERS" // taxable "HMRC-TERS-ORG" and non taxable "HMRC-TERSNT-ORG"
-
-  private def combineTrustClientCount(count: Map[String, Int]): Map[String, Int] = {
-    val taxableTrustCounts = count.filter(m => m._1.contains(TRUSTS))
+  private def combineTrustCount(fullCount: Map[String, Int]): Map[String, Int] = {
+    val taxableTrustCounts = fullCount.filter(m => m._1.contains("HMRC-TERS"))
     val combinedTrustCountValue = taxableTrustCounts.values.sum // total
 
-    if (combinedTrustCountValue > 0)
-      count.filterNot(m => m._1.contains(TRUSTS)) ++ Map(TRUSTS -> combinedTrustCountValue)
-    else count.filterNot(m => m._1.contains(TRUSTS)) // removes trusts if agent has no trust clients
+    fullCount.filterNot(m => m._1.contains("HMRC-TERS")) ++ Map("HMRC-TERS" -> combinedTrustCountValue)
   }
 
   override def getById(
@@ -145,7 +156,7 @@ class TaxGroupsServiceImpl @Inject() (
           case None =>
             TaxServiceGroupNotCreated
           case Some(creationId) => // TODO add auditing via audit service
-            logger.info(s"Created tax service group. Service: ${taxGroup.service} DB id: '$creationId")
+            logger.info(s"Created tax service group. DB id: '$creationId")
             TaxServiceGroupCreated(creationId)
         }
     }
@@ -194,12 +205,12 @@ class TaxGroupsServiceImpl @Inject() (
                                        }
     } yield taxServiceGroupDeletionStatus
 
-  override def update(groupId: GroupId, taxGroup: TaxGroup, whoIsUpdating: AgentUser)(implicit
+  override def update(groupId: GroupId, accessGroup: TaxGroup, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus] =
     for {
-      accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(taxGroup, whoIsUpdating)
+      accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
       maybeUpdatedCount <-
         taxServiceGroupsRepository
           .update(groupId.arn, groupId.groupName, accessGroupWithWhoIsUpdating)
@@ -209,7 +220,7 @@ class TaxGroupsServiceImpl @Inject() (
 //                                                accessGroupWithWhoIsUpdating)
                                      Future.successful(TaxServiceGroupUpdated)
                                    case _ =>
-                                     logger.info(s"Tax service group '${taxGroup.groupName}' not updated. Service: ${taxGroup.service}")
+                                     logger.info(s"Access group '${accessGroup.groupName}' not updated")
                                      Future.successful(TaxServiceGroupNotUpdated)
                                  }
     } yield accessGroupUpdateStatus

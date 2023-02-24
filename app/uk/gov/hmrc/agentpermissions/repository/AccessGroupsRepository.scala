@@ -19,6 +19,7 @@ package uk.gov.hmrc.agentpermissions.repository
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.{Collation, IndexOptions}
 import com.mongodb.{BasicDBObject, MongoWriteException}
+import org.mongodb.scala.bson.Document
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
@@ -39,12 +40,21 @@ import scala.concurrent.{ExecutionContext, Future}
 @ImplementedBy(classOf[AccessGroupsRepositoryImpl])
 trait AccessGroupsRepository {
   def findById(id: String): Future[Option[CustomGroup]]
+
   def get(arn: Arn): Future[Seq[CustomGroup]]
+
   def get(arn: Arn, groupName: String): Future[Option[CustomGroup]]
+
   def insert(accessGroup: CustomGroup): Future[Option[String]]
+
   def delete(arn: Arn, groupName: String): Future[Option[Long]]
+
   def update(arn: Arn, groupName: String, accessGroup: CustomGroup): Future[Option[Long]]
+
   def addTeamMember(id: String, toAdd: AgentUser): Future[UpdateResult]
+
+  def removeClient(groupId: String, clientId: String): Future[UpdateResult]
+
 }
 
 @Singleton
@@ -131,6 +141,16 @@ class AccessGroupsRepositoryImpl @Inject() (
       )
       .head()
   }
+
+  def removeClient(id: String, enrolmentKey: String): Future[UpdateResult] =
+    collection
+      .updateOne(
+        filter = Filters.equal("_id", id),
+        update = Updates.pullByFilter(
+          Document("clients" -> Document("enrolmentKey" -> Codecs.toBson(enrolmentKey)))
+        )
+      )
+      .head()
 }
 
 object AccessGroupsRepositoryImpl {

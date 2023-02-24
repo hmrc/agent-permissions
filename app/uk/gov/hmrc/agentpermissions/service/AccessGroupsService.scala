@@ -64,6 +64,11 @@ trait AccessGroupsService {
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
 
+  def removeClient(groupId: String, clientId: String, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[AccessGroupUpdateStatus]
+
   def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList]
 
   def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
@@ -211,6 +216,17 @@ class AccessGroupsServiceImpl @Inject() (
                                      }
                                  }
     } yield accessGroupUpdateStatus
+
+  def removeClient(groupId: String, clientId: String, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[AccessGroupUpdateStatus] =
+    accessGroupsRepository
+      .removeClient(groupId, clientId)
+      .map(_.getMatchedCount match {
+        case 1 => AccessGroupUpdated
+        case _ => AccessGroupNotUpdated
+      })
 
   // TODO move below to groups summary service
   override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =

@@ -45,6 +45,7 @@ trait TaxServiceGroupsRepository {
   def get(arn: Arn, groupName: String): Future[Option[TaxGroup]]
 
   def getByService(arn: Arn, service: String): Future[Option[TaxGroup]]
+
   def groupExistsForTaxService(arn: Arn, service: String): Future[Boolean]
 
   def insert(accessGroup: TaxGroup): Future[Option[String]]

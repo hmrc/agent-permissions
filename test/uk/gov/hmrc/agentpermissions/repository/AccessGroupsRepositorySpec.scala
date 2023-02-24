@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
+import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.bson.types.ObjectId
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
@@ -35,7 +36,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
-    val dbId: ObjectId = new ObjectId()
+    val groupDbId: ObjectId = new ObjectId()
     val groupName: String = "Some Group".toLowerCase
     val agent: AgentUser = AgentUser("userId", "userName")
     val user1: AgentUser = AgentUser("user1", "User 1")
@@ -47,15 +48,15 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
     val accessGroup: CustomGroup =
       CustomGroup(
-        dbId,
+        groupDbId,
         arn,
         groupName,
         now,
         now,
         agent,
         agent,
-        Some(Set(agent, user1, user2)),
-        Some(Set(client1, client2, client3))
+        teamMembers = Some(Set(agent, user1, user2)),
+        clients = Some(Set(client1, client2, client3))
       )
 
     def now: LocalDateTime = LocalDateTime.now()
@@ -101,7 +102,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "group of that name does not exist" should {
         "return nothing" in new TestScope {
-          accessGroupsRepository.findById(dbId.toHexString).futureValue shouldBe None
+          accessGroupsRepository.findById(groupDbId.toHexString).futureValue shouldBe None
         }
       }
     }
@@ -189,16 +190,71 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
           val agentToAdd: AgentUser = AgentUser("user10", "Bob Smith")
 
           // when
-          val updateResult: UpdateResult = accessGroupsRepository.addTeamMember(dbId.toString, agentToAdd).futureValue
+          val updateResult: UpdateResult =
+            accessGroupsRepository.addTeamMember(groupDbId.toString, agentToAdd).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 1
 
           // and
-          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(dbId.toString).futureValue
+          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId.toString).futureValue
           updatedGroup.get.teamMembers.isDefined shouldBe true
           updatedGroup.get.teamMembers.get.contains(agentToAdd) shouldBe true
           updatedGroup.get.teamMembers.get.size shouldBe 4
+        }
+      }
+
+    }
+
+    "removing a client from a group" when {
+
+      "group exists" should {
+
+        "return modified count of 1 when client is in group" in new TestScope {
+          // given
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+
+          accessGroup.clients.get.contains(client1) shouldBe true
+
+          // when
+          val updateResult: UpdateResult =
+            accessGroupsRepository.removeClient(groupDbId.toString, client1.enrolmentKey).futureValue
+
+          // then
+          updateResult.getModifiedCount shouldBe 1
+
+          // and
+          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId.toString).futureValue
+          private val clients: Set[Client] = updatedGroup.get.clients.get
+          clients.size shouldBe 2
+          clients.contains(client1) shouldBe false
+        }
+
+        "return modified count of 0 when client is NOT in group" in new TestScope {
+          // given
+          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+
+          // when
+          val updateResult: UpdateResult =
+            accessGroupsRepository.removeClient(groupDbId.toString, randomAlphabetic(23)).futureValue
+
+          // then
+          updateResult.getModifiedCount shouldBe 0
+
+          // and
+          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId.toString).futureValue
+          private val clients: Set[Client] = updatedGroup.get.clients.get
+          clients.size shouldBe 3
+        }
+
+        "return modified count of 0 when group is not found" in new TestScope {
+          // when
+          val updateResult: UpdateResult =
+            accessGroupsRepository.removeClient(randomAlphabetic(5), randomAlphabetic(23)).futureValue
+
+          // then
+          updateResult.getModifiedCount shouldBe 0
+
         }
       }
 

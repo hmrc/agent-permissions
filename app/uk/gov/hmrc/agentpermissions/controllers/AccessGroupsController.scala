@@ -21,7 +21,7 @@ import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentmtdidentifiers.utils.PaginatedListBuilder
 import uk.gov.hmrc.agentpermissions.model.{AddMembersToAccessGroupRequest, AddOneTeamMemberToGroupRequest, CreateAccessGroupRequest, UpdateAccessGroupRequest}
-import uk.gov.hmrc.agentpermissions.service._
+import uk.gov.hmrc.agentpermissions.service.{AccessGroupDeletionStatus, _}
 import uk.gov.hmrc.auth.core.AuthorisationException
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -283,6 +283,19 @@ class AccessGroupsController @Inject() (
         }
       }
     } transformWith failureHandler
+  }
+
+  def removeClient(gid: String, clientId: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent() { authorisedAgent =>
+      accessGroupsService
+        .removeClient(gid, clientId, authorisedAgent.agentUser)
+        .map {
+          case AccessGroupNotUpdated =>
+            logger.info(s"Access group '$gid' didn't remove client '$clientId''")
+            NotModified
+          case AccessGroupUpdated => NoContent
+        }
+    }
   }
 
   def addUnassignedMembers(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
