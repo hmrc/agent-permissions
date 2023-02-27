@@ -259,19 +259,19 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockEacdSynchronizerSyncWithEacdNoException(
       accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
-    ): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
+    ): Unit =
       (mockEacdSynchronizer
-        .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *)
-        .returning(Future successful accessGroupUpdateStatuses)
+        .syncWithEacd(_: Arn, _: AgentUser, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *, *)
+        .returning(Future.successful(accessGroupUpdateStatuses))
 
     def mockEacdSynchronizerSyncWithEacdHasException(
       ex: Exception
-    ): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Future[Seq[AccessGroupUpdateStatus]]] =
+    ): Unit =
       (mockEacdSynchronizer
-        .syncWithEacd(_: Arn, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *)
-        .returning(Future failed ex)
+        .syncWithEacd(_: Arn, _: AgentUser, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *, *)
+        .returning(Future.failed(ex))
 
     def mockGroupsServiceGetGroupSummariesForClient(
       accessGroupSummaries: Seq[GroupSummary]

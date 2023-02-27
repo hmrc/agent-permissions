@@ -25,8 +25,9 @@ GET     /group/:gid/clients/add             uk.gov.hmrc.agentpermissions.control
 DELETE  /groups/:gid/clients/:clientId      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeClient(gid: String, clientId: String)
 DELETE  /groups/:gid/members/:memberId      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeTeamMember(gid: String, memberId: String)
 
-# TODO: Change PATCH to POST in below endpoint
-PATCH   /arn/:arn/sync                   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
+# TODO: Remove the PATCH version of endpoint below
+PATCH   /arn/:arn/sync                   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, fullSync: Boolean ?= false)
+POST    /arn/:arn/sync                   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, fullSync: Boolean ?= false)
 GET     /arn/:arn/unassigned-clients     uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.unassignedClients(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn, page: Int ?= 1, pageSize: Int ?= 20, search: Option[String] ?= None,filter: Option[String] ?= None)
 
 # Tax service groups

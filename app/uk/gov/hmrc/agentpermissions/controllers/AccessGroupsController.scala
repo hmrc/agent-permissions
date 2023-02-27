@@ -361,10 +361,10 @@ class AccessGroupsController @Inject() (
     }
   }
 
-  def syncWithEacd(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def syncWithEacd(arn: Arn, fullSync: Boolean = false): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
-        eacdSynchronizer.syncWithEacd(matchedArn, authorisedAgent.agentUser).onComplete {
+        eacdSynchronizer.syncWithEacd(matchedArn, authorisedAgent.agentUser, fullSync).onComplete {
           case Success(updateStatuses) =>
             logger.info(s"EACD Sync request processed for ${arn.value} with update statuses: $updateStatuses")
           case Failure(ex) =>

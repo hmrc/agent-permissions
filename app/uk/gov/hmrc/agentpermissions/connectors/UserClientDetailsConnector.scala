@@ -32,6 +32,8 @@ import uk.gov.hmrc.http.HttpReads.is5xx
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, UpstreamErrorResponse}
 import uk.gov.hmrc.http.StringContextOps
+import uk.gov.hmrc.http.NotFoundException
+import uk.gov.hmrc.http.HttpException
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.duration.DurationInt
@@ -81,6 +83,11 @@ trait UserClientDetailsConnector {
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Map[String, Int]]]
 
   def getTeamMembers(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[UserDetails]]
+
+  def syncTeamMember(arn: Arn, userId: String, expectedAssignments: Seq[String] /* enrolment keys */ )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Boolean]
 }
 
 case class AgentClientSize(`client-count`: Int)
@@ -331,6 +338,32 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
           case e        => throw UpstreamErrorResponse(s"error getTeamMemberList for ${arn.value}", e)
         }
       }
+    }
+  }
+
+  def syncTeamMember(arn: Arn, userId: String, expectedAssignments: Seq[String] /* enrolment keys */ )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Boolean] = {
+    val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/user/$userId/ensure-assignments"
+
+    monitor("ConsumedAPI-AgentUserClientDetails-syncTeamMember-POST") {
+      httpV2
+        .post(url"$url")
+        .withBody(Json.toJson(expectedAssignments))
+        .execute[HttpResponse]
+        .flatMap { response =>
+          response.status match {
+            case OK       => Future.successful(false)
+            case ACCEPTED => Future.successful(true)
+            case NOT_FOUND =>
+              logger.warn(s"Team member assignment failed: Not found $arn / $userId")
+              Future.failed(new NotFoundException(response.body))
+            case other =>
+              logger.warn(s"Team member assignment sync returned unexpected status $other: ${response.body}")
+              Future.failed(new HttpException(response.body, other))
+          }
+        }
     }
   }
 
