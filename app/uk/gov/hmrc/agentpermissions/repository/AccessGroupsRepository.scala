@@ -30,7 +30,7 @@ import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, CustomGroup}
 import uk.gov.hmrc.agentpermissions.model.SensitiveAccessGroup
 import uk.gov.hmrc.agentpermissions.model.SensitiveTaxServiceGroup.encryptAgentUser
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
-import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
+import uk.gov.hmrc.crypto.{Crypted, Decrypter, Encrypter, PlainText}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 
@@ -54,6 +54,8 @@ trait AccessGroupsRepository {
   def addTeamMember(id: String, toAdd: AgentUser): Future[UpdateResult]
 
   def removeClient(groupId: String, clientId: String): Future[UpdateResult]
+
+  def removeTeamMember(groupId: String, clientId: String): Future[UpdateResult]
 
 }
 
@@ -142,12 +144,21 @@ class AccessGroupsRepositoryImpl @Inject() (
       .head()
   }
 
-  def removeClient(id: String, enrolmentKey: String): Future[UpdateResult] =
+  def removeClient(groupId: String, enrolmentKey: String): Future[UpdateResult] =
     collection
       .updateOne(
-        filter = Filters.equal("_id", id),
+        filter = Filters.equal("_id", groupId),
         update = Updates.pullByFilter(
           Document("clients" -> Document("enrolmentKey" -> Codecs.toBson(enrolmentKey)))
+        )
+      )
+      .head()
+  def removeTeamMember(groupId: String, memberId: String): Future[UpdateResult] =
+    findById(groupId).collection
+      .updateOne(
+        filter = Filters.equal("_id", groupId),
+        update = Updates.pullByFilter(
+          Document("teamMembers" -> Document("id" -> encryptedId))
         )
       )
       .head()

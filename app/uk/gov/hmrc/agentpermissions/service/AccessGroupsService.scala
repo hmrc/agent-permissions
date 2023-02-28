@@ -53,7 +53,6 @@ trait AccessGroupsService {
   def getCustomGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]]
-
   def delete(groupId: GroupId, agentUser: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -65,6 +64,11 @@ trait AccessGroupsService {
   ): Future[AccessGroupUpdateStatus]
 
   def removeClient(groupId: String, clientId: String, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[AccessGroupUpdateStatus]
+
+  def removeTeamMember(groupId: String, clientId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
@@ -152,10 +156,10 @@ class AccessGroupsServiceImpl @Inject() (
           .map(GroupSummary.fromAccessGroup)
       )
 
-  override def delete(
-    groupId: GroupId,
-    agentUser: AgentUser
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupDeletionStatus] =
+  override def delete(groupId: GroupId, agentUser: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[AccessGroupDeletionStatus] =
     for {
       maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupDeletion(groupId)
       maybeDeletedCount          <- accessGroupsRepository.delete(groupId.arn, groupId.groupName)
@@ -227,6 +231,21 @@ class AccessGroupsServiceImpl @Inject() (
         case 1 => AccessGroupUpdated
         case _ => AccessGroupNotUpdated
       })
+
+  def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[AccessGroupUpdateStatus] = {
+
+    val eventualMaybeGroup = accessGroupsRepository.findById(groupId)
+
+    accessGroupsRepository
+      .removeTeamMember(groupId, teamMemberId)
+      .map(_.getMatchedCount match {
+        case 1 => AccessGroupUpdated
+        case _ => AccessGroupNotUpdated
+      })
+  }
 
   // TODO move below to groups summary service
   override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
