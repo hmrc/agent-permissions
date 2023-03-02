@@ -298,6 +298,19 @@ class AccessGroupsController @Inject() (
     }
   }
 
+  def removeTeamMember(gid: String, memberId: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent() { authorisedAgent =>
+      accessGroupsService
+        .removeTeamMember(gid, memberId, authorisedAgent.agentUser)
+        .map {
+          case AccessGroupNotUpdated =>
+            logger.info(s"Access group '$gid' didn't remove client '$memberId''")
+            NotModified
+          case AccessGroupUpdated => NoContent
+        }
+    }
+  }
+
   def addUnassignedMembers(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddMembersToAccessGroupRequest] { updateAccessGroupRequest =>

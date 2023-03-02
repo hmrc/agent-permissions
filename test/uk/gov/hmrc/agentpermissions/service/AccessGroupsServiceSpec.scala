@@ -18,6 +18,8 @@ package uk.gov.hmrc.agentpermissions.service
 
 import akka.stream.Materializer
 import com.mongodb.client.result.UpdateResult
+import org.apache.commons.lang3.RandomStringUtils
+import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.bson.types.ObjectId
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4, CallHandler5}
 import uk.gov.hmrc.agentmtdidentifiers.model._
@@ -115,7 +117,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .expects(arn, groupName)
         .returning(Future.successful(maybeAccessGroup))
 
-    def mockAccessGroupsRepositoryGetById(
+    def mockAccessGroupsRepositoryFindById(
       maybeAccessGroup: Option[CustomGroup]
     ): CallHandler1[String, Future[Option[CustomGroup]]] =
       (mockAccessGroupsRepository
@@ -440,7 +442,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     "group exists" should {
       "return corresponding summaries" in new TestScope {
-        mockAccessGroupsRepositoryGetById(Some(accessGroupInMongo))
+        mockAccessGroupsRepositoryFindById(Some(accessGroupInMongo))
         mockUserClientDetailsConnectorGetClients(Some(clients))
 
         accessGroupsService.getById(dbId.toHexString).futureValue shouldBe
@@ -734,6 +736,32 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockAddRemoveClientFromGroup(dbId.toString, clientVat, 0)
         accessGroupsService
           .removeClient(dbId.toString, clientVat.enrolmentKey, user)
+          .futureValue shouldBe AccessGroupNotUpdated
+      }
+    }
+  }
+
+  "Removing a team members from a group" when {
+
+    "works as expected when successful " should {
+      s"return $AccessGroupUpdated" in new TestScope {
+        // expect
+        mockAccessGroupsRepositoryFindById(Some(accessGroup))
+        mockAccessGroupsRepositoryUpdate(Some(1))
+
+        // when
+        private val result = accessGroupsService.removeTeamMember(dbId.toString, user1.id, user).futureValue
+
+        // then
+        result shouldBe AccessGroupUpdated
+      }
+
+      s"return $AccessGroupNotUpdated" in new TestScope {
+        mockAccessGroupsRepositoryFindById(Some(accessGroup))
+        mockAccessGroupsRepositoryUpdate(Some(0))
+
+        accessGroupsService
+          .removeTeamMember(dbId.toString, randomAlphabetic(8), user)
           .futureValue shouldBe AccessGroupNotUpdated
       }
     }
