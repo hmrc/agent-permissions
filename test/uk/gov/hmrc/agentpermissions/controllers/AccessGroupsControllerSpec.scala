@@ -197,6 +197,15 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .returning(Future.successful(accessGroupUpdateStatus))
         .once()
 
+    def expectRemoveTeamMemberFromGroup(
+      accessGroupUpdateStatus: AccessGroupUpdateStatus
+    ): CallHandler5[String, String, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
+      (mockAccessGroupsService
+        .removeTeamMember(_: String, _: String, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *, *)
+        .returning(Future.successful(accessGroupUpdateStatus))
+        .once()
+
     def mockAccessGroupsServiceDelete(
       accessGroupDeletionStatus: AccessGroupDeletionStatus
     ): CallHandler4[GroupId, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupDeletionStatus]] =
@@ -1314,6 +1323,46 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
         // when
         val result = controller.removeClient(dbId.toHexString, "whatever")(baseRequest)
+
+        // then
+        status(result) shouldBe NOT_MODIFIED
+      }
+
+      s"return $FORBIDDEN" in new TestScope {
+        // given
+        mockAuthActionGetAuthorisedAgent(None)
+        // when
+        val result = controller.removeClient(dbId.toHexString, "whatever")(baseRequest)
+
+        // then
+        status(result) shouldBe FORBIDDEN
+      }
+    }
+  }
+
+  "Call to remove a team member from to a group" when {
+
+    "work as expected and" should {
+
+      s"return $NO_CONTENT when successfully removed team member" in new TestScope {
+        // given
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        expectRemoveTeamMemberFromGroup(AccessGroupUpdated)
+
+        // when
+        val result = controller.removeTeamMember(dbId.toHexString, "a valid id")(baseRequest)
+
+        // then
+        status(result) shouldBe NO_CONTENT
+      }
+
+      s"return $NOT_MODIFIED when team member or group not found" in new TestScope {
+        // given
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        expectRemoveTeamMemberFromGroup(AccessGroupNotUpdated)
+
+        // when
+        val result = controller.removeTeamMember(dbId.toHexString, "invalid id")(baseRequest)
 
         // then
         status(result) shouldBe NOT_MODIFIED

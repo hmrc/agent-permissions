@@ -55,8 +55,6 @@ trait AccessGroupsRepository {
 
   def removeClient(groupId: String, clientId: String): Future[UpdateResult]
 
-  def removeTeamMember(groupId: String, clientId: String): Future[UpdateResult]
-
 }
 
 @Singleton
@@ -150,15 +148,6 @@ class AccessGroupsRepositoryImpl @Inject() (
         filter = Filters.equal("_id", groupId),
         update = Updates.pullByFilter(
           Document("clients" -> Document("enrolmentKey" -> Codecs.toBson(enrolmentKey)))
-        )
-      )
-      .head()
-  def removeTeamMember(groupId: String, memberId: String): Future[UpdateResult] =
-    findById(groupId).collection
-      .updateOne(
-        filter = Filters.equal("_id", groupId),
-        update = Updates.pullByFilter(
-          Document("teamMembers" -> Document("id" -> encryptedId))
         )
       )
       .head()

@@ -235,17 +235,22 @@ class AccessGroupsServiceImpl @Inject() (
   def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[AccessGroupUpdateStatus] = {
-
-    val eventualMaybeGroup = accessGroupsRepository.findById(groupId)
-
+  ): Future[AccessGroupUpdateStatus] =
     accessGroupsRepository
-      .removeTeamMember(groupId, teamMemberId)
-      .map(_.getMatchedCount match {
-        case 1 => AccessGroupUpdated
-        case _ => AccessGroupNotUpdated
-      })
-  }
+      .findById(groupId)
+      .flatMap {
+        case Some(accessGroup) =>
+          val maybeAgentUsers = accessGroup.teamMembers
+            .map(_.filterNot(tm => tm.id == teamMemberId))
+          val updatedGroup = accessGroup.copy(teamMembers = maybeAgentUsers)
+          accessGroupsRepository
+            .update(accessGroup.arn, accessGroup.groupName, updatedGroup)
+            .map {
+              case Some(1) => AccessGroupUpdated
+              case _       => AccessGroupNotUpdated
+            }
+        case None => Future successful AccessGroupNotUpdated
+      }
 
   // TODO move below to groups summary service
   override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
