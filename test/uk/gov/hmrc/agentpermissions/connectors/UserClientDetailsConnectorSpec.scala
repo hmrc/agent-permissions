@@ -26,6 +26,7 @@ import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2}
 import play.api.http.Status._
 import play.api.libs.json.Json
 import play.api.libs.ws.{BodyWritable, DefaultBodyWritables, WSRequest}
+import play.api.test.Helpers.await
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
@@ -358,6 +359,52 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         }
       }
     }
+  }
+
+  "getPaginatedClientsList" should {
+
+    "return a PaginatedList[Client] when status response is OK" in new TestScope {
+      val SEARCH = "rob"
+      val FILTER = "whatever"
+      val PAGE = 1
+      val url: String = mockAppConfig.agentUserClientDetailsBaseUrl
+      val aucdBaseUrl = s"$url/agent-user-client-details"
+      val clients = Seq(
+        Client(enrolmentKey = "HMRC-MTD-IT~MTDITID~XX12345", friendlyName = "Bob"),
+        Client(enrolmentKey = "HMRC-MTD-IT~MTDITID~XX12347", friendlyName = "Builder")
+      )
+      val meta = PaginationMetaData(
+        lastPage = false,
+        firstPage = true,
+        totalSize = 2,
+        totalPages = 1,
+        pageSize = 20,
+        currentPageNumber = 1,
+        currentPageSize = 2
+      )
+      val paginatedList = PaginatedList[Client](pageContent = clients, paginationMetaData = meta)
+      mockAppConfigAgentUserClientDetailsBaseUrl
+      private val PAGE_SIZE = 5
+      mockHttpGetV2(
+        new URL(
+          s"$aucdBaseUrl/arn/${arn.value}/clients?page=$PAGE&pageSize=$PAGE_SIZE&search=$SEARCH&filter=$FILTER"
+        )
+      )
+      mockRequestBuilderExecuteWithoutException(HttpResponse(OK, "[]"))
+      val result: Future[PaginatedList[Client]] =
+        userClientDetailsConnector.getPaginatedClients(arn)(PAGE, PAGE_SIZE, Some(SEARCH), Some(FILTER))
+      result.futureValue shouldBe paginatedList
+    }
+
+//    "throw error when status response is 5xx" in {
+//
+//      expectHttpClientGET[HttpResponse](HttpResponse.apply(503, ""))
+//
+//      intercept[UpstreamErrorResponse] {
+//        await(connector.getPaginatedClients(arn)(1, 20))
+//      }
+//    }
+
   }
 
   "getClientListStatus" when {

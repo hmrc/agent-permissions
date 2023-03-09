@@ -20,6 +20,7 @@ import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
+import uk.gov.hmrc.agentpermissions.model.DisplayClient
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
@@ -37,6 +38,14 @@ trait AccessGroupsService {
   ): Future[AccessGroupUpdateStatus]
 
   def getById(id: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]]
+
+  def getGroupByIdWithPageOfClientsToAdd(
+    id: String,
+    page: Int = 1,
+    pageSize: Int = 20,
+    search: Option[String] = None,
+    filter: Option[String] = None
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[(GroupSummary, PaginatedList[DisplayClient])]]
 
   def create(
     accessGroup: CustomGroup
@@ -94,6 +103,38 @@ class AccessGroupsServiceImpl @Inject() (
     accessGroupsRepository
       .findById(id)
       .flatMap(withClientName)
+
+  /** Gets a page of clients for the Arn and then finds if any of them are already in the group */
+  override def getGroupByIdWithPageOfClientsToAdd(
+    id: String,
+    page: Int = 1,
+    pageSize: Int = 20,
+    search: Option[String] = None,
+    filter: Option[String] = None
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[(GroupSummary, PaginatedList[DisplayClient])]] = {
+    println("~~~~~~~~~~~~~~~~~~~~~")
+    println(search, filter)
+    println("~~~~~~~~~~~~~~~~~~~~~")
+    accessGroupsRepository
+      .findById(id)
+      .flatMap {
+        case None => Future successful None
+        case Some(grp) =>
+          val enrolmentKeys = grp.clients.map(_.map(_.enrolmentKey))
+          userClientDetailsConnector
+            .getPaginatedClients(grp.arn)(page, pageSize, search, filter)
+            .map { paginatedClients =>
+              val paginatedList = PaginatedList[DisplayClient](
+                paginationMetaData = paginatedClients.paginationMetaData,
+                // TODO: NEED TO ONLY LOAD THE CLIENTS FROM THE GROUP THAT ARE IN THIS PAGINATED LIST
+                pageContent = paginatedClients.pageContent.map { c =>
+                  DisplayClient.fromClient(c, enrolmentKeys.getOrElse(Set.empty[String]).contains(c.enrolmentKey))
+                }
+              )
+              Some((GroupSummary(grp._id.toString, grp.groupName, None, grp.teamMembers.size, None), paginatedList))
+            }
+      }
+  }
 
   override def create(
     accessGroup: CustomGroup
