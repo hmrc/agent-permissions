@@ -21,7 +21,7 @@ import play.api.mvc._
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentmtdidentifiers.utils.PaginatedListBuilder
 import uk.gov.hmrc.agentpermissions.model.{AddMembersToAccessGroupRequest, AddOneTeamMemberToGroupRequest, CreateAccessGroupRequest, UpdateAccessGroupRequest}
-import uk.gov.hmrc.agentpermissions.service.{AccessGroupDeletionStatus, _}
+import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.auth.core.AuthorisationException
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -227,17 +227,28 @@ class AccessGroupsController @Inject() (
               if (term == "TRUST") clientsMatchingSearch.filter(_.enrolmentKey.contains("HMRC-TERS"))
               else clientsMatchingSearch.filter(_.enrolmentKey.contains(term))
             }
-            Ok(
-              Json.toJson(
-                PaginatedListBuilder.build[Client](
-                  page,
-                  pageSize,
-                  taxServiceFilteredClients.toSeq.sortBy(c => c.friendlyName.toLowerCase)
-                )
-              )
-            )
+            val filteredClientsPage = taxServiceFilteredClients.toSeq.sortBy(c => c.friendlyName.toLowerCase)
+            Ok(Json.toJson(PaginatedListBuilder.build[Client](page, pageSize, filteredClientsPage)))
           }
       }
+    } transformWith failureHandler
+  }
+
+  def getPaginatedClientsForAddingToGroup(
+    gid: String,
+    page: Int = 1,
+    pageSize: Int = 20,
+    search: Option[String] = None,
+    filter: Option[String] = None
+  ): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
+      accessGroupsService
+        .getGroupByIdWithPageOfClientsToAdd(gid, page, pageSize, search, filter)
+        .map {
+          case None => NotFound
+          case Some((groupSummary, clients)) =>
+            Ok(Json.toJson(groupSummary, clients))
+        }
     } transformWith failureHandler
   }
 

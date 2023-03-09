@@ -54,6 +54,12 @@ trait UserClientDetailsConnector {
     ec: ExecutionContext
   ): Future[Option[Seq[Client]]]
 
+  def getPaginatedClients(
+    arn: Arn
+  )(page: Int, pageSize: Int, search: Option[String] = None, filter: Option[String] = None)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[PaginatedList[Client]]
   def pushAssignments(
     assignments: UserEnrolmentAssignments
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus]
@@ -93,9 +99,10 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   override val kenshooRegistry: MetricRegistry = metrics.defaultRegistry
 
   val aucdBaseUrl = appConfig.agentUserClientDetailsBaseUrl
+  private val aucdUrl = s"$aucdBaseUrl/agent-user-client-details"
 
   override def agentSize(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]] = {
-    val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/agent-size"
+    val url = s"$aucdUrl/arn/${arn.value}/agent-size"
 
     monitor(s"ConsumedAPI-AgentUserClientDetails-AgentSize-GET") {
       httpV2
@@ -114,7 +121,7 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   override def clientCountByTaxService(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Map[String, Int]]] = {
-    val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/tax-service-client-count"
+    val url = s"$aucdUrl/arn/${arn.value}/tax-service-client-count"
 
     monitor(s"ConsumedAPI-AgentUserClientDetails-ClientCount-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
@@ -131,7 +138,7 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   override def isSingleUserAgency(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
-    val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/user-check"
+    val url = s"$aucdUrl/arn/${arn.value}/user-check"
 
     monitor(s"ConsumedAPI-AgentUserClientDetails-UserCheck-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
@@ -151,7 +158,7 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   override def outstandingWorkItemsExist(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
-    val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/work-items-exist"
+    val url = s"$aucdUrl/arn/${arn.value}/work-items-exist"
 
     monitor(s"ConsumedAPI-AgentUserClientDetails-WorkItemsExist-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
@@ -171,7 +178,7 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   override def outstandingAssignmentsWorkItemsExist(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
-    val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/assignments-work-items-exist"
+    val url = s"$aucdUrl/arn/${arn.value}/assignments-work-items-exist"
 
     monitor(s"ConsumedAPI-AgentUserClientDetails-AssignmentsWorkItemsExist-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
@@ -192,12 +199,9 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Option[Seq[Client]]] = {
-    val url =
-      s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/client-list" + (if (sendEmail)
-                                                                                  "?sendEmail=true" + lang.fold("")(
-                                                                                    "&lang=" + _
-                                                                                  )
-                                                                                else "")
+
+    val params = if (sendEmail) "?sendEmail=true" + lang.fold("")("&lang=" + _) else ""
+    val url = s"$aucdUrl/arn/${arn.value}/client-list$params"
 
     monitor("ConsumedAPI-AgentUserClientDetails-ClientList-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
@@ -215,10 +219,32 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
     }
   }
 
+  def getPaginatedClients(
+    arn: Arn
+  )(page: Int, pageSize: Int, search: Option[String] = None, filter: Option[String] = None)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[PaginatedList[Client]] = {
+
+    val searchParam = search.fold("")(searchTerm => s"&search=$searchTerm")
+    val filterParam = filter.fold("")(filterTerm => s"&filter=$filterTerm")
+    val url = s"$aucdUrl/arn/${arn.value}/clients" +
+      s"?page=$page&pageSize=$pageSize$searchParam$filterParam"
+    monitor("ConsumedAPI-getClientList-GET") {
+      httpV2.get(url"$url").execute[HttpResponse].map { response =>
+        response.status match {
+          case OK => response.json.as[PaginatedList[Client]]
+          case e  => throw UpstreamErrorResponse(s"error getClientList for ${arn.value}", e)
+        }
+      }
+    }
+  }
+
   override def getClientListStatus(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]] = {
-    val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/client-list-status"
+
+    val url = s"$aucdUrl/arn/${arn.value}/client-list-status"
 
     monitor("ConsumedAPI-AgentUserClientDetails-ClientListStatus-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
@@ -239,7 +265,8 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   override def pushAssignments(
     userEnrolmentAssignments: UserEnrolmentAssignments
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] = {
-    val url = s"$aucdBaseUrl/agent-user-client-details/user-enrolment-assignments"
+
+    val url = s"$aucdUrl/user-enrolment-assignments"
 
     monitor("ConsumedAPI-AgentUserClientDetails-PushAssignments-POST") {
       httpV2
@@ -269,7 +296,8 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
     ec: ExecutionContext,
     materializer: Materializer
   ): Future[Option[GroupDelegatedEnrolments]] = {
-    val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/clients-assigned-users"
+
+    val url = s"$aucdUrl/arn/${arn.value}/clients-assigned-users"
 
     monitor("ConsumedAPI-AgentUserClientDetails-ClientsWithAssignedUsers-GET") {
 
@@ -293,7 +321,8 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   }
 
   def getTeamMembers(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[UserDetails]] = {
-    val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/team-members"
+
+    val url = s"$aucdUrl/arn/${arn.value}/team-members"
     monitor("ConsumedAPI-team-members-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
         response.status match {

@@ -21,8 +21,9 @@ PATCH   /groups/:gid                        uk.gov.hmrc.agentpermissions.control
 PUT     /groups/:gid/add-unassigned         uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: String)
 PATCH   /groups/:id/members/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addTeamMemberToGroup(id: String)
 GET     /group/:gid/clients                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForGroup(gid: String, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
-DELETE  /groups/:gid/clients/:clientId       uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeClient(gid: String, clientId: String)
-DELETE  /groups/:gid/members/:memberId       uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeTeamMember(gid: String, memberId: String)
+GET     /group/:gid/clients/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForAddingToGroup(gid: String, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
+DELETE  /groups/:gid/clients/:clientId      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeClient(gid: String, clientId: String)
+DELETE  /groups/:gid/members/:memberId      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeTeamMember(gid: String, memberId: String)
 
 # TODO: Change PATCH to POST in below endpoint
 PATCH   /arn/:arn/sync                   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)

@@ -18,14 +18,14 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import akka.actor.ActorSystem
 import org.bson.types.ObjectId
-import org.scalamock.handlers.{CallHandler3, CallHandler4, CallHandler5}
+import org.scalamock.handlers.{CallHandler3, CallHandler4, CallHandler5, CallHandler7}
 import play.api.libs.json.{JsArray, JsNumber, JsString, JsValue, Json}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.model.AddOneTeamMemberToGroupRequest
+import uk.gov.hmrc.agentpermissions.model.{AddOneTeamMemberToGroupRequest, DisplayClient}
 import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.auth.core.InvalidBearerToken
 import uk.gov.hmrc.http.HeaderCarrier
@@ -229,6 +229,25 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful unassignedClients)
+
+    def mockAccessGroupsServiceGetPaginatedClientsForUpdate(
+      groupId: String,
+      page: Int,
+      pageSize: Int,
+      search: Option[String] = None,
+      filter: Option[String] = None
+    )(mockResponse: (GroupSummary, PaginatedList[DisplayClient])): CallHandler7[String, Int, Int, Option[
+      String
+    ], Option[String], HeaderCarrier, ExecutionContext, Future[Option[(GroupSummary, PaginatedList[DisplayClient])]]] =
+      (
+        mockAccessGroupsService
+          .getGroupByIdWithPageOfClientsToAdd(_: String, _: Int, _: Int, _: Option[String], _: Option[String])(
+            _: HeaderCarrier,
+            _: ExecutionContext
+          )
+        )
+        .expects(groupId, page, pageSize, search, filter, *, *)
+        .returning(Future successful Option(mockResponse))
 
     def mockAccessGroupsServiceGetUnassignedClientsWithException(
       ex: Exception
@@ -1633,6 +1652,51 @@ class AccessGroupsControllerSpec extends BaseSpec {
           }
         }
 
+      }
+    }
+  }
+
+  "Call to fetch GroupSummary and PaginatedClientsForUpdate" when {
+    "provided groupId is valid" should {
+      s"return $OK" in new TestScope {
+        // given
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        private val PAGE = 2
+        private val PAGE_SIZE = 10
+        private val SEARCH: Some[String] = Some("f")
+        private val FILTER: Some[String] = Some("VAT")
+        private val groupId: String = accessGroup._id.toString
+        private val paginationMetaData: PaginationMetaData = PaginationMetaData(false, true, 50, 5, 10, 22, 10, None)
+        private val response: (GroupSummary, PaginatedList[DisplayClient]) =
+          (groupSummaries.head, PaginatedList[DisplayClient](Seq.empty, paginationMetaData))
+        mockAccessGroupsServiceGetPaginatedClientsForUpdate(groupId, PAGE, PAGE_SIZE, SEARCH, FILTER)(response)
+
+        // when
+        val result =
+          controller.getPaginatedClientsForAddingToGroup(groupId, PAGE, PAGE_SIZE, SEARCH, FILTER)(baseRequest)
+
+        // then
+        status(result) shouldBe OK
+      }
+    }
+
+    "provided groupId is not found" should {
+      s"return $NOT_FOUND" in new TestScope {
+        // given
+        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+        private val PAGE = 2
+        private val PAGE_SIZE = 10
+        private val SEARCH: Some[String] = Some("f")
+        private val FILTER: Some[String] = Some("VAT")
+        private val groupId: String = accessGroup._id.toString
+        mockAccessGroupsServiceGetPaginatedClientsForUpdate(groupId, PAGE, PAGE_SIZE, SEARCH, FILTER)(null)
+
+        // when
+        val result =
+          controller.getPaginatedClientsForAddingToGroup(groupId, PAGE, PAGE_SIZE, SEARCH, FILTER)(baseRequest)
+
+        // then
+        status(result) shouldBe NOT_FOUND
       }
     }
   }
