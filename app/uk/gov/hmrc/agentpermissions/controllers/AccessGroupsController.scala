@@ -271,12 +271,12 @@ class AccessGroupsController @Inject() (
           } else {
             accessGroupsService.update(groupId, mergedAccessGroup, authorisedAgent.agentUser) map {
               case AccessGroupNotUpdated =>
-                logger.info("Access group was not updated")
+                logger.info("Custom group was not updated")
                 NotFound
               case AccessGroupUpdated =>
                 Ok
               case AccessGroupUpdatedWithoutAssignmentsPushed =>
-                logger.warn(s"Access group was updated, but assignments were not pushed")
+                logger.warn(s"Custom group was updated, but assignments were not pushed")
                 Ok
             }
           }
@@ -291,9 +291,12 @@ class AccessGroupsController @Inject() (
         .removeClient(gid, clientId, authorisedAgent.agentUser)
         .map {
           case AccessGroupNotUpdated =>
-            logger.info(s"Access group '$gid' didn't remove client '$clientId''")
+            logger.info(s"Custom group '$gid' didn't remove client '$clientId''")
             NotModified
-          case AccessGroupUpdated => NoContent
+//          case AccessGroupUpdated => NoContent
+          case AccessGroupUpdatedWithoutAssignmentsPushed =>
+            logger.info(s"Custom group removed a client, but assignments were not pushed")
+            NoContent
         }
     }
   }
@@ -304,9 +307,12 @@ class AccessGroupsController @Inject() (
         .removeTeamMember(gid, memberId, authorisedAgent.agentUser)
         .map {
           case AccessGroupNotUpdated =>
-            logger.info(s"Access group '$gid' didn't remove client '$memberId''")
+            logger.info(s"Custom group '$gid' didn't remove client '$memberId''")
             NotModified
-          case AccessGroupUpdated => NoContent
+//          case AccessGroupUpdated => NoContent
+          case AccessGroupUpdatedWithoutAssignmentsPushed =>
+            logger.info(s"Custom group removed a team member, but assignments were not pushed")
+            NoContent
         }
     }
   }
@@ -341,9 +347,12 @@ class AccessGroupsController @Inject() (
       withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
         accessGroupsService
           .addMemberToGroup(gid, addRequest.teamMember) map {
-          case AccessGroupUpdated => Ok
+//          case AccessGroupUpdated => Ok
+          case AccessGroupUpdatedWithoutAssignmentsPushed =>
+            logger.info(s"Custom group added a team member, but assignments were not pushed")
+            Ok
           case AccessGroupNotUpdated =>
-            logger.info(s"Tax Service Group with id '$gid' was not updated it probably doesn't exist")
+            logger.info(s"Custom group with id '$gid' was not updated it probably doesn't exist")
             NotFound
         }
       }

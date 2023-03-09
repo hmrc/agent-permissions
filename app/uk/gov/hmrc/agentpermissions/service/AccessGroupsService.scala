@@ -228,7 +228,7 @@ class AccessGroupsServiceImpl @Inject() (
     accessGroupsRepository
       .removeClient(groupId, clientId)
       .map(_.getMatchedCount match {
-        case 1 => AccessGroupUpdated
+        case 1 => AccessGroupUpdatedWithoutAssignmentsPushed // TODO push assignments
         case _ => AccessGroupNotUpdated
       })
 
@@ -246,7 +246,7 @@ class AccessGroupsServiceImpl @Inject() (
           accessGroupsRepository
             .update(accessGroup.arn, accessGroup.groupName, updatedGroup)
             .map {
-              case Some(1) => AccessGroupUpdated
+              case Some(1) => AccessGroupUpdatedWithoutAssignmentsPushed // TODO push assignments
               case _       => AccessGroupNotUpdated
             }
         case None => Future successful AccessGroupNotUpdated
@@ -361,7 +361,7 @@ class AccessGroupsServiceImpl @Inject() (
     accessGroupsRepository
       .addTeamMember(groupId, teamMember)
       .map(_.getMatchedCount match {
-        case 1 => AccessGroupUpdated
+        case 1 => AccessGroupUpdatedWithoutAssignmentsPushed // TODO push assignments
         case _ => AccessGroupNotUpdated
       })
 }
