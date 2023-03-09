@@ -111,10 +111,7 @@ class AccessGroupsServiceImpl @Inject() (
     pageSize: Int = 20,
     search: Option[String] = None,
     filter: Option[String] = None
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[(GroupSummary, PaginatedList[DisplayClient])]] = {
-    println("~~~~~~~~~~~~~~~~~~~~~")
-    println(search, filter)
-    println("~~~~~~~~~~~~~~~~~~~~~")
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[(GroupSummary, PaginatedList[DisplayClient])]] =
     accessGroupsRepository
       .findById(id)
       .flatMap {
@@ -134,7 +131,6 @@ class AccessGroupsServiceImpl @Inject() (
               Some((GroupSummary(grp._id.toString, grp.groupName, None, grp.teamMembers.size, None), paginatedList))
             }
       }
-  }
 
   override def create(
     accessGroup: CustomGroup

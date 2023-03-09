@@ -18,10 +18,9 @@ package uk.gov.hmrc.agentpermissions.service
 
 import akka.stream.Materializer
 import com.mongodb.client.result.UpdateResult
-import org.apache.commons.lang3.RandomStringUtils
 import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.bson.types.ObjectId
-import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4, CallHandler5}
+import org.scalamock.handlers._
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
@@ -244,6 +243,23 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .outstandingAssignmentsWorkItemsExist(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future successful maybeOutstandingAssignmentsWorkItemsExist)
+
+    def mockAucdGetPaginatedClientsForArn(
+      arn: Arn,
+      page: Int = 1,
+      pageSize: Int = 20,
+      search: Option[String] = None,
+      filter: Option[String] = None
+    )(mockedResponse: PaginatedList[Client]): CallHandler7[Arn, Int, Int, Option[String], Option[
+      String
+    ], HeaderCarrier, ExecutionContext, Future[PaginatedList[Client]]] =
+      (mockUserClientDetailsConnector
+        .getPaginatedClients(_: Arn)(_: Int, _: Int, _: Option[String], _: Option[String])(
+          _: HeaderCarrier,
+          _: ExecutionContext
+        ))
+        .expects(arn, page, pageSize, search, filter, *, *)
+        .returning(Future successful mockedResponse)
 
     def mockAuditServiceAuditEsAssignmentUnassignments()
       : CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Unit] =
@@ -763,6 +779,38 @@ class AccessGroupsServiceSpec extends BaseSpec {
         accessGroupsService
           .removeTeamMember(dbId.toString, randomAlphabetic(8), user)
           .futureValue shouldBe AccessGroupNotUpdated
+      }
+    }
+  }
+
+  "Getting a page of data for purpose of adding clients to a group" when {
+
+    "works as expected when successful " should {
+      s"return a paginated list" in new TestScope {
+        // given
+        private val PAGE = 2
+        private val PAGE_SIZE = 10
+        private val SEARCH: Some[String] = Some("f")
+        private val FILTER: Some[String] = Some("VAT")
+
+        private val mockedResponse: PaginatedList[Client] = PaginatedList[Client](
+          accessGroup.clients.get.toSeq,
+          PaginationMetaData(false, false, 40, 4, 10, 2, 10, None)
+        )
+        mockAccessGroupsRepositoryFindById(Some(accessGroup))
+        mockAucdGetPaginatedClientsForArn(accessGroup.arn, PAGE, PAGE_SIZE, SEARCH, FILTER)(mockedResponse)
+
+        // when
+        val response =
+          accessGroupsService
+            .getGroupByIdWithPageOfClientsToAdd(dbId.toString, PAGE, PAGE_SIZE, SEARCH, FILTER)
+            .futureValue
+
+        // then
+        response should not equal None
+        response.get._1.groupName shouldBe accessGroup.groupName
+        response.get._1.groupId shouldBe accessGroup._id.toString
+        response.get._2.pageContent.length shouldBe accessGroup.clients.get.size
       }
     }
   }

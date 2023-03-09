@@ -367,8 +367,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       val SEARCH = "rob"
       val FILTER = "whatever"
       val PAGE = 1
-      val url: String = mockAppConfig.agentUserClientDetailsBaseUrl
-      val aucdBaseUrl = s"$url/agent-user-client-details"
       val clients = Seq(
         Client(enrolmentKey = "HMRC-MTD-IT~MTDITID~XX12345", friendlyName = "Bob"),
         Client(enrolmentKey = "HMRC-MTD-IT~MTDITID~XX12347", friendlyName = "Builder")
@@ -384,26 +382,22 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       )
       val paginatedList = PaginatedList[Client](pageContent = clients, paginationMetaData = meta)
       mockAppConfigAgentUserClientDetailsBaseUrl
+      mockMetricsDefaultRegistry
       private val PAGE_SIZE = 5
       mockHttpGetV2(
         new URL(
-          s"$aucdBaseUrl/arn/${arn.value}/clients?page=$PAGE&pageSize=$PAGE_SIZE&search=$SEARCH&filter=$FILTER"
+          s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients?page=$PAGE&pageSize=$PAGE_SIZE&search=$SEARCH&filter=$FILTER"
         )
       )
-      mockRequestBuilderExecuteWithoutException(HttpResponse(OK, "[]"))
+      mockRequestBuilderExecuteWithoutException(HttpResponse(OK, Json.toJson(paginatedList).toString))
+
+      // when
       val result: Future[PaginatedList[Client]] =
         userClientDetailsConnector.getPaginatedClients(arn)(PAGE, PAGE_SIZE, Some(SEARCH), Some(FILTER))
+
+      // then
       result.futureValue shouldBe paginatedList
     }
-
-//    "throw error when status response is 5xx" in {
-//
-//      expectHttpClientGET[HttpResponse](HttpResponse.apply(503, ""))
-//
-//      intercept[UpstreamErrorResponse] {
-//        await(connector.getPaginatedClients(arn)(1, 20))
-//      }
-//    }
 
   }
 
