@@ -24,9 +24,8 @@ import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
 import com.kenshoo.play.metrics.Metrics
 import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2}
 import play.api.http.Status._
-import play.api.libs.json.Json
+import play.api.libs.json.{JsArray, Json}
 import play.api.libs.ws.{BodyWritable, DefaultBodyWritables, WSRequest}
-import play.api.test.Helpers.await
 import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
@@ -560,6 +559,96 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         }
       }
     }
+
+    "getTeamMembers" when {
+
+      s"http response has $OK status code" should {
+        "return some value" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpGetV2(
+            new URL(
+              s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/team-members"
+            )
+          )
+          mockRequestBuilderExecuteWithoutException(HttpResponse(OK, "[]"))
+          userClientDetailsConnector.getTeamMembers(arn).futureValue shouldBe Seq.empty
+        }
+      }
+
+      "http response has non-200 status codes" should {
+        Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+          s"fail for $statusCode" in new TestScope {
+            mockAppConfigAgentUserClientDetailsBaseUrl
+            mockMetricsDefaultRegistry
+            mockHttpGetV2(
+              new URL(
+                s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/team-members"
+              )
+            )
+            mockRequestBuilderExecuteWithException(UpstreamErrorResponse("", statusCode))
+            userClientDetailsConnector.getTeamMembers(arn).failed.futureValue shouldBe a[UpstreamErrorResponse]
+          }
+        }
+      }
+
+    }
+
+    "syncTeamMember" when {
+      val userId = "myUser"
+
+      s"http response has $OK status code" should {
+        "return false" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpPostV2(
+            new URL(
+              s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user/$userId/ensure-assignments"
+            )
+          )
+          mockRequestBuilderWithBody(JsArray.empty)
+          mockRequestBuilderExecuteWithoutException(HttpResponse(OK, ""))
+          userClientDetailsConnector.syncTeamMember(arn, userId, Seq.empty).futureValue shouldBe false
+        }
+      }
+
+      s"http response has $ACCEPTED status code" should {
+        "return true" in new TestScope {
+          mockAppConfigAgentUserClientDetailsBaseUrl
+          mockMetricsDefaultRegistry
+          mockHttpPostV2(
+            new URL(
+              s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user/$userId/ensure-assignments"
+            )
+          )
+          mockRequestBuilderWithBody(JsArray.empty)
+          mockRequestBuilderExecuteWithoutException(HttpResponse(ACCEPTED, ""))
+          userClientDetailsConnector.syncTeamMember(arn, userId, Seq.empty).futureValue shouldBe true
+        }
+      }
+
+      "http response has non-successful status codes" should {
+        Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
+          s"fail for $statusCode" in new TestScope {
+            mockAppConfigAgentUserClientDetailsBaseUrl
+            mockMetricsDefaultRegistry
+            mockHttpPostV2(
+              new URL(
+                s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user/$userId/ensure-assignments"
+              )
+            )
+            mockRequestBuilderWithBody(JsArray.empty)
+            mockRequestBuilderExecuteWithException(UpstreamErrorResponse("", statusCode))
+            userClientDetailsConnector
+              .syncTeamMember(arn, userId, Seq.empty)
+              .failed
+              .futureValue shouldBe a[UpstreamErrorResponse]
+          }
+        }
+      }
+
+    }
+
   }
 
   trait TestScope extends DefaultBodyWritables {

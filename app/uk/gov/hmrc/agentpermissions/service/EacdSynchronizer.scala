@@ -16,16 +16,17 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import akka.stream.Materializer
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, CustomGroup, UserDetails}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, CustomGroup, TaxGroup, UserDetails}
+import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
-import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
+import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, EacdSyncRepository, TaxServiceGroupsRepository}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.util.GroupOps
 import uk.gov.hmrc.http.HeaderCarrier
 
+import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -35,7 +36,7 @@ case class RemovalSet(enrolmentKeysToRemove: Set[String], userIdsToRemove: Set[S
 
 @ImplementedBy(classOf[EacdSynchronizerImpl])
 trait EacdSynchronizer {
-  def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser)(implicit
+  def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser, fullSync: Boolean = false)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Seq[AccessGroupUpdateStatus]]
@@ -45,109 +46,219 @@ trait EacdSynchronizer {
 class EacdSynchronizerImpl @Inject() (
   userClientDetailsConnector: UserClientDetailsConnector,
   accessGroupsRepository: AccessGroupsRepository,
-  auditService: AuditService
-)(implicit materializer: Materializer)
-    extends EacdSynchronizer with Logging {
+  taxServiceGroupsRepository: TaxServiceGroupsRepository,
+  eacdSyncRepository: EacdSyncRepository,
+  auditService: AuditService,
+  appConfig: AppConfig
+) extends EacdSynchronizer with Logging {
 
   /** Interrogate EACD to find out whether the stored access groups are referencing any clients or team members who are
     * no longer with the agency. These clients and members should be removed from any groups they are in.
+    *
     * @return
     *   the lists of clients and team members which should removed from access groups.
     */
-  private[service] def calculateRemovalSet(arn: Arn, accessGroups: Seq[CustomGroup])(implicit
+  private[service] def calculateRemovalSet(arn: Arn, accessGroups: Seq[AccessGroup])(implicit
     ec: ExecutionContext,
     hc: HeaderCarrier
-  ): Future[RemovalSet] = for {
-    clientsInEacd <- userClientDetailsConnector
-                       .getClients(arn)
-                       .map(_.getOrElse(throw new RuntimeException("Could not retrieve client list from ES3")).toSet)
-    membersInEacd: Set[UserDetails] <- userClientDetailsConnector.getTeamMembers(arn).map(_.toSet)
-    clientsInAccessGroups = accessGroups.flatMap(_.clients.getOrElse(Seq.empty)).toSet
-    membersInAccessGroups = accessGroups.flatMap(_.teamMembers.getOrElse(Set.empty)).toSet
-    enrolmentKeysToRemove = clientsInAccessGroups.map(_.enrolmentKey).diff(clientsInEacd.map(_.enrolmentKey))
-    userIdsToRemove = membersInAccessGroups.map(_.id).diff(membersInEacd.flatMap(_.userId))
-  } yield RemovalSet(enrolmentKeysToRemove, userIdsToRemove)
+  ): Future[RemovalSet] = if (accessGroups.isEmpty)
+    Future.successful(RemovalSet(Set.empty, Set.empty))
+  else
+    for {
+      clientsInEacd <- userClientDetailsConnector
+                         .getClients(arn)
+                         .map(_.getOrElse(throw new RuntimeException("Could not retrieve client list from ES3")).toSet)
+      membersInEacd: Set[UserDetails] <- userClientDetailsConnector.getTeamMembers(arn).map(_.toSet)
+      clientsInAccessGroups = accessGroups.flatMap {
+                                case cg: CustomGroup => cg.clients.getOrElse(Set.empty)
+                                case tg: TaxGroup    => tg.excludedClients.getOrElse(Set.empty)
+                              }.toSet
+      membersInAccessGroups = accessGroups.flatMap(_.teamMembers.getOrElse(Set.empty)).toSet
+      enrolmentKeysToRemove = clientsInAccessGroups.map(_.enrolmentKey).diff(clientsInEacd.map(_.enrolmentKey))
+      userIdsToRemove = membersInAccessGroups.map(_.id).diff(membersInEacd.flatMap(_.userId))
+    } yield RemovalSet(enrolmentKeysToRemove, userIdsToRemove)
 
-  /** From each access group provided, remove the clients and members specified in the removal set. This function has
-    * the side-effect of sending audit events to record the clients and members that are removed.
+  /** From the access group provided, remove the clients and members specified in the removal set. This function has the
+    * side-effect of sending audit events to record the clients and members that are removed.
+    *
     * @return
     *   The updated list of access groups.
     */
-  private[service] def applyRemovalSet(
-    accessGroups: Seq[CustomGroup],
+  private[service] def applyRemovalSetToCustomGroup(
+    accessGroup: CustomGroup,
     removalSet: RemovalSet,
     whoIsUpdating: AgentUser
   )(implicit
     ec: ExecutionContext,
     hc: HeaderCarrier
-  ): Future[Seq[CustomGroup]] = {
-    // Step 1. Remove clients that are no longer with the agency from any stored access groups.
-    val accessGroups1 = accessGroups.map { group =>
+  ): Future[CustomGroup] = {
+    // Step 1. Remove clients in the removal set from the access group.
+    val accessGroup1 = {
       val (updatedGroup, clientsRemovedFromGroup) =
         GroupOps.removeClientsFromGroup(
-          group,
+          accessGroup,
           removalSet.enrolmentKeysToRemove,
           whoIsUpdating
         )
-      if (clientsRemovedFromGroup.nonEmpty) auditService.auditAccessGroupClientsRemoval(group, clientsRemovedFromGroup)
+      if (clientsRemovedFromGroup.nonEmpty)
+        auditService.auditAccessGroupClientsRemoval(accessGroup, clientsRemovedFromGroup)
       updatedGroup
     }
 
-    // Step 2. Remove members that are no longer with the agency from any stored access groups.
-    val accessGroups2 = accessGroups1.map { group =>
+    // Step 2. Remove members in the removal set from the access group.
+    val accessGroup2 = {
       val (updatedGroup, membersRemovedFromGroup) =
-        GroupOps.removeTeamMembersFromGroup(group, removalSet.userIdsToRemove, whoIsUpdating)
+        GroupOps.removeTeamMembersFromGroup(accessGroup1, removalSet.userIdsToRemove, whoIsUpdating)
       if (membersRemovedFromGroup.nonEmpty)
-        auditService.auditAccessGroupTeamMembersRemoval(group, membersRemovedFromGroup)
+        auditService.auditAccessGroupTeamMembersRemoval(accessGroup1, membersRemovedFromGroup)
       updatedGroup
     }
 
     /* There is really no need for this function to return a Future, but since this function sends audit events
       a Future return type is a way to signal the presence of side effects */
-    Future.successful(accessGroups2)
+    Future.successful(accessGroup2)
   }
 
-  private[service] def persistAccessGroups(accessGroups: Seq[CustomGroup])(implicit
+  /** From the tax service access group provided, remove the clients and members specified in the removal set. This
+    * function has the side-effect of sending audit events to record the clients and members that are removed.
+    *
+    * @return
+    *   The updated tax service access group.
+    */
+  private[service] def applyRemovalSetToTaxGroup(
+    accessGroup: TaxGroup,
+    removalSet: RemovalSet,
+    whoIsUpdating: AgentUser
+  )(implicit
+    ec: ExecutionContext,
+    hc: HeaderCarrier
+  ): Future[TaxGroup] = {
+    val updatedGroup = accessGroup.copy(
+      teamMembers = accessGroup.teamMembers.map(_.filterNot(member => removalSet.userIdsToRemove.contains(member.id))),
+      excludedClients = accessGroup.excludedClients.map(
+        _.filterNot(client => removalSet.enrolmentKeysToRemove.contains(client.enrolmentKey))
+      ),
+      lastUpdated = LocalDateTime.now(),
+      lastUpdatedBy = whoIsUpdating
+    )
+    val membersRemoved =
+      accessGroup.teamMembers.getOrElse(Set.empty).diff(updatedGroup.teamMembers.getOrElse(Set.empty))
+    val excludedClientsRemoved =
+      accessGroup.excludedClients.getOrElse(Set.empty).diff(updatedGroup.excludedClients.getOrElse(Set.empty))
+
+    if (membersRemoved.nonEmpty) auditService.auditAccessGroupTeamMembersRemoval(accessGroup, membersRemoved)
+    // TODO should be sending an audit event when we remove an excluded client?
+    /* There is really no need for this function to return a Future, but since this function sends audit events
+      a Future return type is a way to signal the presence of side effects */
+    val isChanged = membersRemoved.nonEmpty || excludedClientsRemoved.nonEmpty
+    Future.successful(if (isChanged) updatedGroup else accessGroup)
+  }
+
+  private[service] def applyRemovalSet(
+    accessGroup: AccessGroup,
+    removalSet: RemovalSet,
+    whoIsUpdating: AgentUser
+  )(implicit
+    ec: ExecutionContext,
+    hc: HeaderCarrier
+  ): Future[AccessGroup] = accessGroup match {
+    case customGroup: CustomGroup => applyRemovalSetToCustomGroup(customGroup, removalSet, whoIsUpdating)
+    case taxGroup: TaxGroup       => applyRemovalSetToTaxGroup(taxGroup, removalSet, whoIsUpdating)
+  }
+
+  /** Force the assigned enrolments in EACD to match those stored here.
+    */
+  private[service] def doFullSync(arn: Arn, customGroups: Seq[CustomGroup])(implicit
+    ec: ExecutionContext,
+    hc: HeaderCarrier
+  ): Future[Set[(String, Boolean)]] = {
+    val allUserIds: Set[String] = customGroups.flatMap(_.teamMembers.getOrElse(Set.empty).map(_.id)).toSet
+    Future.traverse(allUserIds) { userId =>
+      val expectedAssignments = customGroups
+        .filter(_.teamMembers.getOrElse(Set.empty).map(_.id).contains(userId))
+        .flatMap(_.clients.getOrElse(Set.empty).map(_.enrolmentKey))
+      userClientDetailsConnector.syncTeamMember(arn, userId, expectedAssignments).map((userId, _))
+    }
+  }
+
+  private[service] def persistAccessGroup(accessGroup: AccessGroup)(implicit
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupUpdateStatus]] = Future.traverse(accessGroups) { accessGroup =>
+  ): Future[AccessGroupUpdateStatus] = {
     logger.info(
       s"Updating access group of ${accessGroup.arn.value} having name '${accessGroup.groupName}'"
     )
-    accessGroupsRepository
-      .update(accessGroup.arn, accessGroup.groupName, accessGroup)
-      .map {
-        case None =>
+    (accessGroup match {
+      case customGroup: CustomGroup =>
+        accessGroupsRepository.update(customGroup.arn, customGroup.groupName, customGroup)
+      case taxGroup: TaxGroup =>
+        taxServiceGroupsRepository.update(taxGroup.arn, taxGroup.groupName, taxGroup)
+    }).map {
+      case None =>
+        AccessGroupNotUpdated
+      case Some(updatedCount) =>
+        if (updatedCount == 1L) {
+          AccessGroupUpdated
+        } else {
           AccessGroupNotUpdated
-        case Some(updatedCount) =>
-          if (updatedCount == 1L) {
-            AccessGroupUpdated
-          } else {
-            AccessGroupNotUpdated
-          }
-      }
+        }
+    }
   }
 
-  def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser)(implicit
+  /** Run the enclosed function only if safe (i.e. there are no outstanding assignment work item and the sync lock can
+    * be acquired)
+    */
+  def ifSyncShouldOccur[A](arn: Arn)(action: => Future[A])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupUpdateStatus]] =
+  ): Future[Option[A]] = for {
+    maybeOutstandingAssignmentsWorkItemsExist <- userClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn)
+
+    maybeEacdSyncRecord <- maybeOutstandingAssignmentsWorkItemsExist match {
+                             case None | Some(true) => Future.successful(None)
+                             case Some(false) => eacdSyncRepository.acquire(arn, appConfig.eacdSyncNotBeforeSeconds)
+                           }
+
+    result <- maybeEacdSyncRecord match {
+                case None => Future.successful(None)
+                case _ =>
+                  logger.info(s"Acquired record for EACD Sync for '${arn.value}'")
+                  action.map(Some(_))
+              }
+  } yield result
+
+  /** Ensure that access groups stored in agent-permissions do not contain any clients or team members that no longer
+    * appear to be with the agency (as reported by EACD) Optionally (if requesting a 'full sync') also force the
+    * assigned enrolments in EACD to match those stored here.
+    */
+  def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser, fullSync: Boolean = false)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Seq[AccessGroupUpdateStatus]] = ifSyncShouldOccur(arn) {
     for {
-      accessGroups <- accessGroupsRepository.get(arn)
+      customAccessGroups <- accessGroupsRepository.get(arn)
+      taxServiceGroups   <- taxServiceGroupsRepository.get(arn)
+      allAccessGroups: Seq[AccessGroup] = customAccessGroups ++ taxServiceGroups
 
       // Determine list of clients and team members that should be removed from all access groups.
-      removalSet <- calculateRemovalSet(arn, accessGroups)
+      removalSet <- calculateRemovalSet(arn, allAccessGroups)
       _ = logger.info(s"Calculated removal set for $arn: $removalSet")
 
-      // Remove members that are no longer with the agency from any stored access groups.
-      updatedAccessGroups <- applyRemovalSet(accessGroups, removalSet, whoIsUpdating)
+      // Remove clients and members that are no longer with the agency from any stored access groups.
+      updatedAccessGroups <- Future.traverse(allAccessGroups)(applyRemovalSet(_, removalSet, whoIsUpdating))
 
       // Persist the updated access groups.
       updateStatuses: Seq[AccessGroupUpdateStatus] <-
-        if (removalSet.isEmpty) Future.successful(Seq.empty) else persistAccessGroups(updatedAccessGroups)
+        if (removalSet.isEmpty) Future.successful(Seq.empty)
+        else Future.traverse(updatedAccessGroups)(persistAccessGroup(_))
 
-      // Next step: Ensure assignments in EACD reflect those in Agent Permissions
-      // To be developed...
+      // Optionally ensure that in EACD the enrolment assignments match those kept by agent-permissions.
+      fullSyncResults <- if (!fullSync) Future.successful(Seq.empty)
+                         else doFullSync(arn, updatedAccessGroups.collect { case cg: CustomGroup => cg })
+      resyncedCount = fullSyncResults.count { case (_, isChanged) => isChanged }
+      _ =
+        if (fullSync)
+          logger.info(s"Full sync performed. $resyncedCount users of ${fullSyncResults.size} needed syncing in EACD.")
 
     } yield updateStatuses
-
+  }.map(_.getOrElse(Seq.empty))
 }
