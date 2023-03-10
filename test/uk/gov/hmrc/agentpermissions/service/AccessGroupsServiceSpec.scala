@@ -723,9 +723,11 @@ class AccessGroupsServiceSpec extends BaseSpec {
   "Adding team member to a group" when {
 
     "works as expected when successful " should {
-      s"return $AccessGroupUpdated" in new TestScope {
+      s"return $AccessGroupUpdatedWithoutAssignmentsPushed" in new TestScope {
         mockAddTeamMemberToGroup(dbId.toString, user, 1)
-        accessGroupsService.addMemberToGroup(dbId.toString, user).futureValue shouldBe AccessGroupUpdated
+        accessGroupsService
+          .addMemberToGroup(dbId.toString, user)
+          .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
       }
     }
 
@@ -741,11 +743,11 @@ class AccessGroupsServiceSpec extends BaseSpec {
   "Removing a client from a group" when {
 
     "works as expected when successful " should {
-      s"return $AccessGroupUpdated" in new TestScope {
+      s"return $AccessGroupUpdatedWithoutAssignmentsPushed" in new TestScope {
         mockAddRemoveClientFromGroup(dbId.toString, clientVat, 1)
         accessGroupsService
           .removeClient(dbId.toString, clientVat.enrolmentKey, user)
-          .futureValue shouldBe AccessGroupUpdated
+          .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
       }
 
       s"return $AccessGroupNotUpdated" in new TestScope {
@@ -760,7 +762,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
   "Removing a team members from a group" when {
 
     "works as expected when successful " should {
-      s"return $AccessGroupUpdated" in new TestScope {
+      s"return $AccessGroupUpdatedWithoutAssignmentsPushed" in new TestScope {
         // expect
         mockAccessGroupsRepositoryFindById(Some(accessGroup))
         mockAccessGroupsRepositoryUpdate(Some(1))
@@ -769,7 +771,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         private val result = accessGroupsService.removeTeamMember(dbId.toString, user1.id, user).futureValue
 
         // then
-        result shouldBe AccessGroupUpdated
+        result shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
       }
 
       s"return $AccessGroupNotUpdated" in new TestScope {

@@ -1297,7 +1297,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
         // when
         val request: AddOneTeamMemberToGroupRequest = AddOneTeamMemberToGroupRequest(user)
-        expectAddTeamMemberToGroup(AccessGroupUpdated)
+        expectAddTeamMemberToGroup(AccessGroupUpdatedWithoutAssignmentsPushed)
 
         // then
         val result = controller.addTeamMemberToGroup(dbId.toHexString)(baseRequest.withBody(Json.toJson(request)))
@@ -1326,7 +1326,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"return $NO_CONTENT when successfully removed client" in new TestScope {
         // given
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        expectRemoveClientFromGroup(AccessGroupUpdated)
+        expectRemoveClientFromGroup(AccessGroupUpdatedWithoutAssignmentsPushed)
 
         // when
         val result = controller.removeClient(dbId.toHexString, "whatever")(baseRequest)
@@ -1366,7 +1366,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"return $NO_CONTENT when successfully removed team member" in new TestScope {
         // given
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        expectRemoveTeamMemberFromGroup(AccessGroupUpdated)
+        expectRemoveTeamMemberFromGroup(AccessGroupUpdatedWithoutAssignmentsPushed)
 
         // when
         val result = controller.removeTeamMember(dbId.toHexString, "a valid id")(baseRequest)
