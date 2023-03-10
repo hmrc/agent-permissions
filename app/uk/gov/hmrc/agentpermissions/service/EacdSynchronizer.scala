@@ -204,6 +204,9 @@ class EacdSynchronizerImpl @Inject() (
     }
   }
 
+  /** Run the enclosed function only if safe (i.e. there are no outstanding assignment work item and the sync lock can
+    * be acquired)
+    */
   def ifSyncShouldOccur[A](arn: Arn)(action: => Future[A])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext

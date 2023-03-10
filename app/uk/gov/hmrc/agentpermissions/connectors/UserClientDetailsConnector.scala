@@ -333,9 +333,8 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
     monitor("ConsumedAPI-team-members-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
         response.status match {
-          case ACCEPTED => Seq.empty[UserDetails]
-          case OK       => response.json.as[Seq[UserDetails]]
-          case e        => throw UpstreamErrorResponse(s"error getTeamMemberList for ${arn.value}", e)
+          case OK => response.json.as[Seq[UserDetails]]
+          case e  => throw UpstreamErrorResponse(s"error getTeamMemberList for ${arn.value}", e)
         }
       }
     }
