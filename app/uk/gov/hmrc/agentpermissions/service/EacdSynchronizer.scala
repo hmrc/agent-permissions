@@ -241,7 +241,10 @@ class EacdSynchronizerImpl @Inject() (
 
       // Determine list of clients and team members that should be removed from all access groups.
       removalSet <- calculateRemovalSet(arn, allAccessGroups)
-      _ = logger.info(s"Calculated removal set for $arn: $removalSet")
+      _ =
+        logger.info(
+          s"Calculated removal set for $arn: clients=${removalSet.enrolmentKeysToRemove.size} users=${removalSet.userIdsToRemove.size}"
+        )
 
       // Remove clients and members that are no longer with the agency from any stored access groups.
       updatedAccessGroups <- Future.traverse(allAccessGroups)(applyRemovalSet(_, removalSet, whoIsUpdating))
