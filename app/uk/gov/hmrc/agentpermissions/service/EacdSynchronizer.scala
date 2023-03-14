@@ -16,9 +16,10 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
+import akka.actor.ActorSystem
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AccessGroup, AgentUser, Arn, CustomGroup, TaxGroup, UserDetails}
+import uk.gov.hmrc.agentmtdidentifiers.model._
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, EacdSyncRepository, TaxServiceGroupsRepository}
@@ -28,7 +29,9 @@ import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 case class RemovalSet(enrolmentKeysToRemove: Set[String], userIdsToRemove: Set[String]) {
   def isEmpty: Boolean = enrolmentKeysToRemove.isEmpty && userIdsToRemove.isEmpty
@@ -49,6 +52,7 @@ class EacdSynchronizerImpl @Inject() (
   taxServiceGroupsRepository: TaxServiceGroupsRepository,
   eacdSyncRepository: EacdSyncRepository,
   auditService: AuditService,
+  actorSystem: ActorSystem,
   appConfig: AppConfig
 ) extends EacdSynchronizer with Logging {
 
@@ -147,7 +151,8 @@ class EacdSynchronizerImpl @Inject() (
       accessGroup.excludedClients.getOrElse(Set.empty).diff(updatedGroup.excludedClients.getOrElse(Set.empty))
 
     if (membersRemoved.nonEmpty) auditService.auditAccessGroupTeamMembersRemoval(accessGroup, membersRemoved)
-    // TODO should be sending an audit event when we remove an excluded client?
+    if (excludedClientsRemoved.nonEmpty)
+      auditService.auditAccessGroupExcludedClientsRemoval(accessGroup, excludedClientsRemoved)
     /* There is really no need for this function to return a Future, but since this function sends audit events
       a Future return type is a way to signal the presence of side effects */
     val isChanged = membersRemoved.nonEmpty || excludedClientsRemoved.nonEmpty
@@ -171,14 +176,31 @@ class EacdSynchronizerImpl @Inject() (
   private[service] def doFullSync(arn: Arn, customGroups: Seq[CustomGroup])(implicit
     ec: ExecutionContext,
     hc: HeaderCarrier
-  ): Future[Set[(String, Boolean)]] = {
+  ): Future[Unit] = {
+    logger.info(s"Starting full sync for $arn.")
     val allUserIds: Set[String] = customGroups.flatMap(_.teamMembers.getOrElse(Set.empty).map(_.id)).toSet
-    Future.traverse(allUserIds) { userId =>
-      val expectedAssignments = customGroups
-        .filter(_.teamMembers.getOrElse(Set.empty).map(_.id).contains(userId))
-        .flatMap(_.clients.getOrElse(Set.empty).map(_.enrolmentKey))
-      userClientDetailsConnector.syncTeamMember(arn, userId, expectedAssignments).map((userId, _))
-    }
+    Future
+      .traverse(allUserIds) { userId =>
+        val expectedAssignments = customGroups
+          .filter(_.teamMembers.getOrElse(Set.empty).map(_.id).contains(userId))
+          .flatMap(_.clients.getOrElse(Set.empty).map(_.enrolmentKey))
+        userClientDetailsConnector.syncTeamMember(arn, userId, expectedAssignments).transformWith { res =>
+          Future.successful((userId, res))
+        }
+      // return value is Future of (userId, Success(bool: updated or not)) or (userId, Failure(exception))
+      }
+      .map { fullSyncResults =>
+        val resyncedCount = fullSyncResults.count { case (_, Success(isChanged)) => isChanged }
+        val exceptions = fullSyncResults.collect { case (userId, Failure(e)) => (userId, e) }
+        val failuresText = if (exceptions.isEmpty) "No failures." else s"${exceptions.size} failures."
+        logger.info(
+          s"Full sync finished for $arn. $resyncedCount users of ${fullSyncResults.size} needed syncing in EACD. $failuresText"
+        )
+        if (exceptions.nonEmpty) {
+          val failuresDetails = exceptions.map { case (userId, e) => s"userId $userId got ${e.getMessage}" }
+          logger.warn(s"Full sync for $arn failed for the following users: " + failuresDetails.mkString("; "))
+        }
+      }
   }
 
   private[service] def persistAccessGroup(accessGroup: AccessGroup)(implicit
@@ -214,12 +236,18 @@ class EacdSynchronizerImpl @Inject() (
     maybeOutstandingAssignmentsWorkItemsExist <- userClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn)
 
     maybeEacdSyncRecord <- maybeOutstandingAssignmentsWorkItemsExist match {
-                             case None | Some(true) => Future.successful(None)
+                             case None | Some(true) =>
+                               logger.warn(
+                                 "Could not ensure that outstanding assignment queue was empty. Not doing sync"
+                               )
+                               Future.successful(None)
                              case Some(false) => eacdSyncRepository.acquire(arn, appConfig.eacdSyncNotBeforeSeconds)
                            }
 
     result <- maybeEacdSyncRecord match {
-                case None => Future.successful(None)
+                case None =>
+                  logger.warn("Could not acquire sync record. Not doing sync")
+                  Future.successful(None)
                 case _ =>
                   logger.info(s"Acquired record for EACD Sync for '${arn.value}'")
                   action.map(Some(_))
@@ -255,13 +283,11 @@ class EacdSynchronizerImpl @Inject() (
         else Future.traverse(updatedAccessGroups)(persistAccessGroup(_))
 
       // Optionally ensure that in EACD the enrolment assignments match those kept by agent-permissions.
-      fullSyncResults <- if (!fullSync) Future.successful(Seq.empty)
-                         else doFullSync(arn, updatedAccessGroups.collect { case cg: CustomGroup => cg })
-      resyncedCount = fullSyncResults.count { case (_, isChanged) => isChanged }
-      _ =
-        if (fullSync)
-          logger.info(s"Full sync performed. $resyncedCount users of ${fullSyncResults.size} needed syncing in EACD.")
-
+      // This is scheduled asynchronously as it could take some time.
+      _ = if (fullSync) actorSystem.scheduler.scheduleOnce(FiniteDuration(0, "s")) {
+            doFullSync(arn, updatedAccessGroups.collect { case cg: CustomGroup => cg })
+          }
+          else ()
     } yield updateStatuses
   }.map(_.getOrElse(Seq.empty))
 }
