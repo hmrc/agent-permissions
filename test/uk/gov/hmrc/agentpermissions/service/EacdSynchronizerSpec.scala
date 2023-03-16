@@ -247,6 +247,7 @@ class EacdSynchronizerSpec extends BaseSpec {
           Set(agentUser2.id)
         )
 
+        expectAuditExcludedClientsRemoval()
         expectAuditTeamMembersRemoval()
 
         val accessGroup: TaxGroup =
@@ -380,6 +381,7 @@ class EacdSynchronizerSpec extends BaseSpec {
     val stubEacdSyncRepository: EacdSyncRepository = stub[EacdSyncRepository]
     val stubTaxServiceGroupsRepository: TaxServiceGroupsRepository = stub[TaxServiceGroupsRepository]
     val stubAppConfig: AppConfig = stub[AppConfig]
+    val actorSystem: ActorSystem = ActorSystem("test")
 
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
@@ -391,6 +393,7 @@ class EacdSynchronizerSpec extends BaseSpec {
         stubTaxServiceGroupsRepository,
         stubEacdSyncRepository,
         mockAuditService,
+        actorSystem,
         stubAppConfig
       )
 
@@ -445,6 +448,13 @@ class EacdSynchronizerSpec extends BaseSpec {
     def expectAuditClientsRemoval(): CallHandler4[CustomGroup, Set[Client], HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
         .auditAccessGroupClientsRemoval(_: CustomGroup, _: Set[Client])(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(())
+
+    def expectAuditExcludedClientsRemoval()
+      : CallHandler4[TaxGroup, Set[Client], HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditService
+        .auditAccessGroupExcludedClientsRemoval(_: TaxGroup, _: Set[Client])(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(())
 

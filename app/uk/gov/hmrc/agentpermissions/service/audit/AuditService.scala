@@ -51,7 +51,12 @@ trait AuditService {
 
   def auditOptOutEvent(arn: Arn, agentUser: AgentUser)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
 
-  def auditAccessGroupClientsRemoval(accessGroup: AccessGroup, clientsToRemove: Set[Client])(implicit
+  def auditAccessGroupClientsRemoval(customGroup: CustomGroup, clientsToRemove: Set[Client])(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Unit
+
+  def auditAccessGroupExcludedClientsRemoval(tax: TaxGroup, clientsToRemove: Set[Client])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit
@@ -180,7 +185,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       Json.obj("agentReferenceNumber" -> s"${arn.value}", "user" -> agentUser)
     )
 
-  override def auditAccessGroupClientsRemoval(accessGroup: AccessGroup, clientsToRemove: Set[Client])(implicit
+  override def auditAccessGroupClientsRemoval(customGroup: CustomGroup, clientsToRemove: Set[Client])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit =
@@ -188,9 +193,25 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       "GranularPermissionsAccessGroupClientsRemoval",
       AccessGroupClientsRemoval
         .split(
-          accessGroup.arn.value,
-          accessGroup._id,
-          accessGroup.groupName,
+          customGroup.arn.value,
+          customGroup._id,
+          customGroup.groupName,
+          clientsToRemove,
+          chunkSize = appConfig.clientsRemovalChunkSize
+        )
+    )
+
+  override def auditAccessGroupExcludedClientsRemoval(taxGroup: TaxGroup, clientsToRemove: Set[Client])(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Unit =
+    sendChunkedAuditEvents(
+      "GranularPermissionsAccessGroupExcludedClientsRemoval",
+      AccessGroupClientsRemoval
+        .split(
+          taxGroup.arn.value,
+          taxGroup._id,
+          taxGroup.groupName,
           clientsToRemove,
           chunkSize = appConfig.clientsRemovalChunkSize
         )
