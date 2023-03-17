@@ -45,6 +45,13 @@ trait AccessGroupsRepository {
 
   def get(arn: Arn, groupName: String): Future[Option[CustomGroup]]
 
+  /* TODO APB-7070: add following functionality
+   *   - find client in group by ids
+   *   - find team member in group by ids (decrypted)
+   *  to be used for find Client & Team member pair in group by ids
+   *
+   * */
+
   def insert(accessGroup: CustomGroup): Future[Option[String]]
 
   def delete(arn: Arn, groupName: String): Future[Option[Long]]
