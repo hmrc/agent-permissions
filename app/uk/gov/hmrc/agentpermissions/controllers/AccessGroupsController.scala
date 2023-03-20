@@ -374,7 +374,7 @@ class AccessGroupsController @Inject() (
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         // Note: we are not waiting for this future to complete before returning a response
-        eacdSynchronizer.syncWithEacd(matchedArn, authorisedAgent.agentUser, fullSync).onComplete {
+        eacdSynchronizer.syncWithEacd(matchedArn, fullSync).onComplete {
           case Success(Some(updateStatuses)) =>
             logger.info(s"EACD Sync request processed for ${arn.value} with results: ${updateStatuses.mkString(", ")}")
           case Success(None) =>

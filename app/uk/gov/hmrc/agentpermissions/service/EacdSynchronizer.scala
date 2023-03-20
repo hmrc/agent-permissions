@@ -46,7 +46,7 @@ object SyncResult {
 
 @ImplementedBy(classOf[EacdSynchronizerImpl])
 trait EacdSynchronizer {
-  def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser, fullSync: Boolean = false)(implicit
+  def syncWithEacd(arn: Arn, fullSync: Boolean = false)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Option[Map[SyncResult, Int]]]
@@ -262,10 +262,11 @@ class EacdSynchronizerImpl @Inject() (
     *   None if sync was not done (if too soon after previous sync or items still outstanding). A list of update
     *   statuses otherwise
     */
-  def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser, fullSync: Boolean = false)(implicit
+  def syncWithEacd(arn: Arn, fullSync: Boolean = false)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Option[Map[SyncResult, Int]]] = ifSyncShouldOccur(arn) {
+    val whoIsUpdating = AgentUser(id = "", name = "EACD sync")
     for {
       customAccessGroups <- accessGroupsRepository.get(arn)
       taxServiceGroups   <- taxServiceGroupsRepository.get(arn)

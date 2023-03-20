@@ -260,16 +260,16 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockEacdSynchronizerSyncWithEacdNoException(results: Map[SyncResult, Int] = Map.empty): Unit =
       (mockEacdSynchronizer
-        .syncWithEacd(_: Arn, _: AgentUser, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *, *)
+        .syncWithEacd(_: Arn, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
         .returning(Future.successful(Some(results)))
 
     def mockEacdSynchronizerSyncWithEacdHasException(
       ex: Exception
     ): Unit =
       (mockEacdSynchronizer
-        .syncWithEacd(_: Arn, _: AgentUser, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *, *)
+        .syncWithEacd(_: Arn, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
         .returning(Future.failed(ex))
 
     def mockGroupsServiceGetGroupSummariesForClient(
