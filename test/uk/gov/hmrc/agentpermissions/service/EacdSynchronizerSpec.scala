@@ -59,7 +59,7 @@ class EacdSynchronizerSpec extends BaseSpec {
       (mockAccessGroupsRepository.get(_: Arn)).expects(arn).returning(Future.successful(Seq.empty))
       (stubTaxServiceGroupsRepository.get(_: Arn)).when(arn).returns(Future.successful(Seq.empty))
 
-      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Some(Seq.empty)
+      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Some(Map.empty)
     }
 
     "do the sync if all conditions are satisfied" in new TestScope {
@@ -83,7 +83,7 @@ class EacdSynchronizerSpec extends BaseSpec {
       expectAuditTeamMembersRemoval()
       expectAccessGroupsRepositoryUpdate(Some(1))
 
-      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Some(Seq(AccessGroupUpdated))
+      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Some(Map(SyncResult.AccessGroupUpdateSuccess -> 1))
     }
   }
 
@@ -119,7 +119,7 @@ class EacdSynchronizerSpec extends BaseSpec {
 
           eacdSynchronizer
             .syncWithEacd(arn, agentUser1)
-            .futureValue shouldBe Some(Seq(AccessGroupUpdated))
+            .futureValue shouldBe Some(Map(SyncResult.AccessGroupUpdateSuccess -> 1))
         }
       }
 
@@ -167,7 +167,7 @@ class EacdSynchronizerSpec extends BaseSpec {
               arn,
               agentUser1
             )
-            .futureValue shouldBe Some(Seq.empty)
+            .futureValue shouldBe Some(Map(SyncResult.AccessGroupUnchanged -> 1))
         }
       }
     }
@@ -297,7 +297,7 @@ class EacdSynchronizerSpec extends BaseSpec {
 
         expectAccessGroupsRepositoryUpdate(None)
 
-        eacdSynchronizer.persistAccessGroup(accessGroup).futureValue shouldBe AccessGroupNotUpdated
+        eacdSynchronizer.persistAccessGroup(accessGroup).futureValue shouldBe SyncResult.AccessGroupUpdateFailure
       }
     }
 
@@ -308,7 +308,7 @@ class EacdSynchronizerSpec extends BaseSpec {
 
         expectAccessGroupsRepositoryUpdate(Some(1))
 
-        eacdSynchronizer.persistAccessGroup(accessGroup).futureValue shouldBe AccessGroupUpdated
+        eacdSynchronizer.persistAccessGroup(accessGroup).futureValue shouldBe SyncResult.AccessGroupUpdateSuccess
       }
     }
 
@@ -319,7 +319,7 @@ class EacdSynchronizerSpec extends BaseSpec {
 
         expectAccessGroupsRepositoryUpdate(Some(0))
 
-        eacdSynchronizer.persistAccessGroup(accessGroup).futureValue shouldBe AccessGroupNotUpdated
+        eacdSynchronizer.persistAccessGroup(accessGroup).futureValue shouldBe SyncResult.AccessGroupUpdateFailure
       }
     }
 
@@ -330,7 +330,7 @@ class EacdSynchronizerSpec extends BaseSpec {
 
         expectTaxGroupsRepositoryUpdate(Some(1))
 
-        eacdSynchronizer.persistAccessGroup(accessGroup).futureValue shouldBe AccessGroupUpdated
+        eacdSynchronizer.persistAccessGroup(accessGroup).futureValue shouldBe SyncResult.AccessGroupUpdateSuccess
       }
     }
 

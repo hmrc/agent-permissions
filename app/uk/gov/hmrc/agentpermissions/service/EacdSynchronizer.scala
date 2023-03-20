@@ -37,12 +37,19 @@ case class RemovalSet(enrolmentKeysToRemove: Set[String], userIdsToRemove: Set[S
   def isEmpty: Boolean = enrolmentKeysToRemove.isEmpty && userIdsToRemove.isEmpty
 }
 
+sealed trait SyncResult
+object SyncResult {
+  case object AccessGroupUpdateSuccess extends SyncResult
+  case object AccessGroupUpdateFailure extends SyncResult
+  case object AccessGroupUnchanged extends SyncResult
+}
+
 @ImplementedBy(classOf[EacdSynchronizerImpl])
 trait EacdSynchronizer {
   def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser, fullSync: Boolean = false)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Option[Seq[AccessGroupUpdateStatus]]]
+  ): Future[Option[Map[SyncResult, Int]]]
 }
 
 @Singleton
@@ -205,7 +212,7 @@ class EacdSynchronizerImpl @Inject() (
 
   private[service] def persistAccessGroup(accessGroup: AccessGroup)(implicit
     ec: ExecutionContext
-  ): Future[AccessGroupUpdateStatus] = {
+  ): Future[SyncResult] = {
     logger.info(
       s"Updating access group of ${accessGroup.arn.value} having name '${accessGroup.groupName}'"
     )
@@ -215,14 +222,8 @@ class EacdSynchronizerImpl @Inject() (
       case taxGroup: TaxGroup =>
         taxServiceGroupsRepository.update(taxGroup.arn, taxGroup.groupName, taxGroup)
     }).map {
-      case None =>
-        AccessGroupNotUpdated
-      case Some(updatedCount) =>
-        if (updatedCount == 1L) {
-          AccessGroupUpdated
-        } else {
-          AccessGroupNotUpdated
-        }
+      case Some(updatedCount) if updatedCount == 1L => SyncResult.AccessGroupUpdateSuccess
+      case _                                        => SyncResult.AccessGroupUpdateFailure
     }
   }
 
@@ -264,7 +265,7 @@ class EacdSynchronizerImpl @Inject() (
   def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser, fullSync: Boolean = false)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Option[Seq[AccessGroupUpdateStatus]]] = ifSyncShouldOccur(arn) {
+  ): Future[Option[Map[SyncResult, Int]]] = ifSyncShouldOccur(arn) {
     for {
       customAccessGroups <- accessGroupsRepository.get(arn)
       taxServiceGroups   <- taxServiceGroupsRepository.get(arn)
@@ -280,10 +281,16 @@ class EacdSynchronizerImpl @Inject() (
       // Remove clients and members that are no longer with the agency from any stored access groups.
       updatedAccessGroups <- Future.traverse(allAccessGroups)(applyRemovalSet(_, removalSet, whoIsUpdating))
 
+      // Determine which access groups have actually changed
+      accessGroupsToPersist = allAccessGroups.zip(updatedAccessGroups).collect {
+                                case (old, updated) if updated.lastUpdated != old.lastUpdated => updated
+                              }
+      nrUnchangedAccessGroups = updatedAccessGroups.size - accessGroupsToPersist.size
+
       // Persist the updated access groups.
-      updateStatuses: Seq[AccessGroupUpdateStatus] <-
+      updateStatuses: Seq[SyncResult] <-
         if (removalSet.isEmpty) Future.successful(Seq.empty)
-        else Future.traverse(updatedAccessGroups)(persistAccessGroup(_))
+        else Future.traverse(accessGroupsToPersist)(persistAccessGroup(_))
 
       // Optionally ensure that in EACD the enrolment assignments match those kept by agent-permissions.
       // This is scheduled asynchronously as it could take some time.
@@ -291,6 +298,10 @@ class EacdSynchronizerImpl @Inject() (
             doFullSync(arn, updatedAccessGroups.collect { case cg: CustomGroup => cg })
           }
           else ()
-    } yield updateStatuses
+    } yield Map[SyncResult, Int](
+      SyncResult.AccessGroupUpdateSuccess -> updateStatuses.count(_ == SyncResult.AccessGroupUpdateSuccess),
+      SyncResult.AccessGroupUpdateFailure -> updateStatuses.count(_ == SyncResult.AccessGroupUpdateFailure),
+      SyncResult.AccessGroupUnchanged     -> nrUnchangedAccessGroups
+    ).filter(_._2 > 0)
   }
 }
