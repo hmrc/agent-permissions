@@ -318,7 +318,7 @@ class AccessGroupsController @Inject() (
         .removeTeamMember(gid, memberId, authorisedAgent.agentUser)
         .map {
           case AccessGroupNotUpdated =>
-            logger.info(s"Custom group '$gid' didn't remove client '$memberId''")
+            logger.info(s"Custom group '$gid' didn't remove member '$memberId''")
             NotModified
 //          case AccessGroupUpdated => NoContent
           case AccessGroupUpdatedWithoutAssignmentsPushed =>

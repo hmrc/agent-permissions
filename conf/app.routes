@@ -38,6 +38,7 @@ GET     /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controller
 PATCH   /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.updateGroup(groupId: String)
 DELETE  /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.deleteGroup(groupId: String)
 PATCH   /tax-group/:groupId/members/add  uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.addTeamMemberToGroup(groupId: String)
+DELETE  /tax-group/:gid/members/:memberId      uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.removeTeamMember(gid: String, memberId: String)
 
 GET     /arn/:arn/client-count/available-tax-services    uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.clientCountForAvailableTaxServices(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
 GET     /arn/:arn/client-count/tax-groups                uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.clientCountForTaxGroups(arn: uk.gov.hmrc.agentmtdidentifiers.model.Arn)
