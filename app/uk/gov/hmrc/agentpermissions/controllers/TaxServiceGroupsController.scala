@@ -192,6 +192,22 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     }
   }
 
+  def removeTeamMember(gid: String, memberId: String): Action[AnyContent] = Action.async { implicit request =>
+    withAuthorisedAgent() { authorisedAgent =>
+      taxGroupsService
+        .removeTeamMember(gid, memberId, authorisedAgent.agentUser)
+        .map {
+          case AccessGroupNotUpdated =>
+            logger.info(s"Custom group '$gid' didn't remove client '$memberId''")
+            NotModified
+          //          case AccessGroupUpdated => NoContent
+          case AccessGroupUpdatedWithoutAssignmentsPushed =>
+            logger.info(s"Custom group removed a team member, but assignments were not pushed")
+            NoContent
+        }
+    }
+  }
+
   def clientCountForAvailableTaxServices(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>

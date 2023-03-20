@@ -72,7 +72,10 @@ trait TaxGroupsService {
     ec: ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus]
 
-  // TODO getExcludedClients
+  def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[AccessGroupUpdateStatus]
 
 }
 
@@ -233,6 +236,25 @@ class TaxGroupsServiceImpl @Inject() (
         case _ => TaxServiceGroupNotUpdated
       })
 
+  def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[AccessGroupUpdateStatus] =
+    taxServiceGroupsRepository
+      .findById(groupId)
+      .flatMap {
+        case Some(accessGroup) =>
+          val maybeAgentUsers = accessGroup.teamMembers
+            .map(_.filterNot(tm => tm.id == teamMemberId))
+          val updatedGroup = accessGroup.copy(teamMembers = maybeAgentUsers)
+          taxServiceGroupsRepository
+            .update(accessGroup.arn, accessGroup.groupName, updatedGroup)
+            .map {
+              case Some(1) => AccessGroupUpdatedWithoutAssignmentsPushed // TODO push assignments
+              case _       => AccessGroupNotUpdated
+            }
+        case None => Future successful AccessGroupNotUpdated
+      }
 }
 
 sealed trait TaxServiceGroupCreationStatus
