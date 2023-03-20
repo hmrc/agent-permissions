@@ -37,19 +37,19 @@ class EacdSynchronizerSpec extends BaseSpec {
 
     "not sync if outstanding work items cannot be determined" in new TestScope {
       outstandingAssignmentsWorkItemsExist(None)
-      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
+      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe None
     }
 
     "not sync if outstanding assignment work items exist" in new TestScope {
       outstandingAssignmentsWorkItemsExist(Some(true))
-      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
+      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe None
     }
 
     "not sync if there are no outstanding assignment work items but EACD sync token is not acquired" in new TestScope {
       outstandingAssignmentsWorkItemsExist(Some(false))
       appConfigEacdSetSeconds(10)
       syncRepoCannotBeAcquired()
-      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
+      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe None
     }
 
     "not sync if there are no outstanding assignment work items, EACD sync token is acquired but there are no access groups" in new TestScope {
@@ -59,7 +59,7 @@ class EacdSynchronizerSpec extends BaseSpec {
       (mockAccessGroupsRepository.get(_: Arn)).expects(arn).returning(Future.successful(Seq.empty))
       (stubTaxServiceGroupsRepository.get(_: Arn)).when(arn).returns(Future.successful(Seq.empty))
 
-      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq.empty
+      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Some(Seq.empty)
     }
 
     "do the sync if all conditions are satisfied" in new TestScope {
@@ -83,7 +83,7 @@ class EacdSynchronizerSpec extends BaseSpec {
       expectAuditTeamMembersRemoval()
       expectAccessGroupsRepositoryUpdate(Some(1))
 
-      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Seq(AccessGroupUpdated)
+      eacdSynchronizer.syncWithEacd(arn, user).futureValue shouldBe Some(Seq(AccessGroupUpdated))
     }
   }
 
@@ -119,7 +119,7 @@ class EacdSynchronizerSpec extends BaseSpec {
 
           eacdSynchronizer
             .syncWithEacd(arn, agentUser1)
-            .futureValue shouldBe Seq(AccessGroupUpdated)
+            .futureValue shouldBe Some(Seq(AccessGroupUpdated))
         }
       }
 
@@ -167,7 +167,7 @@ class EacdSynchronizerSpec extends BaseSpec {
               arn,
               agentUser1
             )
-            .futureValue shouldBe Seq.empty
+            .futureValue shouldBe Some(Seq.empty)
         }
       }
     }

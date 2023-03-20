@@ -42,7 +42,7 @@ trait EacdSynchronizer {
   def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser, fullSync: Boolean = false)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupUpdateStatus]]
+  ): Future[Option[Seq[AccessGroupUpdateStatus]]]
 }
 
 @Singleton
@@ -257,11 +257,14 @@ class EacdSynchronizerImpl @Inject() (
   /** Ensure that access groups stored in agent-permissions do not contain any clients or team members that no longer
     * appear to be with the agency (as reported by EACD) Optionally (if requesting a 'full sync') also force the
     * assigned enrolments in EACD to match those stored here.
+    * @return
+    *   None if sync was not done (if too soon after previous sync or items still outstanding). A list of update
+    *   statuses otherwise
     */
   def syncWithEacd(arn: Arn, whoIsUpdating: AgentUser, fullSync: Boolean = false)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Seq[AccessGroupUpdateStatus]] = ifSyncShouldOccur(arn) {
+  ): Future[Option[Seq[AccessGroupUpdateStatus]]] = ifSyncShouldOccur(arn) {
     for {
       customAccessGroups <- accessGroupsRepository.get(arn)
       taxServiceGroups   <- taxServiceGroupsRepository.get(arn)
@@ -289,5 +292,5 @@ class EacdSynchronizerImpl @Inject() (
           }
           else ()
     } yield updateStatuses
-  }.map(_.getOrElse(Seq.empty))
+  }
 }

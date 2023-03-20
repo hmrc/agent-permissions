@@ -373,16 +373,19 @@ class AccessGroupsController @Inject() (
   def syncWithEacd(arn: Arn, fullSync: Boolean = false): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
+        // Note: we are not waiting for this future to complete before returning a response
         eacdSynchronizer.syncWithEacd(matchedArn, authorisedAgent.agentUser, fullSync).onComplete {
-          case Success(updateStatuses) =>
+          case Success(Some(updateStatuses)) =>
             logger.info(s"EACD Sync request processed for ${arn.value} with update statuses: $updateStatuses")
+          case Success(None) =>
+            logger.info(s"EACD Sync request for ${arn.value} was not processed at this time.")
           case Failure(ex) =>
             logger.error(s"Error during EACD Sync for ${arn.value}: ${ex.getMessage}")
         }
 
-        Future successful Ok
+        Future.successful(Accepted)
       }
-    } transformWith failureHandler
+    }.transformWith(failureHandler)
   }
 
   private def withGroupId(gid: String, authorisedArn: Arn)(
