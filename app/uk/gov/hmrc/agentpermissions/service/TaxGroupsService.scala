@@ -250,7 +250,7 @@ class TaxGroupsServiceImpl @Inject() (
           taxServiceGroupsRepository
             .update(accessGroup.arn, accessGroup.groupName, updatedGroup)
             .map {
-              case Some(1) => AccessGroupUpdatedWithoutAssignmentsPushed // TODO push assignments
+              case Some(1) => AccessGroupUpdated
               case _       => AccessGroupNotUpdated
             }
         case None => Future successful AccessGroupNotUpdated

@@ -1028,7 +1028,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       s"return $NO_CONTENT when successfully removed team member" in new TestScope {
         // given
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        expectRemoveTeamMemberFromGroup(AccessGroupUpdatedWithoutAssignmentsPushed)
+        expectRemoveTeamMemberFromGroup(AccessGroupUpdated)
 
         // when
         val result = controller.removeTeamMember(dbId.toHexString, "a valid id")(baseRequest)

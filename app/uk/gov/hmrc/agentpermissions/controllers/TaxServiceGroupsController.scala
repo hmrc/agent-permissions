@@ -200,7 +200,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
           case AccessGroupNotUpdated =>
             logger.info(s"Tax group '$gid' didn't remove member '$memberId''")
             NotModified
-          case AccessGroupUpdatedWithoutAssignmentsPushed =>
+          case AccessGroupUpdated =>
             logger.info(s"Tax group removed a team member")
             NoContent
         }
