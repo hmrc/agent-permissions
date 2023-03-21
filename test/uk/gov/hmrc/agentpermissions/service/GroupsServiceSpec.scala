@@ -16,12 +16,13 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import org.bson.types.ObjectId
 import org.scalamock.handlers.{CallHandler2, CallHandler3}
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.repository.TaxServiceGroupsRepository
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup, GroupSummary, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -42,39 +43,38 @@ class GroupsServiceSpec extends BaseSpec {
     val client2: Client = Client("HMRC-MTD-VAT~VRN~101746700", "Ann Von-Innes")
     val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
 
-    val groupId: GroupId = GroupId(arn, groupName)
-    val dbId: String = new ObjectId().toHexString
-
     val taxGroup: TaxGroup = TaxGroup(
+      GroupId.random(),
       arn,
       "VAT",
       now,
       now,
       user,
       user,
-      Some(Set(user, user1, user2)),
+      Set(user, user1, user2),
       serviceVat,
       automaticUpdates = true,
-      Some(Set(client1, client2))
+      Set(client1, client2)
     )
 
     val accessGroup: CustomGroup = CustomGroup(
+      GroupId.random(),
       arn,
       groupName,
       now,
       now,
       user,
       user,
-      Some(Set(user, user1, user2)),
-      Some(Set(client1, client2, clientCgt))
+      Set(user, user1, user2),
+      Set(client1, client2, clientCgt)
     )
 
     def groupSummary(
-      id: ObjectId = new ObjectId(),
+      id: GroupId = GroupId.random(),
       name: String = groupName,
       taxService: Option[String] = None
     ): GroupSummary =
-      GroupSummary(id.toHexString, name, if (taxService.isEmpty) Some(3) else None, 3, taxService)
+      GroupSummary(id, name, if (taxService.isEmpty) Some(3) else None, 3, taxService)
 
     val taxSummaries = Seq(
       groupSummary(name = "Capital Gains Tax", taxService = Some(serviceCgt)),
@@ -94,14 +94,14 @@ class GroupsServiceSpec extends BaseSpec {
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    val mockTaxGroupsRepository: TaxServiceGroupsRepository = mock[TaxServiceGroupsRepository]
+    val mockTaxGroupsRepository: TaxGroupsRepositoryV2 = mock[TaxGroupsRepositoryV2]
     val mockTaxGroupsService: TaxGroupsService = mock[TaxGroupsService]
-    val mockCustomGroupsService: AccessGroupsService = mock[AccessGroupsService]
+    val mockCustomGroupsService: CustomGroupsService = mock[CustomGroupsService]
 
     val mockAuditService: AuditService = mock[AuditService]
 
-    val groupsService: GroupsService =
-      new GroupsServiceImpl(
+    val groupsService: GroupSummaryService =
+      new GroupSummaryServiceImpl(
         mockTaxGroupsRepository,
         mockCustomGroupsService,
         mockTaxGroupsService
@@ -199,7 +199,7 @@ class GroupsServiceSpec extends BaseSpec {
         val ag1: CustomGroup = accessGroup
         val tg1: TaxGroup = taxGroup
         val tg2: TaxGroup =
-          taxGroup.copy(service = serviceCgt, groupName = "Capital Gains Tax", teamMembers = Some(Set(user3)))
+          taxGroup.copy(service = serviceCgt, groupName = "Capital Gains Tax", teamMembers = Set(user3))
 
         mockCustomGroupsServiceGetAllGroups(Seq(ag1))
         mockTaxGroupsServiceGetAllGroups(Seq(tg1, tg2))
@@ -208,14 +208,14 @@ class GroupsServiceSpec extends BaseSpec {
         groupsService.getAllGroupSummaries(arn).futureValue shouldBe
           Seq(
             GroupSummary(
-              taxGroup._id.toHexString,
+              taxGroup.id,
               "Capital Gains Tax",
               Some(10),
               1,
               taxService = Some(serviceCgt)
             ),
-            GroupSummary(accessGroup._id.toHexString, "some group", Some(3), 3),
-            GroupSummary(taxGroup._id.toHexString, "VAT", Some(5), 3, taxService = Some(serviceVat))
+            GroupSummary(accessGroup.id, "some group", Some(3), 3),
+            GroupSummary(taxGroup.id, "VAT", Some(5), 3, taxService = Some(serviceVat))
           )
       }
     }
@@ -252,7 +252,7 @@ class GroupsServiceSpec extends BaseSpec {
         mockTaxGroupsRepositoryGetByService(Some(taxGroup))
 
         groupsService.getAllGroupSummariesForClient(arn, clientCgt.enrolmentKey).futureValue shouldBe
-          customSummaries ++ Seq(GroupSummary.fromAccessGroup(taxGroup))
+          customSummaries ++ Seq(GroupSummary.of(taxGroup))
       }
 
       "custom summaries found but no tax group found" in new TestScope {
@@ -268,7 +268,7 @@ class GroupsServiceSpec extends BaseSpec {
         mockTaxGroupsRepositoryGetByService(Some(taxGroup))
 
         groupsService.getAllGroupSummariesForClient(arn, clientCgt.enrolmentKey).futureValue shouldBe
-          Seq(GroupSummary.fromAccessGroup(taxGroup))
+          Seq(GroupSummary.of(taxGroup))
       }
     }
 

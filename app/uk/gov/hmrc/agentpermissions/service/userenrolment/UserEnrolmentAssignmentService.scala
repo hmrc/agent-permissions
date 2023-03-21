@@ -18,9 +18,11 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Client, CustomGroup, GroupId, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
-import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
+import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
+import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
@@ -33,23 +35,24 @@ trait UserEnrolmentAssignmentService {
     ec: ExecutionContext
   ): Future[Option[UserEnrolmentAssignments]]
 
-  def calculateForGroupDeletion(groupId: GroupId)(implicit
+  def calculateForGroupDeletion(arn: Arn, groupName: String)(implicit
     ec: ExecutionContext
   ): Future[Option[UserEnrolmentAssignments]]
 
-  def calculateForGroupUpdate(
-    groupId: GroupId,
-    accessGroupToUpdate: CustomGroup
-  )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
+  def calculateForGroupUpdate(arn: Arn, groupName: String, accessGroupToUpdate: CustomGroup)(implicit
+    ec: ExecutionContext
+  ): Future[Option[UserEnrolmentAssignments]]
 
   def calculateForAddToGroup(
-    groupId: GroupId,
+    arn: Arn,
+    groupName: String,
     clients: Set[Client],
     teamMembers: Set[AgentUser]
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
 
   def calculateForRemoveFromGroup(
-    groupId: GroupId,
+    arn: Arn,
+    groupName: String,
     clients: Set[Client],
     teamMembers: Set[AgentUser]
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
@@ -61,8 +64,7 @@ trait UserEnrolmentAssignmentService {
 
 @Singleton
 class UserEnrolmentAssignmentServiceImpl @Inject() (
-  accessGroupsRepository: AccessGroupsRepository,
-  userEnrolmentAssignmentCalculator: UserEnrolmentAssignmentCalculator,
+  customGroupsRepository: CustomGroupsRepositoryV2,
   userClientDetailsConnector: UserClientDetailsConnector
 ) extends UserEnrolmentAssignmentService with Logging {
 
@@ -70,32 +72,36 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     accessGroup: CustomGroup
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
-      existingAccessGroups <- accessGroupsRepository.get(accessGroup.arn)
+      existingAccessGroups <- customGroupsRepository.get(accessGroup.arn)
       maybeUserEnrolmentAssignments <-
-        Future.successful(userEnrolmentAssignmentCalculator.forGroupCreation(accessGroup, existingAccessGroups))
+        Future.successful(UserEnrolmentAssignmentOps.forGroupCreation(accessGroup, existingAccessGroups))
     } yield maybeUserEnrolmentAssignments
 
-  override def calculateForGroupDeletion(
-    groupId: GroupId
-  )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
+  override def calculateForGroupDeletion(arn: Arn, groupName: String)(implicit
+    ec: ExecutionContext
+  ): Future[Option[UserEnrolmentAssignments]] =
     for {
-      existingAccessGroups     <- accessGroupsRepository.get(groupId.arn)
-      maybeExistingAccessGroup <- accessGroupsRepository.get(groupId.arn, groupId.groupName)
+      existingAccessGroups     <- customGroupsRepository.get(arn)
+      maybeExistingAccessGroup <- customGroupsRepository.get(arn, groupName)
       maybeUserEnrolmentAssignments <-
         Future.successful(
-          maybeExistingAccessGroup.flatMap(userEnrolmentAssignmentCalculator.forGroupDeletion(_, existingAccessGroups))
+          maybeExistingAccessGroup.flatMap(
+            UserEnrolmentAssignmentOps.forGroupDeletion(_, existingAccessGroups)
+          )
         )
     } yield maybeUserEnrolmentAssignments
 
-  // TODO APB-7070 - replace with improved method
   override def calculateForGroupUpdate(
-    groupId: GroupId,
+    arn: Arn,
+    groupName: String,
     accessGroupToUpdate: CustomGroup
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
-      existingAccessGroups <- accessGroupsRepository.get(groupId.arn)
+      existingAccessGroups <- customGroupsRepository.get(arn)
       maybeUserEnrolmentAssignments <-
-        Future.successful(userEnrolmentAssignmentCalculator.forGroupUpdate(accessGroupToUpdate, existingAccessGroups))
+        Future.successful(
+          UserEnrolmentAssignmentOps.forGroupUpdate(accessGroupToUpdate, existingAccessGroups)
+        )
     } yield maybeUserEnrolmentAssignments
 
   /** Could be merged with forRemoveFromGroup if you had a bool for isAssigns
@@ -109,7 +115,8 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     *   add to group OR existing in group
     */
   override def calculateForAddToGroup(
-    groupId: GroupId,
+    arn: Arn,
+    groupName: String,
     clients: Set[Client],
     teamMembers: Set[AgentUser]
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
@@ -120,25 +127,26 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
        *       maybeUserEnrolmentAssignments <-
        *         Future.successful(userEnrolmentAssignmentCalculator.assessUserEnrolmentPairs(maxNetChangePairs, foundPairs))
        */
-      existingAccessGroups <- accessGroupsRepository.get(groupId.arn)
+      existingAccessGroups <- customGroupsRepository.get(arn)
       maybeUserEnrolmentAssignments <-
         Future.successful(
-          userEnrolmentAssignmentCalculator.forAddToGroup(clients, teamMembers, existingAccessGroups, groupId)
+          UserEnrolmentAssignmentOps.forAddToGroup(clients, teamMembers, existingAccessGroups, arn, groupName)
         )
     } yield maybeUserEnrolmentAssignments
 
   override def calculateForRemoveFromGroup(
-    groupId: GroupId,
+    arn: Arn,
+    groupName: String,
     clients: Set[Client],
     teamMembers: Set[AgentUser]
   )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
       /* TODO: Replace pulling existing access groups with mongo query for pairs of UserEnrolments */
-      existingAccessGroups <- accessGroupsRepository.get(groupId.arn)
+      existingAccessGroups <- customGroupsRepository.get(arn)
       maybeUserEnrolmentAssignments <-
         Future.successful(
-          userEnrolmentAssignmentCalculator
-            .forRemoveFromGroup(clients, teamMembers, existingAccessGroups, groupId)
+          UserEnrolmentAssignmentOps
+            .forRemoveFromGroup(clients, teamMembers, existingAccessGroups, arn, groupName)
         )
     } yield maybeUserEnrolmentAssignments
 
@@ -155,7 +163,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
 
         Future
           .sequence(
-            UserEnrolmentAssignmentsSplitter
+            UserEnrolmentAssignmentOps
               .split(userEnrolmentAssignments, 500)
               .map(userClientDetailsConnector.pushAssignments(_))
           )

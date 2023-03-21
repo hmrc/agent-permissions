@@ -17,26 +17,28 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
-import org.bson.types.ObjectId
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.result.UpdateResult
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.model.SensitiveAccessGroup
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agentpermissions.repository.storagemodel.SensitiveCustomGroup
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 
 import java.time.LocalDateTime
+import java.util.UUID
 import scala.concurrent.ExecutionContext
 
-class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[SensitiveAccessGroup] {
+class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[SensitiveCustomGroup] {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
-    val groupDbId: ObjectId = new ObjectId()
+    val groupDbId: UUID = GroupId.random()
     val groupName: String = "Some Group".toLowerCase
     val agent: AgentUser = AgentUser("userId", "userName")
     val user1: AgentUser = AgentUser("user1", "User 1")
@@ -55,14 +57,14 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
         now,
         agent,
         agent,
-        teamMembers = Some(Set(agent, user1, user2)),
-        clients = Some(Set(client1, client2, client3))
+        teamMembers = Set(agent, user1, user2),
+        clients = Set(client1, client2, client3)
       )
 
     def now: LocalDateTime = LocalDateTime.now()
 
-    val accessGroupsRepositoryImpl: AccessGroupsRepositoryImpl = repository.asInstanceOf[AccessGroupsRepositoryImpl]
-    val accessGroupsRepository: AccessGroupsRepository =
+    val accessGroupsRepositoryImpl: CustomGroupsRepositoryV2Impl = repository.asInstanceOf[CustomGroupsRepositoryV2Impl]
+    val accessGroupsRepository: CustomGroupsRepositoryV2 =
       accessGroupsRepositoryImpl // trying to use trait interface as much as possible
   }
 
@@ -70,7 +72,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
     "set up" should {
       "have correct indexes" in new TestScope {
-        accessGroupsRepositoryImpl.collectionName shouldBe "access-groups"
+        accessGroupsRepositoryImpl.collectionName shouldBe "access-groups-custom"
 
         accessGroupsRepositoryImpl.indexes.size shouldBe 2
         val collectionIndexes: Seq[IndexModel] = accessGroupsRepositoryImpl.indexes
@@ -102,7 +104,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
       "group of that name does not exist" should {
         "return nothing" in new TestScope {
-          accessGroupsRepository.findById(groupDbId.toHexString).futureValue shouldBe None
+          accessGroupsRepository.findById(groupDbId).futureValue shouldBe None
         }
       }
     }
@@ -128,7 +130,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
           val document = accessGroupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
           document.toString should include(accessGroup.groupName) // the group name should be in plaintext
           // But the agent user ids and names should be encrypted
-          (accessGroup.teamMembers.get ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>
+          (accessGroup.teamMembers ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>
             document.toString should not include agentUser.id
             document.toString should not include agentUser.name
           }
@@ -191,16 +193,15 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.addTeamMember(groupDbId.toString, agentToAdd).futureValue
+            accessGroupsRepository.addTeamMember(groupDbId, agentToAdd).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 1
 
           // and
-          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId.toString).futureValue
-          updatedGroup.get.teamMembers.isDefined shouldBe true
-          updatedGroup.get.teamMembers.get.contains(agentToAdd) shouldBe true
-          updatedGroup.get.teamMembers.get.size shouldBe 4
+          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId).futureValue
+          updatedGroup.get.teamMembers.contains(agentToAdd) shouldBe true
+          updatedGroup.get.teamMembers.size shouldBe 4
         }
       }
 
@@ -214,18 +215,18 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
           // given
           accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
-          accessGroup.clients.get.contains(client1) shouldBe true
+          accessGroup.clients.contains(client1) shouldBe true
 
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(groupDbId.toString, client1.enrolmentKey).futureValue
+            accessGroupsRepository.removeClient(groupDbId, client1.enrolmentKey).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 1
 
           // and
-          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId.toString).futureValue
-          private val clients: Set[Client] = updatedGroup.get.clients.get
+          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId).futureValue
+          private val clients: Set[Client] = updatedGroup.get.clients
           clients.size shouldBe 2
           clients.contains(client1) shouldBe false
         }
@@ -236,21 +237,21 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(groupDbId.toString, randomAlphabetic(23)).futureValue
+            accessGroupsRepository.removeClient(groupDbId, randomAlphabetic(23)).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 0
 
           // and
-          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId.toString).futureValue
-          private val clients: Set[Client] = updatedGroup.get.clients.get
+          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId).futureValue
+          private val clients: Set[Client] = updatedGroup.get.clients
           clients.size shouldBe 3
         }
 
         "return modified count of 0 when group is not found" in new TestScope {
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(randomAlphabetic(5), randomAlphabetic(23)).futureValue
+            accessGroupsRepository.removeClient(GroupId.random(), randomAlphabetic(23)).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 0
@@ -261,6 +262,6 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
     }
   }
 
-  override protected def repository: PlayMongoRepository[SensitiveAccessGroup] =
-    new AccessGroupsRepositoryImpl(mongoComponent, aesGcmCrypto)
+  override protected def repository: PlayMongoRepository[SensitiveCustomGroup] =
+    new CustomGroupsRepositoryV2Impl(mongoComponent, aesCrypto)
 }

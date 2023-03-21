@@ -16,11 +16,14 @@
 
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
-import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, CustomGroup, GroupId, UserEnrolmentAssignments}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
-import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
+import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, CustomGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -31,24 +34,21 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
   val arn: Arn = Arn("KARN1234567")
   val user: AgentUser = AgentUser("userId", "userName")
   val groupName = "some group"
-  val groupId: GroupId = GroupId(arn, groupName)
   val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)
   val maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments] = Some(userEnrolmentAssignments)
 
-  val accessGroup: CustomGroup = CustomGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
+  val accessGroup: CustomGroup =
+    CustomGroup(GroupId.random(), arn, groupName, now, now, user, user, Set.empty, Set.empty)
 
   lazy val now: LocalDateTime = LocalDateTime.now()
 
   trait TestScope {
-    val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
-    val mockUserEnrolmentAssignmentCalculator: UserEnrolmentAssignmentCalculator =
-      mock[UserEnrolmentAssignmentCalculator]
+    val mockAccessGroupsRepository: CustomGroupsRepositoryV2 = mock[CustomGroupsRepositoryV2]
     val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
 
     val userEnrolmentAssignmentService =
       new UserEnrolmentAssignmentServiceImpl(
         mockAccessGroupsRepository,
-        mockUserEnrolmentAssignmentCalculator,
         mockUserClientDetailsConnector
       )
 
@@ -69,46 +69,6 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
         .expects(arn, *)
         .returning(Future successful maybeAccessGroup)
 
-    def mockUserEnrolmentAssignmentCalculatorForGroupCreation(
-      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[CustomGroup, Seq[CustomGroup], Option[UserEnrolmentAssignments]] =
-      (mockUserEnrolmentAssignmentCalculator
-        .forGroupCreation(_: CustomGroup, _: Seq[CustomGroup]))
-        .expects(accessGroup, *)
-        .returning(maybeUserEnrolmentAssignments)
-
-    def mockUserEnrolmentAssignmentCalculatorForGroupUpdate(
-      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[CustomGroup, Seq[CustomGroup], Option[UserEnrolmentAssignments]] =
-      (mockUserEnrolmentAssignmentCalculator
-        .forGroupUpdate(_: CustomGroup, _: Seq[CustomGroup]))
-        .expects(accessGroup, *)
-        .returning(maybeUserEnrolmentAssignments)
-
-    def mockUserEnrolmentAssignmentCalculatorForAddToGroup(
-      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler4[Set[Client], Set[AgentUser], Seq[CustomGroup], GroupId, Option[UserEnrolmentAssignments]] =
-      (mockUserEnrolmentAssignmentCalculator
-        .forAddToGroup(_: Set[Client], _: Set[AgentUser], _: Seq[CustomGroup], _: GroupId))
-        .expects(*, *, *, *)
-        .returning(maybeUserEnrolmentAssignments)
-
-    def mockUserEnrolmentAssignmentCalculatorForRemoveFromGroup(
-      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler4[Set[Client], Set[AgentUser], Seq[CustomGroup], GroupId, Option[UserEnrolmentAssignments]] =
-      (mockUserEnrolmentAssignmentCalculator
-        .forRemoveFromGroup(_: Set[Client], _: Set[AgentUser], _: Seq[CustomGroup], _: GroupId))
-        .expects(*, *, *, *)
-        .returning(maybeUserEnrolmentAssignments)
-
-    def mockUserEnrolmentAssignmentCalculatorForGroupDeletion(
-      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[CustomGroup, Seq[CustomGroup], Option[UserEnrolmentAssignments]] =
-      (mockUserEnrolmentAssignmentCalculator
-        .forGroupDeletion(_: CustomGroup, _: Seq[CustomGroup]))
-        .expects(accessGroup, *)
-        .returning(maybeUserEnrolmentAssignments)
-
     def mockUserClientDetailsConnectorPushAssignments(
       pushStatus: EacdAssignmentsPushStatus
     ): CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Future[EacdAssignmentsPushStatus]] =
@@ -117,60 +77,6 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
         .expects(userEnrolmentAssignments, *, *)
         .anyNumberOfTimes()
         .returning(Future successful pushStatus)
-  }
-
-  "Calculating assignments during group creation" should {
-    "return calculated assignments" in new TestScope {
-      mockAccessGroupsRepositoryGetAll(Seq.empty)
-      mockUserEnrolmentAssignmentCalculatorForGroupCreation(maybeUserEnrolmentAssignments)
-
-      userEnrolmentAssignmentService
-        .calculateForGroupCreation(accessGroup)
-        .futureValue shouldBe maybeUserEnrolmentAssignments
-    }
-  }
-
-  "Calculating assignments during group update" should {
-    "return calculated assignments" in new TestScope {
-      mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
-      mockUserEnrolmentAssignmentCalculatorForGroupUpdate(maybeUserEnrolmentAssignments)
-
-      userEnrolmentAssignmentService
-        .calculateForGroupUpdate(groupId, accessGroup)
-        .futureValue shouldBe maybeUserEnrolmentAssignments
-    }
-  }
-
-  "Calculating assignments during group update (add/remove)" should {
-    "return calculated assignments for add to group" in new TestScope {
-      mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
-      mockUserEnrolmentAssignmentCalculatorForAddToGroup(maybeUserEnrolmentAssignments)
-
-      userEnrolmentAssignmentService
-        .calculateForAddToGroup(groupId, accessGroup.clients.get, accessGroup.teamMembers.get)
-        .futureValue shouldBe maybeUserEnrolmentAssignments
-    }
-
-    "return calculated assignments for remove from group" in new TestScope {
-      mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
-      mockUserEnrolmentAssignmentCalculatorForRemoveFromGroup(maybeUserEnrolmentAssignments)
-
-      userEnrolmentAssignmentService
-        .calculateForRemoveFromGroup(groupId, accessGroup.clients.get, accessGroup.teamMembers.get)
-        .futureValue shouldBe maybeUserEnrolmentAssignments
-    }
-  }
-
-  "Calculating assignments during group delete" should {
-    "return calculated assignments" in new TestScope {
-      mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
-      mockAccessGroupsRepositoryGet(Some(accessGroup))
-      mockUserEnrolmentAssignmentCalculatorForGroupDeletion(maybeUserEnrolmentAssignments)
-
-      userEnrolmentAssignmentService
-        .calculateForGroupDeletion(groupId)
-        .futureValue shouldBe maybeUserEnrolmentAssignments
-    }
   }
 
   "Pushing assignments" when {

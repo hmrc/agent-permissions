@@ -22,11 +22,10 @@ import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.Indexes.ascending
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.AgentUser
-import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
+import uk.gov.hmrc.agents.accessgroups.AgentUser
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
@@ -41,8 +40,7 @@ trait BetaInviteRepository {
   */
 @Singleton
 class BetaInviteRepositoryImpl @Inject() (
-  mongoComponent: MongoComponent,
-  crypto: Encrypter with Decrypter
+  mongoComponent: MongoComponent
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[BetaInviteRecord](
       collectionName = "beta-invite",

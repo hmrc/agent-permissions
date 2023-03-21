@@ -38,6 +38,6 @@ abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures 
   val serviceIdentifierKeyTrust = "SAUTR"
 
   // Note: This is simply a randomly-chosen secret key to run tests
-  val aesGcmCrypto: Encrypter with Decrypter =
-    SymmetricCryptoFactory.aesGcmCrypto(secretKey = "hWmZq3t6w9zrCeF5JiNcRfUjXn2r5u7x")
+  val aesCrypto: Encrypter with Decrypter =
+    SymmetricCryptoFactory.aesCrypto(secretKey = "hWmZq3t6w9zrCeF5JiNcRfUjXn2r5u7x")
 }

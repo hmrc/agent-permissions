@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.util
 
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Client, CustomGroup}
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 
 import java.time.LocalDateTime
 
@@ -30,39 +30,33 @@ object GroupOps {
     accessGroup: CustomGroup,
     toRemove: Set[String],
     whoIsUpdating: AgentUser
-  ): (CustomGroup, Set[Client]) =
-    accessGroup.clients match {
-      case None =>
-        (accessGroup, Set.empty)
-      case Some(clientsOfAccessGroup) =>
-        val clientsToRemoveFromAccessGroup =
-          // TODO: (LEGACY) Is the fold below the most efficient way of achieving this operation? Probably not
-          clientsOfAccessGroup.foldLeft(Set.empty[Client]) { (acc, clientOfAccessGroup) =>
-            toRemove.find(_ == clientOfAccessGroup.enrolmentKey) match {
-              case None    => acc
-              case Some(_) => acc + clientOfAccessGroup
-            }
-          }
-
-        if (clientsToRemoveFromAccessGroup.nonEmpty) {
-          val (clientsToRemove, clientsToKeep): (Set[Client], Set[Client]) =
-            clientsOfAccessGroup.partition(client =>
-              clientsToRemoveFromAccessGroup.exists(clientToRemove =>
-                client.enrolmentKey == clientToRemove.enrolmentKey
-              )
-            )
-
-          val modifiedAccessGroup = accessGroup.copy(
-            lastUpdated = LocalDateTime.now(),
-            lastUpdatedBy = whoIsUpdating,
-            clients = Some(clientsToKeep)
-          )
-
-          (modifiedAccessGroup, clientsToRemove)
-        } else {
-          (accessGroup, Set.empty)
+  ): (CustomGroup, Set[Client]) = {
+    val clientsToRemoveFromAccessGroup =
+      // TODO: (LEGACY) Is the fold below the most efficient way of achieving this operation? Probably not
+      accessGroup.clients.foldLeft(Set.empty[Client]) { (acc, clientOfAccessGroup) =>
+        toRemove.find(_ == clientOfAccessGroup.enrolmentKey) match {
+          case None    => acc
+          case Some(_) => acc + clientOfAccessGroup
         }
+      }
+
+    if (clientsToRemoveFromAccessGroup.nonEmpty) {
+      val (clientsToRemove, clientsToKeep): (Set[Client], Set[Client]) =
+        accessGroup.clients.partition(client =>
+          clientsToRemoveFromAccessGroup.exists(clientToRemove => client.enrolmentKey == clientToRemove.enrolmentKey)
+        )
+
+      val modifiedAccessGroup = accessGroup.copy(
+        lastUpdated = LocalDateTime.now(),
+        lastUpdatedBy = whoIsUpdating,
+        clients = clientsToKeep
+      )
+
+      (modifiedAccessGroup, clientsToRemove)
+    } else {
+      (accessGroup, Set.empty)
     }
+  }
 
   /** Remove from a group all the team members who appear in the given list
     * @return
@@ -72,35 +66,31 @@ object GroupOps {
     accessGroup: CustomGroup,
     toRemove: Set[String],
     whoIsUpdating: AgentUser
-  ): (CustomGroup, Set[AgentUser]) =
-    accessGroup.teamMembers match {
-      case None =>
-        (accessGroup, Set.empty)
-      case Some(teamMembersOfAccessGroup) =>
-        val teamMembersToRemoveFromAccessGroup =
-          // TODO: (LEGACY) Is the fold below the most efficient way of achieving this operation? Probably not
-          teamMembersOfAccessGroup.foldLeft(Set.empty[AgentUser]) { (acc, agentUserOfAccessGroup) =>
-            toRemove.find(_ == agentUserOfAccessGroup.id) match {
-              case None    => acc
-              case Some(_) => acc + agentUserOfAccessGroup
-            }
-          }
-
-        if (teamMembersToRemoveFromAccessGroup.nonEmpty) {
-          val (teamMembersToRemove, teamMembersToKeep): (Set[AgentUser], Set[AgentUser]) =
-            teamMembersOfAccessGroup.partition(agentUser =>
-              teamMembersToRemoveFromAccessGroup.exists(userToRemove => agentUser.id == userToRemove.id)
-            )
-
-          val modifiedAccessGroup = accessGroup.copy(
-            lastUpdated = LocalDateTime.now(),
-            lastUpdatedBy = whoIsUpdating,
-            teamMembers = Some(teamMembersToKeep)
-          )
-          (modifiedAccessGroup, teamMembersToRemove)
-        } else {
-          (accessGroup, Set.empty)
+  ): (CustomGroup, Set[AgentUser]) = {
+    val teamMembersToRemoveFromAccessGroup =
+      // TODO: (LEGACY) Is the fold below the most efficient way of achieving this operation? Probably not
+      accessGroup.teamMembers.foldLeft(Set.empty[AgentUser]) { (acc, agentUserOfAccessGroup) =>
+        toRemove.find(_ == agentUserOfAccessGroup.id) match {
+          case None    => acc
+          case Some(_) => acc + agentUserOfAccessGroup
         }
+      }
+
+    if (teamMembersToRemoveFromAccessGroup.nonEmpty) {
+      val (teamMembersToRemove, teamMembersToKeep): (Set[AgentUser], Set[AgentUser]) =
+        accessGroup.teamMembers.partition(agentUser =>
+          teamMembersToRemoveFromAccessGroup.exists(userToRemove => agentUser.id == userToRemove.id)
+        )
+
+      val modifiedAccessGroup = accessGroup.copy(
+        lastUpdated = LocalDateTime.now(),
+        lastUpdatedBy = whoIsUpdating,
+        teamMembers = teamMembersToKeep
+      )
+      (modifiedAccessGroup, teamMembersToRemove)
+    } else {
+      (accessGroup, Set.empty)
     }
+  }
 
 }

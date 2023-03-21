@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.{Collation, IndexOptions}
-import com.mongodb.{BasicDBObject, MongoWriteException}
+import com.mongodb.MongoWriteException
 import org.mongodb.scala.bson.Document
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
@@ -26,24 +26,23 @@ import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
 import org.mongodb.scala.model._
 import org.mongodb.scala.result.UpdateResult
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, CustomGroup}
-import uk.gov.hmrc.agentpermissions.model.SensitiveAccessGroup
-import uk.gov.hmrc.agentpermissions.model.SensitiveTaxServiceGroup.encryptAgentUser
-import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepositoryImpl.{FIELD_ARN, FIELD_GROUPNAME, caseInsensitiveCollation}
-import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
+import play.api.libs.json.Format
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2Impl._
+import uk.gov.hmrc.agentpermissions.repository.storagemodel.{SensitiveAgentUser, SensitiveCustomGroup}
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, CustomGroup}
+import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+import uk.gov.hmrc.crypto.json.JsonEncryption
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter, PlainText}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 
-import javax.inject.{Inject, Singleton}
+import javax.inject.{Inject, Named, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
-@ImplementedBy(classOf[AccessGroupsRepositoryImpl])
-trait AccessGroupsRepository {
-  def findById(id: String): Future[Option[CustomGroup]]
-
-  def get(arn: Arn): Future[Seq[CustomGroup]]
-
-  def get(arn: Arn, groupName: String): Future[Option[CustomGroup]]
+@ImplementedBy(classOf[CustomGroupsRepositoryV2Impl])
+trait CustomGroupsRepositoryV2 {
 
   /* TODO: add following functionality
    *   [ ] pull list of tm from group
@@ -54,29 +53,28 @@ trait AccessGroupsRepository {
    *
    * */
 
+  def findById(id: GroupId): Future[Option[CustomGroup]]
+  def get(arn: Arn): Future[Seq[CustomGroup]]
+  def get(arn: Arn, groupName: String): Future[Option[CustomGroup]]
   def insert(accessGroup: CustomGroup): Future[Option[String]]
-
   def delete(arn: Arn, groupName: String): Future[Option[Long]]
-
   def update(arn: Arn, groupName: String, accessGroup: CustomGroup): Future[Option[Long]]
 
   /* TODO is it possible to update lastUpdated/lastUpdatedBy fields at the same time for addTeamMember and removeClient?
    *   if only accomplished by update, remove these methods
    * */
-  def addTeamMember(id: String, toAdd: AgentUser): Future[UpdateResult]
-
-  def removeClient(groupId: String, clientId: String): Future[UpdateResult]
-
+  def addTeamMember(id: GroupId, toAdd: AgentUser): Future[UpdateResult]
+  def removeClient(groupId: GroupId, clientId: String): Future[UpdateResult]
 }
 
 @Singleton
-class AccessGroupsRepositoryImpl @Inject() (
+class CustomGroupsRepositoryV2Impl @Inject() (
   mongoComponent: MongoComponent,
-  crypto: Encrypter with Decrypter
+  @Named("aes") crypto: Encrypter with Decrypter
 )(implicit ec: ExecutionContext)
-    extends PlayMongoRepository[SensitiveAccessGroup](
-      collectionName = "access-groups",
-      domainFormat = SensitiveAccessGroup.format(crypto),
+    extends PlayMongoRepository[SensitiveCustomGroup](
+      collectionName = "access-groups-custom",
+      domainFormat = SensitiveCustomGroup.format(crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending(FIELD_ARN), new IndexOptions().name("arnIdx").unique(false)),
@@ -87,40 +85,52 @@ class AccessGroupsRepositoryImpl @Inject() (
             .unique(true)
             .collation(caseInsensitiveCollation)
         )
+      ),
+      extraCodecs = Seq(
+        // Sensitive string codec so we can operate on individual string fields
+        Codecs.playFormatCodec(sensitiveStringFormat(crypto))
       )
-    ) with AccessGroupsRepository with Logging {
+    ) with CustomGroupsRepositoryV2 with Logging {
 
-  override def findById(id: String): Future[Option[CustomGroup]] =
+  // Ensure that we are using a deterministic cryptographic algorithm, or we won't be able to search on encrypted fields
+  require(
+    crypto.encrypt(PlainText("foo")) == crypto.encrypt(PlainText("foo")),
+    s"Crypto algorithm provided is not deterministic."
+  )
+
+  implicit val theCrypto: Encrypter with Decrypter = crypto
+
+  def findById(id: GroupId): Future[Option[CustomGroup]] =
     collection
-      .find(new BasicDBObject("_id", id))
+      .find(Filters.equal("_id", id.toString))
+      .map(_.decryptedValue)
       .headOption()
-      .map(_.map(_.decryptedValue))
 
-  override def get(arn: Arn): Future[Seq[CustomGroup]] =
+  def get(arn: Arn): Future[Seq[CustomGroup]] =
     collection
       .find(equal(FIELD_ARN, arn.value))
       .collation(caseInsensitiveCollation)
+      .map(_.decryptedValue)
       .collect()
       .toFuture()
-      .map(_.map(_.decryptedValue))
 
-  override def get(arn: Arn, groupName: String): Future[Option[CustomGroup]] =
+  def get(arn: Arn, groupName: String): Future[Option[CustomGroup]] =
     collection
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)))
       .collation(caseInsensitiveCollation)
+      .map(_.decryptedValue)
       .headOption()
-      .map(_.map(_.decryptedValue))
 
-  override def insert(accessGroup: CustomGroup): Future[Option[String]] =
+  def insert(customGroup: CustomGroup): Future[Option[String]] =
     collection
-      .insertOne(SensitiveAccessGroup(accessGroup))
+      .insertOne(SensitiveCustomGroup(customGroup))
       .headOption()
       .map(_.map(result => result.getInsertedId.asString().getValue))
       .recoverWith { case e: MongoWriteException =>
         Future.successful(None)
       }
 
-  override def delete(arn: Arn, groupName: String): Future[Option[Long]] =
+  def delete(arn: Arn, groupName: String): Future[Option[Long]] =
     collection
       .deleteOne(
         and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),
@@ -129,11 +139,11 @@ class AccessGroupsRepositoryImpl @Inject() (
       .headOption()
       .map(_.map(result => result.getDeletedCount))
 
-  override def update(arn: Arn, groupName: String, accessGroup: CustomGroup): Future[Option[Long]] =
+  def update(arn: Arn, groupName: String, customGroup: CustomGroup): Future[Option[Long]] =
     collection
       .replaceOne(
         and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),
-        SensitiveAccessGroup(accessGroup),
+        SensitiveCustomGroup(customGroup),
         replaceOptions
       )
       .headOption()
@@ -144,31 +154,34 @@ class AccessGroupsRepositoryImpl @Inject() (
   private lazy val replaceOptions: ReplaceOptions =
     new ReplaceOptions().upsert(true).collation(caseInsensitiveCollation)
 
-  def addTeamMember(id: String, toAdd: AgentUser): Future[UpdateResult] = {
-    val encryptedAgent = encryptAgentUser(toAdd)(crypto)
+  def addTeamMember(id: GroupId, agentUser: AgentUser): Future[UpdateResult] =
     collection
       .updateOne(
-        filter = Filters.equal("_id", id),
-        update = Updates.addToSet("teamMembers", Codecs.toBson(encryptedAgent))
+        filter = Filters.equal("_id", id.toString),
+        update = Updates.addToSet("teamMembers", Codecs.toBson(SensitiveAgentUser(agentUser)))
       )
       .head()
-  }
 
-  def removeClient(groupId: String, enrolmentKey: String): Future[UpdateResult] =
+  def removeClient(groupId: GroupId, enrolmentKey: String): Future[UpdateResult] =
     collection
       .updateOne(
-        filter = Filters.equal("_id", groupId),
+        filter = Filters.equal("_id", groupId.toString),
         update = Updates.pullByFilter(
-          Document("clients" -> Document("enrolmentKey" -> Codecs.toBson(enrolmentKey)))
+          Document(
+            "clients" -> Document("enrolmentKey" -> Codecs.toBson(SensitiveString(enrolmentKey))(sensitiveStringFormat))
+          )
         )
       )
       .head()
 }
 
-object AccessGroupsRepositoryImpl {
+object CustomGroupsRepositoryV2Impl {
   private val FIELD_ARN = "arn"
   private val FIELD_GROUPNAME = "groupName"
 
   private def caseInsensitiveCollation: Collation =
     Collation.builder().locale("en").collationStrength(SECONDARY).build()
+
+  private def sensitiveStringFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveString] =
+    JsonEncryption.sensitiveEncrypterDecrypter(SensitiveString.apply)
 }

@@ -14,22 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.service.audit
+package uk.gov.hmrc.agentpermissions
 
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client}
+import com.google.inject.AbstractModule
+import uk.gov.hmrc.agentpermissions.repository.legacy.MigrateToV2
 
-import scala.util.Random
-
-trait AuditTestSupport {
-
-  def client(): Client = Client(
-    "service~key~" + Random.alphanumeric.filter(_.isLetter).take(5).mkString,
-    Random.alphanumeric.filter(_.isLetter).take(5).mkString
-  )
-
-  def teamMember(): AgentUser = AgentUser(
-    Random.alphanumeric.filter(_.isLetter).take(5).mkString,
-    Random.alphanumeric.filter(_.isLetter).take(5).mkString
-  )
-
+class MigrateToV2Module extends AbstractModule {
+  override def configure(): Unit =
+    bind(classOf[MigrateToV2]).asEagerSingleton()
 }

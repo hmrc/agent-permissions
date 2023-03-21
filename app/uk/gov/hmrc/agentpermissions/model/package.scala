@@ -14,22 +14,15 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.service.audit
+package uk.gov.hmrc.agentpermissions
 
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client}
+import java.util.UUID
 
-import scala.util.Random
+package object models {
+  type GroupId = UUID
 
-trait AuditTestSupport {
-
-  def client(): Client = Client(
-    "service~key~" + Random.alphanumeric.filter(_.isLetter).take(5).mkString,
-    Random.alphanumeric.filter(_.isLetter).take(5).mkString
-  )
-
-  def teamMember(): AgentUser = AgentUser(
-    Random.alphanumeric.filter(_.isLetter).take(5).mkString,
-    Random.alphanumeric.filter(_.isLetter).take(5).mkString
-  )
-
+  object GroupId {
+    def random(): GroupId = UUID.randomUUID()
+    def fromString(s: String): GroupId = UUID.fromString(s)
+  }
 }

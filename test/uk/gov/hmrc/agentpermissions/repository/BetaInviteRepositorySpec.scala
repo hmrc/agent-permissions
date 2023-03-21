@@ -18,9 +18,10 @@ package uk.gov.hmrc.agentpermissions.repository
 
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
+import uk.gov.hmrc.agents.accessgroups.AgentUser
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 
@@ -92,5 +93,5 @@ class BetaInviteRepositorySpec extends BaseSpec with DefaultPlayMongoRepositoryS
   }
 
   override protected def repository: PlayMongoRepository[BetaInviteRecord] =
-    new BetaInviteRepositoryImpl(mongoComponent, aesGcmCrypto)
+    new BetaInviteRepositoryImpl(mongoComponent)
 }

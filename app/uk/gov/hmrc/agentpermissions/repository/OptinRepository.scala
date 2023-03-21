@@ -22,13 +22,14 @@ import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.Indexes.ascending
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptinRecord}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
+import uk.gov.hmrc.agents.accessgroups.optin._
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
-import javax.inject.{Inject, Singleton}
+import javax.inject.{Inject, Named, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[OptinRepositoryImpl])
@@ -43,10 +44,11 @@ trait OptinRepository {
 @Singleton
 class OptinRepositoryImpl @Inject() (
   mongoComponent: MongoComponent,
-  crypto: Encrypter with Decrypter
+  @Named("aesGcm") crypto: Encrypter with Decrypter
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[SensitiveOptinRecord](
       collectionName = "optin",
+      /* Note: we have to specify manually the encryption algorithm of this DB rather than rely on injection as it still uses aesGcm */
       domainFormat = SensitiveOptinRecord.format(crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(

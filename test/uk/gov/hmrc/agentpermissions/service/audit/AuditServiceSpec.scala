@@ -18,9 +18,12 @@ package uk.gov.hmrc.agentpermissions.service.audit
 
 import org.scalamock.handlers.{CallHandler, CallHandler0}
 import play.api.libs.json.JsObject
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
@@ -32,7 +35,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
   "Access group creation" should {
     "audit event correctly" in new TestScope {
       val accessGroup: CustomGroup =
-        buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat, clientPpt, clientCgt)))
+        buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
 
       mockAppConfigAccessGroupChunkSize(1000)
       mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupCreated", 2)
@@ -44,7 +47,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
   "Access group update" should {
     "audit event correctly" in new TestScope {
       val accessGroup: CustomGroup =
-        buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat, clientPpt, clientCgt)))
+        buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
 
       mockAppConfigAccessGroupChunkSize(1000)
       mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated", 2)
@@ -56,7 +59,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
   "Access group deletion" should {
     "audit event correctly" in new TestScope {
       val accessGroup: CustomGroup =
-        buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat, clientPpt, clientCgt)))
+        buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
 
       mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted", 1)
 
@@ -92,7 +95,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
   "Access group clients removal" should {
     "audit event correctly" in new TestScope {
       val accessGroup: CustomGroup =
-        buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat, clientPpt, clientCgt)))
+        buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
 
       val chunkSize = 1000
 
@@ -106,7 +109,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
   "Access group team members removal" should {
     "audit event correctly" in new TestScope {
       val accessGroup: CustomGroup =
-        buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat, clientPpt, clientCgt)))
+        buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
 
       val chunkSize = 1000
 
@@ -149,8 +152,9 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): CustomGroup =
+    def buildAccessGroup(teamMembers: Set[AgentUser], clients: Set[Client]): CustomGroup =
       CustomGroup(
+        GroupId.random(),
         arn,
         groupName,
         now,

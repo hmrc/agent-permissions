@@ -16,9 +16,6 @@
 
 package uk.gov.hmrc.agentpermissions.connectors
 
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, Source}
-import akka.util.ByteString
 import com.codahale.metrics.MetricRegistry
 import com.google.inject.ImplementedBy
 import com.kenshoo.play.metrics.Metrics
@@ -26,8 +23,10 @@ import play.api.Logging
 import play.api.http.Status._
 import play.api.libs.json.{Json, OFormat}
 import uk.gov.hmrc.agent.kenshoo.monitoring.HttpAPIMonitor
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, PaginatedList}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
+import uk.gov.hmrc.agents.accessgroups.{Client, UserDetails}
 import uk.gov.hmrc.http.HttpReads.is5xx
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, UpstreamErrorResponse}
@@ -69,14 +68,6 @@ trait UserClientDetailsConnector {
   def getClientListStatus(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]]
-
-  def getClientsWithAssignedUsers(
-    arn: Arn
-  )(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext,
-    materializer: Materializer
-  ): Future[Option[GroupDelegatedEnrolments]]
 
   def clientCountByTaxService(
     arn: Arn
@@ -296,37 +287,6 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
     }
   }
 
-  override def getClientsWithAssignedUsers(
-    arn: Arn
-  )(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext,
-    materializer: Materializer
-  ): Future[Option[GroupDelegatedEnrolments]] = {
-
-    val url = s"$aucdUrl/arn/${arn.value}/clients-assigned-users"
-
-    monitor("ConsumedAPI-AgentUserClientDetails-ClientsWithAssignedUsers-GET") {
-
-      httpV2
-        .get(url"$url")
-        .transform(req =>
-          req.withRequestTimeout(120.minutes)
-        ) // 120 minutes * 60 seconds * 20 reqs/sec = 144,000 clients
-        .stream[Source[ByteString, _]]
-        .flatMap(
-          _.runWith(
-            Sink.fold[StringBuffer, ByteString](new StringBuffer())((buffer, chunk) => buffer.append(chunk.utf8String))
-          ).map(collatedChunks =>
-            Option(GroupDelegatedEnrolments(assembleAssignedClientsFromResponse(collatedChunks.toString)))
-          )
-        )
-    } recover { case UpstreamErrorResponse(message, upstreamResponseCode, _, _) =>
-      logger.warn(s"Received $upstreamResponseCode status: $message")
-      Option.empty[GroupDelegatedEnrolments]
-    }
-  }
-
   def getTeamMembers(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[UserDetails]] = {
 
     val url = s"$aucdUrl/arn/${arn.value}/team-members"
@@ -365,14 +325,6 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
         }
     }
   }
-
-  private def assembleAssignedClientsFromResponse(buffer: String): Seq[AssignedClient] =
-    buffer
-      .split("\\[")
-      .filter(_.nonEmpty)
-      .map(part => Json.parse("[" + part).as[Seq[AssignedClient]])
-      .toSeq
-      .flatten
 }
 
 sealed trait EacdAssignmentsPushStatus

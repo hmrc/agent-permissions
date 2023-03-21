@@ -17,7 +17,9 @@
 package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.{Json, OFormat}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, CustomGroup}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 
 import java.time.LocalDateTime
 
@@ -33,14 +35,15 @@ case class CreateAccessGroupRequest(
     val now = LocalDateTime.now()
 
     CustomGroup(
+      GroupId.random(),
       arn,
       Option(groupName).map(_.trim).getOrElse(""),
       now,
       now,
       agentUser,
       agentUser,
-      teamMembers,
-      clients
+      teamMembers.getOrElse(Set.empty),
+      clients.getOrElse(Set.empty)
     )
   }
 }
@@ -59,8 +62,8 @@ case class UpdateAccessGroupRequest(
     val withMergedGroupName = groupName.fold(existingAccessGroup)(name =>
       existingAccessGroup.copy(groupName = Option(name).map(_.trim).getOrElse(""))
     )
-    val withMergedClients = clients.fold(withMergedGroupName)(cls => withMergedGroupName.copy(clients = Some(cls)))
-    teamMembers.fold(withMergedClients)(members => withMergedClients.copy(teamMembers = Some(members)))
+    val withMergedClients = clients.fold(withMergedGroupName)(cls => withMergedGroupName.copy(clients = cls))
+    teamMembers.fold(withMergedClients)(members => withMergedClients.copy(teamMembers = members))
   }
 }
 

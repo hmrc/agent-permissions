@@ -21,11 +21,12 @@ import play.api.http.Status.{FORBIDDEN, OK}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request, Result}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.repository.{RecordInserted, UpsertType}
 import uk.gov.hmrc.agentpermissions.service.BetaInviteService
+import uk.gov.hmrc.agents.accessgroups.AgentUser
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.{ExecutionContext, Future}

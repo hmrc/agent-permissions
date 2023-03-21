@@ -18,29 +18,31 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, EnrolmentKey, PaginatedList}
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
-import uk.gov.hmrc.agentpermissions.model.DisplayClient
-import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
+import uk.gov.hmrc.agentpermissions.model.{DisplayClient, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup, GroupSummary}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
-@ImplementedBy(classOf[AccessGroupsServiceImpl])
-trait AccessGroupsService {
-  def addMemberToGroup(gid: String, teamMember: AgentUser, whoIsUpdating: AgentUser)(implicit
+@ImplementedBy(classOf[CustomGroupsServiceImpl])
+trait CustomGroupsService {
+  def addMemberToGroup(gid: GroupId, teamMember: AgentUser, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
 
-  def getById(id: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]]
+  def getById(id: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]]
 
   def getGroupByIdWithPageOfClientsToAdd(
-    id: String,
+    id: GroupId,
     page: Int = 1,
     pageSize: Int = 20,
     search: Option[String] = None,
@@ -53,7 +55,7 @@ trait AccessGroupsService {
 
   def getAllCustomGroups(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[CustomGroup]]
 
-  def get(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]]
+  def get(arn: Arn, groupName: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]]
 
   def getCustomGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     ec: ExecutionContext
@@ -62,22 +64,22 @@ trait AccessGroupsService {
   def getCustomGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]]
-  def delete(groupId: GroupId, agentUser: AgentUser)(implicit
+  def delete(arn: Arn, groupName: String, agentUser: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupDeletionStatus]
 
-  def update(groupId: GroupId, accessGroup: CustomGroup, whoIsUpdating: AgentUser)(implicit
+  def update(arn: Arn, groupName: String, accessGroup: CustomGroup, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
 
-  def removeClient(groupId: String, clientId: String, whoIsUpdating: AgentUser)(implicit
+  def removeClient(groupId: GroupId, clientId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
 
-  def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
+  def removeTeamMember(groupId: GroupId, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
@@ -90,34 +92,36 @@ trait AccessGroupsService {
 
 }
 
+case class ClientList(assigned: Set[Client], unassigned: Set[Client])
+
 @Singleton
-class AccessGroupsServiceImpl @Inject() (
-  accessGroupsRepository: AccessGroupsRepository,
+class CustomGroupsServiceImpl @Inject() (
+  customGroupsRepository: CustomGroupsRepositoryV2,
   userEnrolmentAssignmentService: UserEnrolmentAssignmentService,
   taxGroupsService: TaxGroupsService,
   userClientDetailsConnector: UserClientDetailsConnector,
   auditService: AuditService
-) extends AccessGroupsService with Logging {
+) extends CustomGroupsService with Logging {
 
-  override def getById(id: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]] =
-    accessGroupsRepository
+  override def getById(id: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]] =
+    customGroupsRepository
       .findById(id)
       .flatMap(withClientName)
 
   /** Gets a page of clients for the Arn and then finds if any of them are already in the group */
   override def getGroupByIdWithPageOfClientsToAdd(
-    id: String,
+    id: GroupId,
     page: Int = 1,
     pageSize: Int = 20,
     search: Option[String] = None,
     filter: Option[String] = None
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[(GroupSummary, PaginatedList[DisplayClient])]] =
-    accessGroupsRepository
+    customGroupsRepository
       .findById(id)
       .flatMap {
         case None => Future successful None
         case Some(grp) =>
-          val enrolmentKeys = grp.clients.map(_.map(_.enrolmentKey))
+          val enrolmentKeys = grp.clients.map(_.enrolmentKey)
           userClientDetailsConnector
             .getPaginatedClients(grp.arn)(page, pageSize, search, filter)
             .map { paginatedClients =>
@@ -125,23 +129,23 @@ class AccessGroupsServiceImpl @Inject() (
                 paginationMetaData = paginatedClients.paginationMetaData,
                 // TODO: NEED TO ONLY LOAD THE CLIENTS FROM THE GROUP THAT ARE IN THIS PAGINATED LIST
                 pageContent = paginatedClients.pageContent.map { c =>
-                  DisplayClient.fromClient(c, enrolmentKeys.getOrElse(Set.empty[String]).contains(c.enrolmentKey))
+                  DisplayClient.fromClient(c, enrolmentKeys.contains(c.enrolmentKey))
                 }
               )
-              Some((GroupSummary(grp._id.toString, grp.groupName, None, grp.teamMembers.size, None), paginatedList))
+              Some((GroupSummary(grp.id, grp.groupName, None, grp.teamMembers.size, None), paginatedList))
             }
       }
 
   override def create(
     accessGroup: CustomGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus] =
-    accessGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
+    customGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
       case Some(_) =>
         Future.successful(AccessGroupExistsForCreation)
       case _ =>
         for {
           maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupCreation(accessGroup)
-          maybeCreationId            <- accessGroupsRepository.insert(withClientNamesRemoved(accessGroup))
+          maybeCreationId            <- customGroupsRepository.insert(withClientNamesRemoved(accessGroup))
           accessGroupCreationStatus <- maybeCreationId match {
                                          case None =>
                                            Future.successful(AccessGroupNotCreated)
@@ -162,44 +166,47 @@ class AccessGroupsServiceImpl @Inject() (
   override def getAllCustomGroups(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[CustomGroup]] =
-    accessGroupsRepository
+    customGroupsRepository
       .get(arn)
       .flatMap(withClientNames)
 
-  override def get(groupId: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]] =
-    accessGroupsRepository
-      .get(groupId.arn, groupId.groupName)
+  override def get(arn: Arn, groupName: String)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Option[CustomGroup]] =
+    customGroupsRepository
+      .get(arn, groupName)
       .flatMap(withClientName)
 
   override def getCustomGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]] =
-    accessGroupsRepository
+    customGroupsRepository
       .get(arn)
       .map(accessGroups =>
         accessGroups
-          .filter(_.clients.fold(false)(_.map(_.enrolmentKey).contains(enrolmentKey)))
-          .map(GroupSummary.fromAccessGroup)
+          .filter(_.clients.map(_.enrolmentKey).contains(enrolmentKey))
+          .map(GroupSummary.of(_))
       )
 
   override def getCustomGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]] =
-    accessGroupsRepository
+    customGroupsRepository
       .get(arn)
       .map(accessGroups =>
         accessGroups
-          .filter(_.teamMembers.fold(false)(_.map(_.id).contains(userId)))
-          .map(GroupSummary.fromAccessGroup)
+          .filter(_.teamMembers.map(_.id).contains(userId))
+          .map(GroupSummary.of(_))
       )
 
-  override def delete(groupId: GroupId, agentUser: AgentUser)(implicit
+  override def delete(arn: Arn, groupName: String, agentUser: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupDeletionStatus] =
     for {
-      maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupDeletion(groupId)
-      maybeDeletedCount          <- accessGroupsRepository.delete(groupId.arn, groupId.groupName)
+      maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupDeletion(arn, groupName)
+      maybeDeletedCount          <- customGroupsRepository.delete(arn, groupName)
       accessGroupDeletionStatus <- maybeDeletedCount match {
                                      case None =>
                                        Future.successful(AccessGroupNotDeleted)
@@ -209,7 +216,7 @@ class AccessGroupsServiceImpl @Inject() (
                                            pushStatus <- pushAssignments(maybeCalculatedAssignments)
                                            _ <-
                                              Future successful auditService
-                                               .auditAccessGroupDeletion(groupId.arn, groupId.groupName, agentUser)
+                                               .auditAccessGroupDeletion(arn, groupName, agentUser)
                                          } yield pushStatus match {
                                            case AssignmentsPushed =>
                                              AccessGroupDeleted
@@ -222,15 +229,16 @@ class AccessGroupsServiceImpl @Inject() (
                                    }
     } yield accessGroupDeletionStatus
 
-  override def update(groupId: GroupId, accessGroup: CustomGroup, whoIsUpdating: AgentUser)(implicit
+  override def update(arn: Arn, groupName: String, accessGroup: CustomGroup, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
     for {
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
-      maybeCalculatedAssignments   <- userEnrolmentAssignmentService.calculateForGroupUpdate(groupId, accessGroup)
+      maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupUpdate(arn, groupName, accessGroup)
       accessGroupUpdateStatus <- handleUpdate(
-                                   GroupId(accessGroup.arn, accessGroup.groupName),
+                                   accessGroup.arn,
+                                   accessGroup.groupName,
                                    accessGroupWithWhoIsUpdating,
                                    maybeCalculatedAssignments
                                  )
@@ -245,16 +253,17 @@ class AccessGroupsServiceImpl @Inject() (
     *   AccessGroupUpdateStatus
     */
   private def handleUpdate(
-    groupId: GroupId,
+    arn: Arn,
+    groupName: String,
     updatedGroup: CustomGroup,
     maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupUpdateStatus] =
     for {
       maybeUpdatedCount <-
-        accessGroupsRepository
+        customGroupsRepository
           .update(
-            groupId.arn,
-            groupId.groupName,
+            arn,
+            groupName,
             withClientNamesRemoved(updatedGroup)
           ) // withClientNamesRemoved unnecessary unless adding clients
       accessGroupUpdateStatus <- maybeUpdatedCount match {
@@ -284,49 +293,50 @@ class AccessGroupsServiceImpl @Inject() (
                                  }
     } yield accessGroupUpdateStatus
 
-  def removeClient(groupId: String, clientId: String, whoIsUpdating: AgentUser)(implicit
+  def removeClient(groupId: GroupId, clientId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
-    accessGroupsRepository
+    customGroupsRepository
       .findById(groupId)
       .flatMap {
         case Some(accessGroup) =>
-          val maybeClients = accessGroup.clients.map(_.filterNot(tm => tm.enrolmentKey == clientId))
+          val maybeClients = accessGroup.clients.filterNot(tm => tm.enrolmentKey == clientId)
           val updatedGroup = accessGroup.copy(
             lastUpdated = LocalDateTime.now(),
             lastUpdatedBy = whoIsUpdating,
             clients = maybeClients
           )
 
-          val clientToRemove = accessGroup.clients.map(_.filter(tm => tm.enrolmentKey == clientId)).get
-          val usersInGroup = accessGroup.teamMembers.getOrElse(Set.empty)
+          val clientToRemove = accessGroup.clients.filter(tm => tm.enrolmentKey == clientId)
+          val usersInGroup = accessGroup.teamMembers
 
           for {
             maybeCalculatedAssignments <-
               userEnrolmentAssignmentService
                 .calculateForRemoveFromGroup(
-                  GroupId(accessGroup.arn, accessGroup.groupName),
+                  accessGroup.arn,
+                  accessGroup.groupName,
                   clientToRemove,
                   usersInGroup
                 )
             updateStatus <-
-              handleUpdate(GroupId(accessGroup.arn, accessGroup.groupName), updatedGroup, maybeCalculatedAssignments)
+              handleUpdate(accessGroup.arn, accessGroup.groupName, updatedGroup, maybeCalculatedAssignments)
           } yield updateStatus
         case _ => Future successful AccessGroupNotUpdated
       }
 
-  def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
+  def removeTeamMember(groupId: GroupId, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
-    accessGroupsRepository
+    customGroupsRepository
       .findById(groupId)
       .flatMap {
         case Some(accessGroup) =>
-          val maybeAgentUsers = accessGroup.teamMembers.map(_.filterNot(tm => tm.id == teamMemberId))
-          val userToRemove = accessGroup.teamMembers.map(_.filter(tm => tm.id == teamMemberId)).get
-          val clientsInGroup = accessGroup.clients.getOrElse(Set.empty)
+          val maybeAgentUsers = accessGroup.teamMembers.filterNot(tm => tm.id == teamMemberId)
+          val userToRemove = accessGroup.teamMembers.filter(tm => tm.id == teamMemberId)
+          val clientsInGroup = accessGroup.clients
 
           val updatedGroup = accessGroup.copy(
             lastUpdated = LocalDateTime.now(),
@@ -337,12 +347,13 @@ class AccessGroupsServiceImpl @Inject() (
             maybeCalculatedAssignments <-
               userEnrolmentAssignmentService
                 .calculateForRemoveFromGroup(
-                  GroupId(accessGroup.arn, accessGroup.groupName),
+                  accessGroup.arn,
+                  accessGroup.groupName,
                   clientsInGroup,
                   userToRemove
                 )
             updateStatus <-
-              handleUpdate(GroupId(accessGroup.arn, accessGroup.groupName), updatedGroup, maybeCalculatedAssignments)
+              handleUpdate(accessGroup.arn, accessGroup.groupName, updatedGroup, maybeCalculatedAssignments)
           } yield updateStatus
         case _ => Future successful AccessGroupNotUpdated
       }
@@ -351,8 +362,8 @@ class AccessGroupsServiceImpl @Inject() (
   override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
     for {
       clients      <- userClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
-      accessGroups <- if (clients.nonEmpty) accessGroupsRepository.get(arn) else Future.successful(Seq.empty)
-      enrolmentKeysInCustomGroups = accessGroups.flatMap(_.clients).toSet.flatten.map(_.enrolmentKey)
+      accessGroups <- if (clients.nonEmpty) customGroupsRepository.get(arn) else Future.successful(Seq.empty)
+      enrolmentKeysInCustomGroups = accessGroups.toSet[CustomGroup].flatMap(_.clients).map(_.enrolmentKey)
       taxServiceGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
     } yield clients.foldLeft(ClientList(Set.empty, Set.empty)) { (clientList, client) =>
       val serviceKey = EnrolmentKey.deconstruct(client.enrolmentKey) match {
@@ -365,7 +376,7 @@ class AccessGroupsServiceImpl @Inject() (
         enrolmentKeysInCustomGroups.contains(client.enrolmentKey) || // ... they are in a custom access group, OR ...
         taxServiceGroups.exists(tsg => // ... there is a tax service group AND they are not excluded from it.
           tsg.service == serviceKey &&
-            !tsg.excludedClients.getOrElse(Set.empty).exists(_.enrolmentKey == client.enrolmentKey)
+            !tsg.excludedClients.exists(_.enrolmentKey == client.enrolmentKey)
         )
       ) {
         clientList.copy(assigned = clientList.assigned + client)
@@ -402,7 +413,7 @@ class AccessGroupsServiceImpl @Inject() (
     }
 
   private def withClientNamesRemoved(accessGroup: CustomGroup): CustomGroup =
-    accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = ""))))
+    accessGroup.copy(clients = accessGroup.clients.map(_.copy(friendlyName = "")))
 
   private def withClientName(
     maybeAccessGroup: Option[CustomGroup]
@@ -418,8 +429,8 @@ class AccessGroupsServiceImpl @Inject() (
     )
 
   private def copyNamesFromBackendClients(
-    maybeAccessGroupClients: Option[Set[Client]]
-  )(backendClients: Seq[Client]): Option[Set[Client]] = {
+    accessGroupClients: Set[Client]
+  )(backendClients: Seq[Client]): Set[Client] = {
 
     def identifyFriendlyNameAmongBackendClients(accessGroupClient: Client): String =
       backendClients.find(_.enrolmentKey == accessGroupClient.enrolmentKey) match {
@@ -427,10 +438,8 @@ class AccessGroupsServiceImpl @Inject() (
         case None                        => ""
       }
 
-    maybeAccessGroupClients.map(
-      _.map(accessGroupClient =>
-        accessGroupClient.copy(friendlyName = identifyFriendlyNameAmongBackendClients(accessGroupClient))
-      )
+    accessGroupClients.map(accessGroupClient =>
+      accessGroupClient.copy(friendlyName = identifyFriendlyNameAmongBackendClients(accessGroupClient))
     )
   }
 
@@ -449,32 +458,33 @@ class AccessGroupsServiceImpl @Inject() (
         }
     }
 
-  override def addMemberToGroup(groupId: String, teamMemberToAdd: AgentUser, whoIsUpdating: AgentUser)(implicit
+  override def addMemberToGroup(groupId: GroupId, teamMemberToAdd: AgentUser, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
-    accessGroupsRepository
+    customGroupsRepository
       .findById(groupId)
       .flatMap {
         case Some(accessGroup) =>
-          val agentUsers = accessGroup.teamMembers.getOrElse(Set.empty) ++ Set(teamMemberToAdd)
-          val clientsInGroup = accessGroup.clients.getOrElse(Set.empty)
+          val agentUsers = accessGroup.teamMembers ++ Set(teamMemberToAdd)
+          val clientsInGroup = accessGroup.clients
 
           val updatedGroup = accessGroup.copy(
             lastUpdated = LocalDateTime.now(),
             lastUpdatedBy = whoIsUpdating,
-            teamMembers = Some(agentUsers)
+            teamMembers = agentUsers
           )
           for {
             maybeCalculatedAssignments <-
               userEnrolmentAssignmentService
                 .calculateForAddToGroup(
-                  GroupId(accessGroup.arn, accessGroup.groupName),
+                  accessGroup.arn,
+                  accessGroup.groupName,
                   clientsInGroup,
                   Set(teamMemberToAdd)
                 )
             updateStatus <-
-              handleUpdate(GroupId(accessGroup.arn, accessGroup.groupName), updatedGroup, maybeCalculatedAssignments)
+              handleUpdate(accessGroup.arn, accessGroup.groupName, updatedGroup, maybeCalculatedAssignments)
           } yield updateStatus
         case _ => Future successful AccessGroupNotUpdated
       }

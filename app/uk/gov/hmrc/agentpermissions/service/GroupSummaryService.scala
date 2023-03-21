@@ -18,16 +18,16 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model._
-import uk.gov.hmrc.agentpermissions.repository.TaxServiceGroupsRepository
-
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
+import uk.gov.hmrc.agents.accessgroups.GroupSummary
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
-@ImplementedBy(classOf[GroupsServiceImpl])
-trait GroupsService {
+@ImplementedBy(classOf[GroupSummaryServiceImpl])
+trait GroupSummaryService {
   def getAllGroupSummaries(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]]
   def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     hc: HeaderCarrier,
@@ -40,23 +40,23 @@ trait GroupsService {
 }
 
 @Singleton
-class GroupsServiceImpl @Inject() (
-  taxServiceGroupsRepo: TaxServiceGroupsRepository,
-  customGroupsService: AccessGroupsService,
+class GroupSummaryServiceImpl @Inject() (
+  taxGroupsRepo: TaxGroupsRepositoryV2,
+  customGroupsService: CustomGroupsService,
   taxGroupsService: TaxGroupsService
-) extends GroupsService with Logging {
+) extends GroupSummaryService with Logging {
 
   override def getAllGroupSummaries(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]] =
     for {
       customGroups <- customGroupsService.getAllCustomGroups(arn)
-      customSummaries = customGroups.map(GroupSummary.fromAccessGroup)
+      customSummaries = customGroups.map(GroupSummary.of(_))
       taxGroups           <- taxGroupsService.getAllTaxServiceGroups(arn)
       taxGroupClientCount <- taxGroupsService.clientCountForTaxGroups(arn)
       taxSummaries = taxGroups.map(group =>
                        GroupSummary
-                         .fromAccessGroup(group)
+                         .of(group)
                          .copy(clientCount = Option(taxGroupClientCount(group.service)))
                      )
       combinedSorted = (customSummaries ++ taxSummaries).sortBy(_.groupName.toLowerCase())
@@ -68,9 +68,9 @@ class GroupsServiceImpl @Inject() (
   ): Future[Seq[GroupSummary]] =
     for {
       customSummaries <- customGroupsService.getCustomGroupSummariesForClient(arn, enrolmentKey)
-      maybeTaxGroup   <- taxServiceGroupsRepo.getByService(arn, enrolmentKey.split('~').head)
+      maybeTaxGroup   <- taxGroupsRepo.getByService(arn, enrolmentKey.split('~').head)
       maybeTaxGroupSummary =
-        maybeTaxGroup.fold(Seq.empty[GroupSummary])(group => Seq(GroupSummary.fromAccessGroup(group)))
+        maybeTaxGroup.fold(Seq.empty[GroupSummary])(group => Seq(GroupSummary.of(group)))
       combinedSummaries = customSummaries ++ maybeTaxGroupSummary
     } yield combinedSummaries
 

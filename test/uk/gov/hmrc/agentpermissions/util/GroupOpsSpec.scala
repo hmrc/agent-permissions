@@ -16,8 +16,10 @@
 
 package uk.gov.hmrc.agentpermissions.util
 
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, CustomGroup}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -30,14 +32,14 @@ class GroupOpsSpec extends BaseSpec {
     "removal enrolments contain some that exist in access group" should {
       "remove only those matching enrolments of access group" in new TestScope {
         val accessGroup: CustomGroup =
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
+          buildAccessGroup(Set(agentUser1), Set(clientVat, clientPpt, clientCgt))
 
         val removalEnrolmentKeys: Set[String] = Set(clientPpt, clientCgt, clientTrust).map(_.enrolmentKey)
 
         val (accessGroupWithClientsRemoved, removedClients) =
           GroupOps.removeClientsFromGroup(accessGroup, removalEnrolmentKeys, agentUser1)
 
-        accessGroupWithClientsRemoved.clients shouldBe Some(Set(clientVat))
+        accessGroupWithClientsRemoved.clients shouldBe Set(clientVat)
         accessGroupWithClientsRemoved.teamMembers shouldBe accessGroup.teamMembers
         removedClients shouldBe Set(clientPpt, clientCgt)
       }
@@ -46,7 +48,7 @@ class GroupOpsSpec extends BaseSpec {
     "removal enrolments do not contain any that exist in access group" should {
       "not remove any enrolments of access group" in new TestScope {
         val accessGroup: CustomGroup =
-          buildAccessGroup(Some(Set(agentUser1)), Some(Set(clientVat, clientPpt, clientCgt)))
+          buildAccessGroup(Set(agentUser1), Set(clientVat, clientPpt, clientCgt))
 
         val removalEnrolmentKeys: Set[String] = Set(clientTrust).map(_.enrolmentKey)
 
@@ -80,8 +82,9 @@ class GroupOpsSpec extends BaseSpec {
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    def buildAccessGroup(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]]): CustomGroup =
+    def buildAccessGroup(teamMembers: Set[AgentUser], clients: Set[Client]): CustomGroup =
       CustomGroup(
+        GroupId.random(),
         arn,
         groupName,
         now,
@@ -99,7 +102,7 @@ class GroupOpsSpec extends BaseSpec {
     "removal user ids contain some that exist in access group" should {
       "remove only those matching user ids of access group" in new TestScope {
         val accessGroup: CustomGroup =
-          buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat)))
+          buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat))
 
         val removalUserIds: Set[String] = Set(agentUser2.id)
 
@@ -107,7 +110,7 @@ class GroupOpsSpec extends BaseSpec {
           GroupOps.removeTeamMembersFromGroup(accessGroup, removalUserIds, agentUser1)
 
         accessGroupWithMemberssRemoved.clients shouldBe accessGroup.clients
-        accessGroupWithMemberssRemoved.teamMembers shouldBe Some(Set(agentUser1))
+        accessGroupWithMemberssRemoved.teamMembers shouldBe Set(agentUser1)
         removedMembers shouldBe Set(agentUser2)
       }
     }
@@ -115,7 +118,7 @@ class GroupOpsSpec extends BaseSpec {
     "removal user ids do not contain any that exist in access group" should {
       "not remove any user ids of access group" in new TestScope {
         val accessGroup: CustomGroup =
-          buildAccessGroup(Some(Set(agentUser1, agentUser2)), Some(Set(clientVat)))
+          buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat))
 
         val removalUserIds: Set[String] = Set("unknown")
 

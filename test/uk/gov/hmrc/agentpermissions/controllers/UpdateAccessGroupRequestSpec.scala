@@ -16,10 +16,11 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, CustomGroup}
-import uk.gov.hmrc.agentpermissions.model.UpdateAccessGroupRequest
-
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.model.UpdateAccessGroupRequest
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 
 import java.time.LocalDateTime
 
@@ -36,7 +37,8 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
   val groupNameToUpdate = "name to update"
   val teamMembersToUpdate: Set[AgentUser] = Set(user1, user2)
   val clientsToUpdate: Set[Client] = Set(client1, client2)
-  val accessGroup: CustomGroup = CustomGroup(arn, groupName, now, now, user, user, Some(Set.empty), Some(Set.empty))
+  val accessGroup: CustomGroup =
+    CustomGroup(GroupId.random(), arn, groupName, now, now, user, user, Set.empty, Set.empty)
 
   "Merge" when {
 
@@ -75,7 +77,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
 
-        updateAccessGroupRequest.merge(accessGroup) shouldBe accessGroup.copy(teamMembers = Some(teamMembersToUpdate))
+        updateAccessGroupRequest.merge(accessGroup) shouldBe accessGroup.copy(teamMembers = teamMembersToUpdate)
       }
     }
 
@@ -88,7 +90,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
         val updateAccessGroupRequest =
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
 
-        updateAccessGroupRequest.merge(accessGroup) shouldBe accessGroup.copy(clients = Some(clientsToUpdate))
+        updateAccessGroupRequest.merge(accessGroup) shouldBe accessGroup.copy(clients = clientsToUpdate)
       }
     }
 
@@ -102,7 +104,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
 
         updateAccessGroupRequest.merge(accessGroup) shouldBe
-          accessGroup.copy(groupName = groupNameToUpdate, teamMembers = Some(teamMembersToUpdate))
+          accessGroup.copy(groupName = groupNameToUpdate, teamMembers = teamMembersToUpdate)
       }
     }
 
@@ -116,7 +118,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
 
         updateAccessGroupRequest.merge(accessGroup) shouldBe
-          accessGroup.copy(groupName = groupNameToUpdate, clients = Some(clientsToUpdate))
+          accessGroup.copy(groupName = groupNameToUpdate, clients = clientsToUpdate)
       }
     }
 
@@ -130,7 +132,7 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
           UpdateAccessGroupRequest(maybeGroupNameToUpdate, maybeTeamMembersToUpdate, maybeClientsToUpdate)
 
         updateAccessGroupRequest.merge(accessGroup) shouldBe
-          accessGroup.copy(teamMembers = Some(teamMembersToUpdate), clients = Some(clientsToUpdate))
+          accessGroup.copy(teamMembers = teamMembersToUpdate, clients = clientsToUpdate)
       }
     }
 
@@ -146,8 +148,8 @@ class UpdateAccessGroupRequestSpec extends BaseSpec {
         updateAccessGroupRequest.merge(accessGroup) shouldBe
           accessGroup.copy(
             groupName = groupNameToUpdate,
-            teamMembers = Some(teamMembersToUpdate),
-            clients = Some(clientsToUpdate)
+            teamMembers = teamMembersToUpdate,
+            clients = clientsToUpdate
           )
       }
     }

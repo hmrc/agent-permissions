@@ -16,13 +16,16 @@
 
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.models.GroupId
 
 import java.time.LocalDateTime
 import scala.util.Random
 
-class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
+class UserEnrolmentAssignmentOpsSpec extends BaseSpec {
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -44,9 +47,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
     val clientTrust: Client = Client(s"$serviceTrust~$serviceIdentifierKeyTrust~0123456789", "Trust Client")
 
     def buildAccessGroup(teamMembers: Set[AgentUser], clients: Set[Client]): CustomGroup =
-      CustomGroup(arn, groupName, now, now, userA, userA, Some(teamMembers), Some(clients))
-
-    val userEnrolmentAssignmentCalculator = new UserEnrolmentAssignmentCalculatorImpl
+      CustomGroup(GroupId.random(), arn, groupName, now, now, userA, userA, teamMembers, clients)
 
     lazy val now: LocalDateTime = LocalDateTime.now()
   }
@@ -72,7 +73,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
 
       val expectedUnassigns: Set[UserEnrolment] = Set.empty
 
-      userEnrolmentAssignmentCalculator.forGroupCreation(
+      UserEnrolmentAssignmentOps.forGroupCreation(
         accessGroupToCreate,
         Seq(existingAccessGroup1, existingAccessGroup2)
       ) shouldBe
@@ -87,8 +88,8 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
 
       val accessGroupToUpdatePreviousVersion: CustomGroup = accessGroupToUpdate.copy(
         groupName = accessGroupToUpdate.groupName.toUpperCase,
-        teamMembers = Some(Set(userA, userB, userD)),
-        clients = Some(Set(clientVat, clientPpt, clientMtdit))
+        teamMembers = Set(userA, userB, userD),
+        clients = Set(clientVat, clientPpt, clientMtdit)
       )
 
       val existingAccessGroup2: CustomGroup =
@@ -106,7 +107,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
         UserEnrolment(userB.id, clientMtdit.enrolmentKey)
       )
 
-      userEnrolmentAssignmentCalculator.forGroupUpdate(
+      UserEnrolmentAssignmentOps.forGroupUpdate(
         accessGroupToUpdate,
         Seq(accessGroupToUpdatePreviousVersion, existingAccessGroup2)
       ) shouldBe
@@ -121,8 +122,8 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
 
       val accessGroupToUpdatePreviousVersion: CustomGroup = accessGroupToUpdate.copy(
         groupName = accessGroupToUpdate.groupName.toUpperCase,
-        teamMembers = Some(Set(userA, userB, userD)),
-        clients = Some(Set(clientVat, clientPpt, clientCgt))
+        teamMembers = Set(userA, userB, userD),
+        clients = Set(clientVat, clientPpt, clientCgt)
       )
 
       val existingAccessGroup2: CustomGroup =
@@ -132,11 +133,12 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
         UserEnrolment(userD.id, clientCgt.enrolmentKey)
       )
 
-      userEnrolmentAssignmentCalculator.forAddToGroup(
-        accessGroupToUpdate.clients.get, // existing clients
+      UserEnrolmentAssignmentOps.forAddToGroup(
+        accessGroupToUpdate.clients, // existing clients
         Set(userD), // team member to add
         Seq(accessGroupToUpdatePreviousVersion, existingAccessGroup2),
-        GroupId(accessGroupToUpdate.arn, accessGroupToUpdate.groupName)
+        accessGroupToUpdate.arn,
+        accessGroupToUpdate.groupName
       ) shouldBe
         Some(UserEnrolmentAssignments(expectedAssigns, Set.empty, arn))
     }
@@ -149,8 +151,8 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
 
       val accessGroupToUpdatePreviousVersion: CustomGroup = accessGroupToUpdate.copy(
         groupName = accessGroupToUpdate.groupName.toUpperCase,
-        teamMembers = Some(Set(userA, userB)),
-        clients = Some(Set(clientVat, clientPpt, clientCgt))
+        teamMembers = Set(userA, userB),
+        clients = Set(clientVat, clientPpt, clientCgt)
       )
 
       val existingAccessGroup2: CustomGroup =
@@ -162,11 +164,12 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
         UserEnrolment(userC.id, clientCgt.enrolmentKey)
       )
 
-      userEnrolmentAssignmentCalculator.forRemoveFromGroup(
-        accessGroupToUpdate.clients.get, // existing clients
+      UserEnrolmentAssignmentOps.forRemoveFromGroup(
+        accessGroupToUpdate.clients, // existing clients
         Set(userC), // team member to remove
         Seq(accessGroupToUpdatePreviousVersion, existingAccessGroup2),
-        GroupId(accessGroupToUpdate.arn, accessGroupToUpdate.groupName)
+        accessGroupToUpdate.arn,
+        accessGroupToUpdate.groupName
       ) shouldBe
         Some(UserEnrolmentAssignments(Set.empty, expectedUnassigns, arn))
     }
@@ -192,7 +195,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
         UserEnrolment(userC.id, clientCgt.enrolmentKey)
       )
 
-      userEnrolmentAssignmentCalculator
+      UserEnrolmentAssignmentOps
         .forGroupDeletion(accessGroupToDelete, Seq(accessGroupToDelete, existingAccessGroup2)) shouldBe
         Some(UserEnrolmentAssignments(expectedAssigns, expectedUnassigns, arn))
     }
@@ -214,7 +217,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
       )
 
       // then
-      userEnrolmentAssignmentCalculator.pairUserEnrolments(users, clients) shouldBe expectedPairs
+      UserEnrolmentAssignmentOps.pairUserEnrolments(users, clients) shouldBe expectedPairs
     }
   }
 
@@ -236,7 +239,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
           val expectedAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(maxNetChange, Set.empty, arn)
 
           // then
-          userEnrolmentAssignmentCalculator
+          UserEnrolmentAssignmentOps
             .assessUserEnrolmentPairs(arn, None, maxNetChange, isNetChangeAssign = true) shouldBe expectedAssignments
         }
 
@@ -254,7 +257,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
           val expectedAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, maxNetChange, arn)
 
           // then
-          userEnrolmentAssignmentCalculator
+          UserEnrolmentAssignmentOps
             .assessUserEnrolmentPairs(arn, None, maxNetChange, isNetChangeAssign = false) shouldBe expectedAssignments
         }
       }
@@ -276,7 +279,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
             UserEnrolmentAssignments(maxNetChange -- foundPairs, Set.empty, arn)
 
           // then
-          userEnrolmentAssignmentCalculator
+          UserEnrolmentAssignmentOps
             .assessUserEnrolmentPairs(
               arn,
               Some(foundPairs),
@@ -301,7 +304,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
             UserEnrolmentAssignments(Set.empty, maxNetChange -- foundPairs, arn)
 
           // then
-          userEnrolmentAssignmentCalculator
+          UserEnrolmentAssignmentOps
             .assessUserEnrolmentPairs(
               arn,
               Some(foundPairs),
@@ -324,7 +327,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
           )
           val expectedAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)
 
-          userEnrolmentAssignmentCalculator
+          UserEnrolmentAssignmentOps
             .assessUserEnrolmentPairs(
               arn,
               Some(maxNetChange),
@@ -344,7 +347,7 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
           )
           val expectedAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)
 
-          userEnrolmentAssignmentCalculator
+          UserEnrolmentAssignmentOps
             .assessUserEnrolmentPairs(
               arn,
               Some(maxNetChange),
@@ -353,6 +356,45 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
             ) shouldBe expectedAssignments
 
         }
+      }
+    }
+  }
+
+  "Splitter" when {
+
+    val arn: Arn = Arn("KARN1234567")
+    def buildRandomUserEnrolments(maxIndex: Int): Set[UserEnrolment] = {
+      val r = new Random
+      for {
+        indexTeamMember: Int <- (1 to r.nextInt(maxIndex)).toSet
+        indexClient: Int     <- (1 to r.nextInt(maxIndex)).toSet
+      } yield UserEnrolment(s"user$indexTeamMember", s"enrolmentKey$indexClient")
+    }
+    def roundUp(d: Double): Int = math.ceil(d).toInt
+
+    "both assigns and unassigns are empty" should {
+      "return empty list" in {
+        UserEnrolmentAssignmentOps.split(
+          UserEnrolmentAssignments(Set.empty, Set.empty, arn),
+          1000
+        ) shouldBe Seq.empty
+      }
+    }
+
+    "assigns and unassigns are non-empty" should {
+      "split with correct count" in {
+        val maxIndex = 100
+        val chunkSize = 10
+
+        val assigns = buildRandomUserEnrolments(maxIndex)
+        val unassigns = buildRandomUserEnrolments(maxIndex)
+
+        val splitUserEnrolmentAssignments =
+          UserEnrolmentAssignmentOps.split(UserEnrolmentAssignments(assigns, unassigns, arn), chunkSize)
+
+        (roundUp((assigns.size.toDouble) / chunkSize) + roundUp(
+          (unassigns.size.toDouble) / chunkSize
+        )) shouldBe splitUserEnrolmentAssignments.size
       }
     }
   }

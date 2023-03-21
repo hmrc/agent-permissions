@@ -17,11 +17,13 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.{CallHandler1, CallHandler3, CallHandler4, CallHandler5}
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, RecordInserted, RecordUpdated, UpsertType}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client}
+import uk.gov.hmrc.agents.accessgroups.optin._
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime

@@ -19,12 +19,13 @@ package uk.gov.hmrc.agentpermissions.service
 import akka.actor.ActorSystem
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
-import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, EacdSyncRepository, TaxServiceGroupsRepository}
+import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, EacdSyncRepository, TaxGroupsRepositoryV2}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.util.GroupOps
+import uk.gov.hmrc.agents.accessgroups.{AccessGroup, AgentUser, CustomGroup, TaxGroup, UserDetails}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -55,9 +56,9 @@ trait EacdSynchronizer {
 @Singleton
 class EacdSynchronizerImpl @Inject() (
   userClientDetailsConnector: UserClientDetailsConnector,
-  accessGroupsRepository: AccessGroupsRepository,
-  taxServiceGroupsRepository: TaxServiceGroupsRepository,
-  eacdSyncRepository: EacdSyncRepository,
+  accessGroupsRepository: CustomGroupsRepositoryV2, // TODO consider importing service instead of repository
+  taxGroupsRepository: TaxGroupsRepositoryV2, // TODO consider importing service instead of repository
+  eacdSyncRepository: EacdSyncRepository, // TODO consider importing service instead of repository
   auditService: AuditService,
   actorSystem: ActorSystem,
   appConfig: AppConfig
@@ -81,10 +82,13 @@ class EacdSynchronizerImpl @Inject() (
                          .map(_.getOrElse(throw new RuntimeException("Could not retrieve client list from ES3")).toSet)
       membersInEacd: Set[UserDetails] <- userClientDetailsConnector.getTeamMembers(arn).map(_.toSet)
       clientsInAccessGroups = accessGroups.flatMap {
-                                case cg: CustomGroup => cg.clients.getOrElse(Set.empty)
-                                case tg: TaxGroup    => tg.excludedClients.getOrElse(Set.empty)
+                                case cg: CustomGroup => cg.clients
+                                case tg: TaxGroup    => tg.excludedClients
                               }.toSet
-      membersInAccessGroups = accessGroups.flatMap(_.teamMembers.getOrElse(Set.empty)).toSet
+      membersInAccessGroups = accessGroups.flatMap {
+                                case cg: CustomGroup => cg.teamMembers
+                                case tg: TaxGroup    => tg.teamMembers
+                              }.toSet
       enrolmentKeysToRemove = clientsInAccessGroups.map(_.enrolmentKey).diff(clientsInEacd.map(_.enrolmentKey))
       userIdsToRemove = membersInAccessGroups.map(_.id).diff(membersInEacd.flatMap(_.userId))
     } yield RemovalSet(enrolmentKeysToRemove, userIdsToRemove)
@@ -145,17 +149,16 @@ class EacdSynchronizerImpl @Inject() (
     hc: HeaderCarrier
   ): Future[TaxGroup] = {
     val updatedGroup = accessGroup.copy(
-      teamMembers = accessGroup.teamMembers.map(_.filterNot(member => removalSet.userIdsToRemove.contains(member.id))),
-      excludedClients = accessGroup.excludedClients.map(
-        _.filterNot(client => removalSet.enrolmentKeysToRemove.contains(client.enrolmentKey))
-      ),
+      teamMembers = accessGroup.teamMembers.filterNot(member => removalSet.userIdsToRemove.contains(member.id)),
+      excludedClients =
+        accessGroup.excludedClients.filterNot(client => removalSet.enrolmentKeysToRemove.contains(client.enrolmentKey)),
       lastUpdated = LocalDateTime.now(),
       lastUpdatedBy = whoIsUpdating
     )
     val membersRemoved =
-      accessGroup.teamMembers.getOrElse(Set.empty).diff(updatedGroup.teamMembers.getOrElse(Set.empty))
+      accessGroup.teamMembers.diff(updatedGroup.teamMembers)
     val excludedClientsRemoved =
-      accessGroup.excludedClients.getOrElse(Set.empty).diff(updatedGroup.excludedClients.getOrElse(Set.empty))
+      accessGroup.excludedClients.diff(updatedGroup.excludedClients)
 
     if (membersRemoved.nonEmpty) auditService.auditAccessGroupTeamMembersRemoval(accessGroup, membersRemoved)
     if (excludedClientsRemoved.nonEmpty)
@@ -185,12 +188,12 @@ class EacdSynchronizerImpl @Inject() (
     hc: HeaderCarrier
   ): Future[Unit] = {
     logger.info(s"Starting full sync for $arn.")
-    val allUserIds: Set[String] = customGroups.flatMap(_.teamMembers.getOrElse(Set.empty).map(_.id)).toSet
+    val allUserIds: Set[String] = customGroups.flatMap(_.teamMembers.map(_.id)).toSet
     Future
       .traverse(allUserIds) { userId =>
         val expectedAssignments = customGroups
-          .filter(_.teamMembers.getOrElse(Set.empty).map(_.id).contains(userId))
-          .flatMap(_.clients.getOrElse(Set.empty).map(_.enrolmentKey))
+          .filter(_.teamMembers.map(_.id).contains(userId))
+          .flatMap(_.clients.map(_.enrolmentKey))
         userClientDetailsConnector.syncTeamMember(arn, userId, expectedAssignments).transformWith { res =>
           Future.successful((userId, res))
         }
@@ -220,7 +223,7 @@ class EacdSynchronizerImpl @Inject() (
       case customGroup: CustomGroup =>
         accessGroupsRepository.update(customGroup.arn, customGroup.groupName, customGroup)
       case taxGroup: TaxGroup =>
-        taxServiceGroupsRepository.update(taxGroup.arn, taxGroup.groupName, taxGroup)
+        taxGroupsRepository.update(taxGroup.arn, taxGroup.groupName, taxGroup)
     }).map {
       case Some(updatedCount) if updatedCount == 1L => SyncResult.AccessGroupUpdateSuccess
       case _                                        => SyncResult.AccessGroupUpdateFailure
@@ -269,7 +272,7 @@ class EacdSynchronizerImpl @Inject() (
     val whoIsUpdating = AgentUser(id = "", name = "EACD sync")
     for {
       customAccessGroups <- accessGroupsRepository.get(arn)
-      taxServiceGroups   <- taxServiceGroupsRepository.get(arn)
+      taxServiceGroups   <- taxGroupsRepository.get(arn)
       allAccessGroups: Seq[AccessGroup] = customAccessGroups ++ taxServiceGroups
 
       // Determine list of clients and team members that should be removed from all access groups.
