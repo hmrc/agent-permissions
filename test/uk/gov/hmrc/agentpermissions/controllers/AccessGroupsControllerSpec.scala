@@ -20,6 +20,7 @@ import akka.actor.ActorSystem
 import org.bson.types.ObjectId
 import org.scalamock.handlers.{CallHandler3, CallHandler4, CallHandler5, CallHandler7}
 import play.api.libs.json.{JsArray, JsNumber, JsString, JsValue, Json}
+import play.api.mvc.Results.Accepted
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
@@ -257,20 +258,18 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
-    def mockEacdSynchronizerSyncWithEacdNoException(
-      accessGroupUpdateStatuses: Seq[AccessGroupUpdateStatus]
-    ): Unit =
+    def mockEacdSynchronizerSyncWithEacdNoException(results: Map[SyncResult, Int] = Map.empty): Unit =
       (mockEacdSynchronizer
-        .syncWithEacd(_: Arn, _: AgentUser, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *, *)
-        .returning(Future.successful(accessGroupUpdateStatuses))
+        .syncWithEacd(_: Arn, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future.successful(Some(results)))
 
     def mockEacdSynchronizerSyncWithEacdHasException(
       ex: Exception
     ): Unit =
       (mockEacdSynchronizer
-        .syncWithEacd(_: Arn, _: AgentUser, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *, *)
+        .syncWithEacd(_: Arn, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *)
         .returning(Future.failed(ex))
 
     def mockGroupsServiceGetGroupSummariesForClient(
@@ -1524,11 +1523,11 @@ class AccessGroupsControllerSpec extends BaseSpec {
         "sync is successful" should {
           s"return $OK" in new TestScope {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-            mockEacdSynchronizerSyncWithEacdNoException(Seq(AccessGroupUpdated))
+            mockEacdSynchronizerSyncWithEacdNoException(Map(SyncResult.AccessGroupUpdateSuccess -> 42))
 
             val result = controller.syncWithEacd(arn)(baseRequest)
 
-            status(result) shouldBe OK
+            status(result) shouldBe ACCEPTED
           }
         }
 
@@ -1539,7 +1538,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
             val result = controller.syncWithEacd(arn)(baseRequest)
 
-            status(result) shouldBe OK
+            status(result) shouldBe ACCEPTED
           }
         }
       }
