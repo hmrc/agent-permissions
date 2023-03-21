@@ -30,7 +30,7 @@ trait UserEnrolmentAssignmentCalculator {
     existingAccessGroups: Seq[CustomGroup]
   ): Option[UserEnrolmentAssignments]
 
-  // TODO APB-7070: split into add and remove
+  // TODO replace with add and remove
   def forGroupUpdate(
     accessGroupToProcess: CustomGroup,
     existingAccessGroups: Seq[CustomGroup]
@@ -41,31 +41,15 @@ trait UserEnrolmentAssignmentCalculator {
     clients: Set[Client], // need enrolment key
     teamMembers: Set[AgentUser], // need ids
     existingAccessGroups: Seq[CustomGroup],
-    groupId: String
+    groupId: GroupId
   ): Option[UserEnrolmentAssignments]
 
   def forRemoveFromGroup(
     clients: Set[Client], // need enrolment key
     teamMembers: Set[AgentUser], // need ids
     existingAccessGroups: Seq[CustomGroup],
-    groupId: String
+    groupId: GroupId
   ): Option[UserEnrolmentAssignments]
-
-//  // Split further for safety? :P
-//  def forRemoveClientFromGroup(client: Client, // need enrolment key
-//                               teamMembersInGroup: Set[AgentUser], // need ids
-//                               existingAccessGroups: Seq[CustomGroup],
-//                               groupId: String): Option[UserEnrolmentAssignments]
-//
-//  def forRemoveTeamMemberFromGroup(teamMember: AgentUser, // need id
-//                                   clientsInGroup: Set[Client], // need enrolment keys
-//                                   existingAccessGroups: Seq[CustomGroup],
-//                                   groupId: String
-//                                  ): Option[UserEnrolmentAssignments]
-
-//  def forAddClientToGroup(): Option[UserEnrolmentAssignments]
-//
-//  def forAddTeamMemberToGroup(): Option[UserEnrolmentAssignments]
 
   def forGroupDeletion(
     accessGroupToProcess: CustomGroup,
@@ -88,7 +72,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     Option(optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns))
   }
 
-  // TODO APB-7070: split into add and remove
+  // TODO APB-x: split into forAddToGroup and forRemoveFromGroup
   override def forGroupUpdate(
     accessGroupToProcess: CustomGroup,
     existingAccessGroups: Seq[CustomGroup]
@@ -106,7 +90,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
 
   /** Could be merged with forRemoveFromGroup if you had a bool for isAssigns
     *
-    * One set will always be the add/remove, the other will be the existing set in the group being changed. For example:
+    * One set will always be the add, the other will be the existing set in the group being changed. For example:
     *   - agentUsers to add to group AND existing clients in the group
     *   - client to add from group AND existing agentUsers in that group
     * @param teamMembers
@@ -118,16 +102,13 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     clients: Set[Client], // need enrolment key
     teamMembers: Set[AgentUser], // need ids
     existingAccessGroups: Seq[CustomGroup],
-    groupId: String
+    groupId: GroupId
   ): Option[UserEnrolmentAssignments] = {
     val maxNetChange = pairUserEnrolments(teamMembers, clients)
     Option(optimiseUserEnrolmentAssignmentsSlightlyBetter(groupId, existingAccessGroups, maxNetChange, Set.empty))
   }
 
-  /** Less safe than forRemoveClientFromGroup & forRemoveTeamMemberFromGroup
-    *
-    * One set will always be the add/remove and the other will be the existing set in the group being changed. For
-    * example:
+  /** One set will always be the remove and the other will be the existing set in the group being changed. For example:
     *   - agentUsers to remove to group AND existing clients in the group
     *   - client to remove from group AND existing agentUsers in that group
     * @param teamMembers
@@ -139,29 +120,11 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     clients: Set[Client], // need enrolment key
     teamMembers: Set[AgentUser], // need ids
     existingAccessGroups: Seq[CustomGroup],
-    groupId: String
+    groupId: GroupId
   ): Option[UserEnrolmentAssignments] = {
     val maxNetChange = pairUserEnrolments(teamMembers, clients)
     Option(optimiseUserEnrolmentAssignmentsSlightlyBetter(groupId, existingAccessGroups, Set.empty, maxNetChange))
   }
-
-//  override def forRemoveClientFromGroup(client: Client, // need enrolment key
-//                                        teamMembersInGroup: Set[AgentUser], // need ids
-//                                        existingAccessGroups: Seq[CustomGroup],
-//                                        groupId: String
-//                                       ): Option[UserEnrolmentAssignments] = {
-//    val maxNetChange = pairUserEnrolments(teamMembersInGroup, Set(client))
-//    Option(optimiseUserEnrolmentAssignmentsSlightlyBetter(groupId, existingAccessGroups, Set.empty, maxNetChange))
-//  }
-//
-//  override def forRemoveTeamMemberFromGroup(teamMember: AgentUser, // need id
-//                                            clientsInGroup: Set[Client], // need enrolment keys
-//                                            existingAccessGroups: Seq[CustomGroup],
-//                                            groupId: String
-//                                           ): Option[UserEnrolmentAssignments] = {
-//    val maxNetChange = pairUserEnrolments(Set(teamMember), clientsInGroup)
-//    Option(optimiseUserEnrolmentAssignmentsSlightlyBetter(groupId, existingAccessGroups, Set.empty, maxNetChange))
-//  }
 
   override def forGroupDeletion(
     accessGroupToProcess: CustomGroup,
@@ -197,15 +160,6 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     enrolmentKey <- clients.map(_.enrolmentKey)
   } yield UserEnrolment(userId, enrolmentKey)
 
-//  //Could be safer to have pairUserEnrolments work for just one? But then you have to map for adding
-//  private def pairUserEnrolmentsForClient(client: Client, teamMembersInGroup: Set[AgentUser]): Set[UserEnrolment] = for {
-//    userId       <- teamMembersInGroup.map(_.id)
-//  } yield UserEnrolment(userId, client.enrolmentKey)
-//
-//  private def pairUserEnrolmentsForTeamMember(agentUser: AgentUser, clientsInGroup: Set[Client]): Set[UserEnrolment] = for {
-//    enrolmentKey       <- clientsInGroup.map(_.enrolmentKey)
-//  } yield UserEnrolment(agentUser.id, enrolmentKey)
-
   private def optimiseUserEnrolmentAssignments(
     accessGroupToProcess: CustomGroup,
     existingAccessGroups: Seq[CustomGroup],
@@ -226,16 +180,14 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
 
   /** optimiseUserEnrolmentAssignments but replaces CustomGroup with groupId */
   private def optimiseUserEnrolmentAssignmentsSlightlyBetter(
-    groupId: String,
+    groupId: GroupId,
     existingAccessGroups: Seq[CustomGroup],
     seedAssigns: Set[UserEnrolment],
     seedUnassigns: Set[UserEnrolment]
-  ): UserEnrolmentAssignments = {
-    val grp = GroupId.decode(groupId).get
-    // ^ does this still work?? thought groupId was now objectId, might need arn as another param
+  ): UserEnrolmentAssignments =
     existingAccessGroups
-      .filterNot(_.groupName.equalsIgnoreCase(grp.groupName))
-      .foldLeft(UserEnrolmentAssignments(seedAssigns, seedUnassigns, grp.arn)) {
+      .filterNot(_.groupName.equalsIgnoreCase(groupId.groupName))
+      .foldLeft(UserEnrolmentAssignments(seedAssigns, seedUnassigns, groupId.arn)) {
         (userEnrolmentAssignments, existingAccessGroup) =>
           val userEnrolments = explodeUserEnrolments(existingAccessGroup)
 
@@ -244,7 +196,6 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
             unassign = userEnrolmentAssignments.unassign -- userEnrolments
           )
       }
-  }
 
   /** Returns optimal assignments for a NET change to EACD by taking the maximum pairs and checking to see if they
     * already exist via other access groups.
@@ -259,7 +210,7 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     * @param foundPairs
     *   the pairs found in existing access groups to remove from net change
     */
-  def assessUserEnrolmentAssignments(
+  def assessUserEnrolmentPairs(
     arn: Arn,
     foundPairs: Option[Set[UserEnrolment]],
     maxNetChange: Set[UserEnrolment],

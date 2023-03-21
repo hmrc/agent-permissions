@@ -116,14 +116,14 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     for {
       /* TODO: Replace pulling existing access groups with mongo query for pairs of UserEnrolments
        *   eg. maxNetChangePairs <- userEnrolmentAssignmentCalculator.pairUserEnrolments(Set[AgentUser], Set[Client])
-       *       foundPairs <- accessGroupsRepository.findPairs(pairs)
+       *       foundPairs <- accessGroupsRepository.findPairs(arn, pairs) //needs decryption mongo work?
        *       maybeUserEnrolmentAssignments <-
-       *         Future.successful(userEnrolmentAssignmentCalculator.assessPairs(maxNetChangePairs, foundPairs))
+       *         Future.successful(userEnrolmentAssignmentCalculator.assessUserEnrolmentPairs(maxNetChangePairs, foundPairs))
        */
       existingAccessGroups <- accessGroupsRepository.get(groupId.arn)
       maybeUserEnrolmentAssignments <-
         Future.successful(
-          userEnrolmentAssignmentCalculator.forAddToGroup(clients, teamMembers, existingAccessGroups, groupId.encode)
+          userEnrolmentAssignmentCalculator.forAddToGroup(clients, teamMembers, existingAccessGroups, groupId)
         )
     } yield maybeUserEnrolmentAssignments
 
@@ -138,7 +138,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
       maybeUserEnrolmentAssignments <-
         Future.successful(
           userEnrolmentAssignmentCalculator
-            .forRemoveFromGroup(clients, teamMembers, existingAccessGroups, groupId.encode)
+            .forRemoveFromGroup(clients, teamMembers, existingAccessGroups, groupId)
         )
     } yield maybeUserEnrolmentAssignments
 

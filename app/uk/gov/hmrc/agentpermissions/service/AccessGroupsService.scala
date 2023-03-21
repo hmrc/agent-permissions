@@ -274,10 +274,11 @@ class AccessGroupsServiceImpl @Inject() (
         case _ => AccessGroupNotUpdated
       })
 
-  /* TODO APB-7066: updates whoIsUpdating (via repo?)
-   *   + get team member & clients in group to calculate assignments
-   *   + push maybe assignments
-   *   + auditing update
+  /* TODO APB-7067:
+   *    [ ] updates whoIsUpdating (via repo?)
+   *    [ ] get team member & clients in group to calculate assignments
+   *    [ ] push maybe assignments
+   *    [ ] auditing update
    * */
   def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,

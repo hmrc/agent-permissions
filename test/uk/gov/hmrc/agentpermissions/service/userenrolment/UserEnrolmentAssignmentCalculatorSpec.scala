@@ -114,6 +114,64 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
     }
   }
 
+  "For add to group" should {
+    "correctly calculate assigns" in new TestScope {
+      val accessGroupToUpdate: CustomGroup =
+        buildAccessGroup(Set(userA, userB), Set(clientVat, clientPpt, clientCgt))
+
+      val accessGroupToUpdatePreviousVersion: CustomGroup = accessGroupToUpdate.copy(
+        groupName = accessGroupToUpdate.groupName.toUpperCase,
+        teamMembers = Some(Set(userA, userB, userD)),
+        clients = Some(Set(clientVat, clientPpt, clientCgt))
+      )
+
+      val existingAccessGroup2: CustomGroup =
+        buildAccessGroup(Set(userA, userD, userE), Set(clientVat, clientPpt, clientMtdit))
+
+      val expectedAssigns: Set[UserEnrolment] = Set(
+        UserEnrolment(userD.id, clientCgt.enrolmentKey)
+      )
+
+      userEnrolmentAssignmentCalculator.forAddToGroup(
+        accessGroupToUpdate.clients.get, // existing clients
+        Set(userD), // team member to add
+        Seq(accessGroupToUpdatePreviousVersion, existingAccessGroup2),
+        GroupId(accessGroupToUpdate.arn, accessGroupToUpdate.groupName)
+      ) shouldBe
+        Some(UserEnrolmentAssignments(expectedAssigns, Set.empty, arn))
+    }
+  }
+
+  "For remove from group" should {
+    "correctly calculate unassigns" in new TestScope {
+      val accessGroupToUpdate: CustomGroup =
+        buildAccessGroup(Set(userA, userB, userC), Set(clientVat, clientPpt, clientCgt))
+
+      val accessGroupToUpdatePreviousVersion: CustomGroup = accessGroupToUpdate.copy(
+        groupName = accessGroupToUpdate.groupName.toUpperCase,
+        teamMembers = Some(Set(userA, userB)),
+        clients = Some(Set(clientVat, clientPpt, clientCgt))
+      )
+
+      val existingAccessGroup2: CustomGroup =
+        buildAccessGroup(Set(userA, userD, userE), Set(clientVat, clientPpt, clientMtdit))
+
+      val expectedUnassigns: Set[UserEnrolment] = Set(
+        UserEnrolment(userC.id, clientVat.enrolmentKey),
+        UserEnrolment(userC.id, clientPpt.enrolmentKey),
+        UserEnrolment(userC.id, clientCgt.enrolmentKey)
+      )
+
+      userEnrolmentAssignmentCalculator.forRemoveFromGroup(
+        accessGroupToUpdate.clients.get, // existing clients
+        Set(userC), // team member to remove
+        Seq(accessGroupToUpdatePreviousVersion, existingAccessGroup2),
+        GroupId(accessGroupToUpdate.arn, accessGroupToUpdate.groupName)
+      ) shouldBe
+        Some(UserEnrolmentAssignments(Set.empty, expectedUnassigns, arn))
+    }
+  }
+
   "For group deletion" should {
     "correctly calculate assigns and unassigns" in new TestScope {
       val accessGroupToDelete: CustomGroup =
@@ -137,6 +195,165 @@ class UserEnrolmentAssignmentCalculatorSpec extends BaseSpec {
       userEnrolmentAssignmentCalculator
         .forGroupDeletion(accessGroupToDelete, Seq(accessGroupToDelete, existingAccessGroup2)) shouldBe
         Some(UserEnrolmentAssignments(expectedAssigns, expectedUnassigns, arn))
+    }
+  }
+
+  "For pairUserEnrolments" should {
+    "return User Enrolments given set of clients and team members" in new TestScope {
+      // given
+      val users = Set(userA, userB)
+      val clients = Set(clientVat, clientPpt, clientCgt)
+
+      val expectedPairs: Set[UserEnrolment] = Set(
+        UserEnrolment(userA.id, clientVat.enrolmentKey),
+        UserEnrolment(userA.id, clientPpt.enrolmentKey),
+        UserEnrolment(userA.id, clientCgt.enrolmentKey),
+        UserEnrolment(userB.id, clientCgt.enrolmentKey),
+        UserEnrolment(userB.id, clientVat.enrolmentKey),
+        UserEnrolment(userB.id, clientPpt.enrolmentKey)
+      )
+
+      // then
+      userEnrolmentAssignmentCalculator.pairUserEnrolments(users, clients) shouldBe expectedPairs
+    }
+  }
+
+  "For assessUserEnrolmentPairs" should {
+    "return correct User Enrolment Assignments" when {
+
+      "no found pairs in other access groups" when {
+        "net change is assigns" in new TestScope {
+          // given
+          val maxNetChange: Set[UserEnrolment] = Set(
+            UserEnrolment(userA.id, clientVat.enrolmentKey),
+            UserEnrolment(userA.id, clientPpt.enrolmentKey),
+            UserEnrolment(userA.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientVat.enrolmentKey),
+            UserEnrolment(userB.id, clientPpt.enrolmentKey)
+          )
+
+          val expectedAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(maxNetChange, Set.empty, arn)
+
+          // then
+          userEnrolmentAssignmentCalculator
+            .assessUserEnrolmentPairs(arn, None, maxNetChange, isNetChangeAssign = true) shouldBe expectedAssignments
+        }
+
+        "net change is NOT assigns" in new TestScope {
+          // given
+          val maxNetChange: Set[UserEnrolment] = Set(
+            UserEnrolment(userA.id, clientVat.enrolmentKey),
+            UserEnrolment(userA.id, clientPpt.enrolmentKey),
+            UserEnrolment(userA.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientVat.enrolmentKey),
+            UserEnrolment(userB.id, clientPpt.enrolmentKey)
+          )
+
+          val expectedAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, maxNetChange, arn)
+
+          // then
+          userEnrolmentAssignmentCalculator
+            .assessUserEnrolmentPairs(arn, None, maxNetChange, isNetChangeAssign = false) shouldBe expectedAssignments
+        }
+      }
+
+      "found some pairs in other access groups" when {
+        "net change is assigns" in new TestScope {
+          // given
+          val maxNetChange: Set[UserEnrolment] = Set(
+            UserEnrolment(userA.id, clientVat.enrolmentKey),
+            UserEnrolment(userA.id, clientPpt.enrolmentKey),
+            UserEnrolment(userA.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientVat.enrolmentKey),
+            UserEnrolment(userB.id, clientPpt.enrolmentKey)
+          )
+          val foundPairs: Set[UserEnrolment] = maxNetChange.take(2)
+
+          val expectedAssignments: UserEnrolmentAssignments =
+            UserEnrolmentAssignments(maxNetChange -- foundPairs, Set.empty, arn)
+
+          // then
+          userEnrolmentAssignmentCalculator
+            .assessUserEnrolmentPairs(
+              arn,
+              Some(foundPairs),
+              maxNetChange,
+              isNetChangeAssign = true
+            ) shouldBe expectedAssignments
+        }
+
+        "net change is NOT assigns" in new TestScope {
+          // given
+          val maxNetChange: Set[UserEnrolment] = Set(
+            UserEnrolment(userA.id, clientVat.enrolmentKey),
+            UserEnrolment(userA.id, clientPpt.enrolmentKey),
+            UserEnrolment(userA.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientVat.enrolmentKey),
+            UserEnrolment(userB.id, clientPpt.enrolmentKey)
+          )
+          val foundPairs: Set[UserEnrolment] = maxNetChange.take(2)
+
+          val expectedAssignments: UserEnrolmentAssignments =
+            UserEnrolmentAssignments(Set.empty, maxNetChange -- foundPairs, arn)
+
+          // then
+          userEnrolmentAssignmentCalculator
+            .assessUserEnrolmentPairs(
+              arn,
+              Some(foundPairs),
+              maxNetChange,
+              isNetChangeAssign = false
+            ) shouldBe expectedAssignments
+        }
+      }
+
+      "found all pairs in other access groups" when {
+        "net change is assigns" in new TestScope {
+          // given
+          val maxNetChange: Set[UserEnrolment] = Set(
+            UserEnrolment(userA.id, clientVat.enrolmentKey),
+            UserEnrolment(userA.id, clientPpt.enrolmentKey),
+            UserEnrolment(userA.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientVat.enrolmentKey),
+            UserEnrolment(userB.id, clientPpt.enrolmentKey)
+          )
+          val expectedAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)
+
+          userEnrolmentAssignmentCalculator
+            .assessUserEnrolmentPairs(
+              arn,
+              Some(maxNetChange),
+              maxNetChange,
+              isNetChangeAssign = true
+            ) shouldBe expectedAssignments
+        }
+
+        "net change is NOT assigns" in new TestScope {
+          val maxNetChange: Set[UserEnrolment] = Set(
+            UserEnrolment(userA.id, clientVat.enrolmentKey),
+            UserEnrolment(userA.id, clientPpt.enrolmentKey),
+            UserEnrolment(userA.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientCgt.enrolmentKey),
+            UserEnrolment(userB.id, clientVat.enrolmentKey),
+            UserEnrolment(userB.id, clientPpt.enrolmentKey)
+          )
+          val expectedAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)
+
+          userEnrolmentAssignmentCalculator
+            .assessUserEnrolmentPairs(
+              arn,
+              Some(maxNetChange),
+              maxNetChange,
+              isNetChangeAssign = false
+            ) shouldBe expectedAssignments
+
+        }
+      }
     }
   }
 }
