@@ -759,17 +759,52 @@ class AccessGroupsServiceSpec extends BaseSpec {
   "Removing a client from a group" when {
 
     "works as expected when successful " should {
+      s"return $AccessGroupUpdated" in new TestScope {
+        // expect
+        (mockAccessGroupsRepository
+          .findById(_: String))
+          .expects(accessGroup._id.toHexString)
+          .returning(Future.successful(Some(accessGroup)))
+        mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
+        mockAccessGroupsRepositoryUpdate(Some(1))
+        mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
+        mockAuditServiceAuditEsAssignmentUnassignments()
+        mockAuditServiceAuditAccessGroupUpdate()
+
+        // when
+        private val result =
+          accessGroupsService.removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user).futureValue
+
+        // then
+        result shouldBe AccessGroupUpdated
+      }
+
       s"return $AccessGroupUpdatedWithoutAssignmentsPushed" in new TestScope {
-        mockAddRemoveClientFromGroup(dbId.toString, clientVat, 1)
+        (mockAccessGroupsRepository
+          .findById(_: String))
+          .expects(accessGroup._id.toHexString)
+          .returning(Future.successful(Some(accessGroup)))
+        mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
+        mockAccessGroupsRepositoryUpdate(Some(1))
+        mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
+        mockAuditServiceAuditAccessGroupUpdate()
+
+        // mockAddRemoveClientFromGroup(dbId.toString, clientVat, 1)
         accessGroupsService
-          .removeClient(dbId.toString, clientVat.enrolmentKey, user)
+          .removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user)
           .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
       }
 
       s"return $AccessGroupNotUpdated" in new TestScope {
-        mockAddRemoveClientFromGroup(dbId.toString, clientVat, 0)
+        (mockAccessGroupsRepository
+          .findById(_: String))
+          .expects(accessGroup._id.toHexString)
+          .returning(Future.successful(Some(accessGroup)))
+        mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
+        mockAccessGroupsRepositoryUpdate(Some(0))
+        // mockAddRemoveClientFromGroup(dbId.toString, clientVat, 0)
         accessGroupsService
-          .removeClient(dbId.toString, clientVat.enrolmentKey, user)
+          .removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user)
           .futureValue shouldBe AccessGroupNotUpdated
       }
     }

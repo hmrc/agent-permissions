@@ -268,11 +268,49 @@ class AccessGroupsServiceImpl @Inject() (
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
     accessGroupsRepository
-      .removeClient(groupId, clientId)
-      .map(_.getMatchedCount match {
-        case 1 => AccessGroupUpdatedWithoutAssignmentsPushed
-        case _ => AccessGroupNotUpdated
-      })
+      .findById(groupId)
+      .flatMap {
+        case Some(accessGroup) =>
+          val maybeClients = accessGroup.clients.map(_.filterNot(tm => tm.enrolmentKey == clientId))
+          val clientToRemove = accessGroup.clients.map(_.filter(tm => tm.enrolmentKey == clientId)).get
+          val usersInGroup = accessGroup.teamMembers.getOrElse(Set.empty)
+
+          val updatedGroup = accessGroup.copy(
+            lastUpdated = LocalDateTime.now(),
+            lastUpdatedBy = whoIsUpdating,
+            clients = maybeClients
+          )
+          for {
+            maybeCalculatedAssignments <-
+              userEnrolmentAssignmentService
+                .calculateForRemoveFromGroup(
+                  GroupId(accessGroup.arn, accessGroup.groupName),
+                  clientToRemove,
+                  usersInGroup
+                )
+            maybeUpdatedCount <- accessGroupsRepository.update(accessGroup.arn, accessGroup.groupName, updatedGroup)
+            updateStatus <- maybeUpdatedCount match {
+                              case Some(updatedCount) =>
+                                if (updatedCount == 1) {
+                                  for {
+                                    pushStatus <- pushAssignments(maybeCalculatedAssignments)
+                                    _ <- Future successful auditService.auditAccessGroupUpdate(
+                                           updatedGroup
+                                         ) // TODO update audit?
+                                  } yield pushStatus match {
+                                    case AssignmentsPushed =>
+                                      AccessGroupUpdated
+                                    case AssignmentsNotPushed =>
+                                      AccessGroupUpdatedWithoutAssignmentsPushed
+                                  }
+                                } else {
+                                  Future successful AccessGroupNotUpdated
+                                }
+                              case _ => Future successful AccessGroupNotUpdated
+                            }
+          } yield updateStatus
+        case _ => Future successful AccessGroupNotUpdated
+      }
 
   /* TODO move generic function calls when access group found
    *  change how whoIsUpdated happens (via repo? - needs encrypting...)
@@ -326,6 +364,25 @@ class AccessGroupsServiceImpl @Inject() (
           } yield updateStatus
         case _ => Future successful AccessGroupNotUpdated
       }
+
+//  def attemptPushAssignments(maybeUpdatedCount: Option[Long], maybeCalculatedAssignments: Option[UserEnrolmentAssignments]) =
+//    maybeUpdatedCount match {
+//    case Some(updatedCount) =>
+//      if (updatedCount == 1) {
+//        for {
+//          pushStatus <- pushAssignments(maybeCalculatedAssignments)
+//        } yield pushStatus match {
+//          case AssignmentsPushed =>
+//            AccessGroupUpdated
+//          case AssignmentsNotPushed =>
+//            AccessGroupUpdatedWithoutAssignmentsPushed
+//        }
+//      } else {
+//        Future successful AccessGroupNotUpdated
+//      }
+//    case _ => Future successful AccessGroupNotUpdated
+//  }
+//
 
   // TODO move below to groups summary service
   override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
