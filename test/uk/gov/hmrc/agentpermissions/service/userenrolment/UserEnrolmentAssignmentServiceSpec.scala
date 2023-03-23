@@ -16,8 +16,8 @@
 
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
-import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, CustomGroup, GroupId, UserEnrolmentAssignments}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler4}
+import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, CustomGroup, GroupId, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
@@ -85,6 +85,22 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
         .expects(accessGroup, *)
         .returning(maybeUserEnrolmentAssignments)
 
+    def mockUserEnrolmentAssignmentCalculatorForAddToGroup(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler4[Set[Client], Set[AgentUser], Seq[CustomGroup], GroupId, Option[UserEnrolmentAssignments]] =
+      (mockUserEnrolmentAssignmentCalculator
+        .forAddToGroup(_: Set[Client], _: Set[AgentUser], _: Seq[CustomGroup], _: GroupId))
+        .expects(*, *, *, *)
+        .returning(maybeUserEnrolmentAssignments)
+
+    def mockUserEnrolmentAssignmentCalculatorForRemoveFromGroup(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler4[Set[Client], Set[AgentUser], Seq[CustomGroup], GroupId, Option[UserEnrolmentAssignments]] =
+      (mockUserEnrolmentAssignmentCalculator
+        .forRemoveFromGroup(_: Set[Client], _: Set[AgentUser], _: Seq[CustomGroup], _: GroupId))
+        .expects(*, *, *, *)
+        .returning(maybeUserEnrolmentAssignments)
+
     def mockUserEnrolmentAssignmentCalculatorForGroupDeletion(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
     ): CallHandler2[CustomGroup, Seq[CustomGroup], Option[UserEnrolmentAssignments]] =
@@ -121,6 +137,26 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
 
       userEnrolmentAssignmentService
         .calculateForGroupUpdate(groupId, accessGroup)
+        .futureValue shouldBe maybeUserEnrolmentAssignments
+    }
+  }
+
+  "Calculating assignments during group update (add/remove)" should {
+    "return calculated assignments for add to group" in new TestScope {
+      mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+      mockUserEnrolmentAssignmentCalculatorForAddToGroup(maybeUserEnrolmentAssignments)
+
+      userEnrolmentAssignmentService
+        .calculateForAddToGroup(groupId, accessGroup.clients.get, accessGroup.teamMembers.get)
+        .futureValue shouldBe maybeUserEnrolmentAssignments
+    }
+
+    "return calculated assignments for remove from group" in new TestScope {
+      mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+      mockUserEnrolmentAssignmentCalculatorForRemoveFromGroup(maybeUserEnrolmentAssignments)
+
+      userEnrolmentAssignmentService
+        .calculateForRemoveFromGroup(groupId, accessGroup.clients.get, accessGroup.teamMembers.get)
         .futureValue shouldBe maybeUserEnrolmentAssignments
     }
   }

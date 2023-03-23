@@ -258,6 +258,11 @@ class AccessGroupsServiceImpl @Inject() (
                                  }
     } yield accessGroupUpdateStatus
 
+  /* TODO APB-7066: updates whoIsUpdating (via repo?)
+   *   + get client & team members in group to calculate assignments
+   *   + push maybe assignments
+   *   + auditing update
+   * */
   def removeClient(groupId: String, clientId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -265,10 +270,16 @@ class AccessGroupsServiceImpl @Inject() (
     accessGroupsRepository
       .removeClient(groupId, clientId)
       .map(_.getMatchedCount match {
-        case 1 => AccessGroupUpdatedWithoutAssignmentsPushed // TODO push assignments
+        case 1 => AccessGroupUpdatedWithoutAssignmentsPushed
         case _ => AccessGroupNotUpdated
       })
 
+  /* TODO APB-7067:
+   *    [ ] updates whoIsUpdating (via repo?)
+   *    [ ] get team member & clients in group to calculate assignments
+   *    [ ] push maybe assignments
+   *    [ ] auditing update
+   * */
   def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -283,7 +294,7 @@ class AccessGroupsServiceImpl @Inject() (
           accessGroupsRepository
             .update(accessGroup.arn, accessGroup.groupName, updatedGroup)
             .map {
-              case Some(1) => AccessGroupUpdatedWithoutAssignmentsPushed // TODO push assignments
+              case Some(1) => AccessGroupUpdatedWithoutAssignmentsPushed
               case _       => AccessGroupNotUpdated
             }
         case None => Future successful AccessGroupNotUpdated
