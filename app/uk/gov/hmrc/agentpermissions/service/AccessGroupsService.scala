@@ -77,7 +77,7 @@ trait AccessGroupsService {
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
 
-  def removeTeamMember(groupId: String, clientId: String, whoIsUpdating: AgentUser)(implicit
+  def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
@@ -274,11 +274,9 @@ class AccessGroupsServiceImpl @Inject() (
         case _ => AccessGroupNotUpdated
       })
 
-  /* TODO APB-7067:
-   *    [ ] updates whoIsUpdating (via repo?)
-   *    [ ] get team member & clients in group to calculate assignments
-   *    [ ] push maybe assignments
-   *    [ ] auditing update
+  /* TODO move generic function calls when access group found
+   *  change how whoIsUpdated happens (via repo? - needs encrypting...)
+   *  update auditing, auditService.auditAccessGroupUpdate(updatedGroup) instead of whole group, log NET change (userToRemove)
    * */
   def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
@@ -288,16 +286,45 @@ class AccessGroupsServiceImpl @Inject() (
       .findById(groupId)
       .flatMap {
         case Some(accessGroup) =>
-          val maybeAgentUsers = accessGroup.teamMembers
-            .map(_.filterNot(tm => tm.id == teamMemberId))
-          val updatedGroup = accessGroup.copy(teamMembers = maybeAgentUsers)
-          accessGroupsRepository
-            .update(accessGroup.arn, accessGroup.groupName, updatedGroup)
-            .map {
-              case Some(1) => AccessGroupUpdatedWithoutAssignmentsPushed
-              case _       => AccessGroupNotUpdated
-            }
-        case None => Future successful AccessGroupNotUpdated
+          val maybeAgentUsers = accessGroup.teamMembers.map(_.filterNot(tm => tm.id == teamMemberId))
+          val userToRemove = accessGroup.teamMembers.map(_.filter(tm => tm.id == teamMemberId)).get
+          val clientsInGroup = accessGroup.clients.getOrElse(Set.empty)
+
+          val updatedGroup = accessGroup.copy(
+            lastUpdated = LocalDateTime.now(),
+            lastUpdatedBy = whoIsUpdating,
+            teamMembers = maybeAgentUsers
+          )
+          for {
+            maybeCalculatedAssignments <-
+              userEnrolmentAssignmentService
+                .calculateForRemoveFromGroup(
+                  GroupId(accessGroup.arn, accessGroup.groupName),
+                  clientsInGroup,
+                  userToRemove
+                )
+            maybeUpdatedCount <- accessGroupsRepository.update(accessGroup.arn, accessGroup.groupName, updatedGroup)
+            updateStatus <- maybeUpdatedCount match {
+                              case Some(updatedCount) =>
+                                if (updatedCount == 1) {
+                                  for {
+                                    pushStatus <- pushAssignments(maybeCalculatedAssignments)
+                                    _ <- Future successful auditService.auditAccessGroupUpdate(
+                                           updatedGroup
+                                         ) // TODO update audit?
+                                  } yield pushStatus match {
+                                    case AssignmentsPushed =>
+                                      AccessGroupUpdated
+                                    case AssignmentsNotPushed =>
+                                      AccessGroupUpdatedWithoutAssignmentsPushed
+                                  }
+                                } else {
+                                  Future successful AccessGroupNotUpdated
+                                }
+                              case _ => Future successful AccessGroupNotUpdated
+                            }
+          } yield updateStatus
+        case _ => Future successful AccessGroupNotUpdated
       }
 
   // TODO move below to groups summary service
