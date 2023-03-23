@@ -164,6 +164,22 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .expects(groupId, accessGroup, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
+    def mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler4[GroupId, Set[Client], Set[AgentUser], ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+      (mockUserEnrolmentAssignmentService
+        .calculateForRemoveFromGroup(_: GroupId, _: Set[Client], _: Set[AgentUser])(_: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future successful maybeUserEnrolmentAssignments)
+
+    def mockUserEnrolmentAssignmentServiceCalculateForAddToGroup(
+      maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
+    ): CallHandler4[GroupId, Set[Client], Set[AgentUser], ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+      (mockUserEnrolmentAssignmentService
+        .calculateForAddToGroup(_: GroupId, _: Set[Client], _: Set[AgentUser])(_: ExecutionContext))
+        .expects(*, *, *, *)
+        .returning(Future successful maybeUserEnrolmentAssignments)
+
     def mockAccessGroupsRepositoryDelete(
       maybeDeletedCount: Option[Long]
     ): CallHandler2[Arn, String, Future[Option[Long]]] =
@@ -761,25 +777,56 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
   "Removing a team members from a group" when {
 
-    "works as expected when successful " should {
-      s"return $AccessGroupUpdatedWithoutAssignmentsPushed" in new TestScope {
+    s"works as expected when successful " should {
+      s"return $AccessGroupUpdated" in new TestScope {
         // expect
-        mockAccessGroupsRepositoryFindById(Some(accessGroup))
+        (mockAccessGroupsRepository
+          .findById(_: String))
+          .expects(accessGroup._id.toHexString)
+          .returning(Future.successful(Some(accessGroup)))
+        mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
         mockAccessGroupsRepositoryUpdate(Some(1))
+        mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsPushed)
+        mockAuditServiceAuditEsAssignmentUnassignments()
+        mockAuditServiceAuditAccessGroupUpdate()
 
         // when
-        private val result = accessGroupsService.removeTeamMember(dbId.toString, user1.id, user).futureValue
+        private val result =
+          accessGroupsService.removeTeamMember(accessGroup._id.toHexString, user1.id, user).futureValue
+
+        // then
+        result shouldBe AccessGroupUpdated
+      }
+
+      s"return $AccessGroupUpdatedWithoutAssignmentsPushed" in new TestScope {
+        // expect
+        (mockAccessGroupsRepository
+          .findById(_: String))
+          .expects(accessGroup._id.toHexString)
+          .returning(Future.successful(Some(accessGroup)))
+        mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
+        mockAccessGroupsRepositoryUpdate(Some(1))
+        mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
+        mockAuditServiceAuditAccessGroupUpdate()
+
+        // when
+        private val result =
+          accessGroupsService.removeTeamMember(accessGroup._id.toHexString, user1.id, user).futureValue
 
         // then
         result shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
       }
 
       s"return $AccessGroupNotUpdated" in new TestScope {
-        mockAccessGroupsRepositoryFindById(Some(accessGroup))
+        (mockAccessGroupsRepository
+          .findById(_: String))
+          .expects(accessGroup._id.toHexString)
+          .returning(Future.successful(Some(accessGroup)))
+        mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
         mockAccessGroupsRepositoryUpdate(Some(0))
 
         accessGroupsService
-          .removeTeamMember(dbId.toString, randomAlphabetic(8), user)
+          .removeTeamMember(accessGroup._id.toHexString, randomAlphabetic(8), user)
           .futureValue shouldBe AccessGroupNotUpdated
       }
     }
