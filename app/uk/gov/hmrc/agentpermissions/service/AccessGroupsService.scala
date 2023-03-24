@@ -32,7 +32,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[AccessGroupsServiceImpl])
 trait AccessGroupsService {
-  def addMemberToGroup(gid: String, teamMember: AgentUser)(implicit
+  def addMemberToGroup(gid: String, teamMember: AgentUser, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
@@ -449,16 +449,35 @@ class AccessGroupsServiceImpl @Inject() (
         }
     }
 
-  override def addMemberToGroup(groupId: String, teamMember: AgentUser)(implicit
+  override def addMemberToGroup(groupId: String, teamMemberToAdd: AgentUser, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
     accessGroupsRepository
-      .addTeamMember(groupId, teamMember)
-      .map(_.getMatchedCount match {
-        case 1 => AccessGroupUpdatedWithoutAssignmentsPushed // TODO push assignments
-        case _ => AccessGroupNotUpdated
-      })
+      .findById(groupId)
+      .flatMap {
+        case Some(accessGroup) =>
+          val agentUsers = accessGroup.teamMembers.getOrElse(Set.empty) ++ Set(teamMemberToAdd)
+          val clientsInGroup = accessGroup.clients.getOrElse(Set.empty)
+
+          val updatedGroup = accessGroup.copy(
+            lastUpdated = LocalDateTime.now(),
+            lastUpdatedBy = whoIsUpdating,
+            teamMembers = Some(agentUsers)
+          )
+          for {
+            maybeCalculatedAssignments <-
+              userEnrolmentAssignmentService
+                .calculateForAddToGroup(
+                  GroupId(accessGroup.arn, accessGroup.groupName),
+                  clientsInGroup,
+                  Set(teamMemberToAdd)
+                )
+            updateStatus <-
+              handleUpdate(GroupId(accessGroup.arn, accessGroup.groupName), updatedGroup, maybeCalculatedAssignments)
+          } yield updateStatus
+        case _ => Future successful AccessGroupNotUpdated
+      }
 }
 
 sealed trait AccessGroupCreationStatus

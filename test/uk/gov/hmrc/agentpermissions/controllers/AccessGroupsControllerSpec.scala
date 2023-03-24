@@ -182,10 +182,10 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def expectAddTeamMemberToGroup(
       accessGroupUpdateStatus: AccessGroupUpdateStatus
-    ): CallHandler4[String, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
+    ): CallHandler5[String, AgentUser, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
       (mockAccessGroupsService
-        .addMemberToGroup(_: String, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *, *)
+        .addMemberToGroup(_: String, _: AgentUser, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *, *)
         .returning(Future.successful(accessGroupUpdateStatus))
         .once()
 
