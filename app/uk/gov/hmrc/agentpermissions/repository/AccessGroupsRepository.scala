@@ -60,9 +60,9 @@ trait AccessGroupsRepository {
 
   def update(arn: Arn, groupName: String, accessGroup: CustomGroup): Future[Option[Long]]
 
-  def addTeamMember(id: String, toAdd: AgentUser): Future[UpdateResult]
+  def addTeamMember(id: String, toAdd: AgentUser, whoIsUpdating: AgentUser): Future[UpdateResult]
 
-  def removeClient(groupId: String, clientId: String): Future[UpdateResult]
+  def removeClient(groupId: String, clientId: String, whoIsUpdating: AgentUser): Future[UpdateResult]
 
 }
 
@@ -141,25 +141,32 @@ class AccessGroupsRepositoryImpl @Inject() (
   private lazy val replaceOptions: ReplaceOptions =
     new ReplaceOptions().upsert(true).collation(caseInsensitiveCollation)
 
-  def addTeamMember(id: String, toAdd: AgentUser): Future[UpdateResult] = {
+  def addTeamMember(id: String, toAdd: AgentUser, whoIsUpdating: AgentUser): Future[UpdateResult] = {
     val encryptedAgent = encryptAgentUser(toAdd)(crypto)
+    val encryptedUpdater = encryptAgentUser(whoIsUpdating)(crypto)
     collection
       .updateOne(
         filter = Filters.equal("_id", id),
-        update = Updates.addToSet("teamMembers", Codecs.toBson(encryptedAgent))
+        update = Updates.combine(
+          Updates.addToSet("teamMembers", Codecs.toBson(encryptedAgent)),
+          Updates.set("lastUpdatedBy", Codecs.toBson(encryptedUpdater))
+        )
       )
       .head()
   }
 
-  def removeClient(groupId: String, enrolmentKey: String): Future[UpdateResult] =
+  def removeClient(groupId: String, enrolmentKey: String, whoIsUpdating: AgentUser): Future[UpdateResult] = {
+    val encryptedUpdater = encryptAgentUser(whoIsUpdating)(crypto)
     collection
       .updateOne(
         filter = Filters.equal("_id", groupId),
-        update = Updates.pullByFilter(
-          Document("clients" -> Document("enrolmentKey" -> Codecs.toBson(enrolmentKey)))
+        update = Updates.combine(
+          Updates.pullByFilter(Document("clients" -> Document("enrolmentKey" -> Codecs.toBson(enrolmentKey)))),
+          Updates.set("lastUpdatedBy", Codecs.toBson(encryptedUpdater))
         )
       )
       .head()
+  }
 }
 
 object AccessGroupsRepositoryImpl {

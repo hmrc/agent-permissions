@@ -32,7 +32,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[AccessGroupsServiceImpl])
 trait AccessGroupsService {
-  def addMemberToGroup(gid: String, teamMember: AgentUser)(implicit
+  def addMemberToGroup(gid: String, teamMember: AgentUser, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
@@ -288,6 +288,10 @@ class AccessGroupsServiceImpl @Inject() (
                   clientToRemove,
                   usersInGroup
                 )
+//            maybeUpdatedCount <- accessGroupsRepository.removeClient(groupId, clientId, whoIsUpdating)
+//            updateStatus <- maybeUpdatedCount match {
+//              case updatedCount =>
+//                if (updatedCount.getModifiedCount == 1) {
             maybeUpdatedCount <- accessGroupsRepository.update(accessGroup.arn, accessGroup.groupName, updatedGroup)
             updateStatus <- maybeUpdatedCount match {
                               case Some(updatedCount) =>
@@ -486,12 +490,12 @@ class AccessGroupsServiceImpl @Inject() (
         }
     }
 
-  override def addMemberToGroup(groupId: String, teamMember: AgentUser)(implicit
+  override def addMemberToGroup(groupId: String, teamMember: AgentUser, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
     accessGroupsRepository
-      .addTeamMember(groupId, teamMember)
+      .addTeamMember(groupId, teamMember, whoIsUpdating)
       .map(_.getMatchedCount match {
         case 1 => AccessGroupUpdatedWithoutAssignmentsPushed // TODO push assignments
         case _ => AccessGroupNotUpdated

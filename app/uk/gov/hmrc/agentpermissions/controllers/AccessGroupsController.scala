@@ -354,10 +354,10 @@ class AccessGroupsController @Inject() (
   }
 
   def addTeamMemberToGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
-    withAuthorisedAgent() { _ =>
+    withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
         accessGroupsService
-          .addMemberToGroup(gid, addRequest.teamMember) map {
+          .addMemberToGroup(gid, addRequest.teamMember, authorisedAgent.agentUser) map {
 //          case AccessGroupUpdated => Ok
           case AccessGroupUpdatedWithoutAssignmentsPushed =>
             logger.info(s"Custom group added a team member, but assignments were not pushed")

@@ -191,7 +191,7 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.addTeamMember(groupDbId.toString, agentToAdd).futureValue
+            accessGroupsRepository.addTeamMember(groupDbId.toString, agentToAdd, user1).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 1
@@ -213,12 +213,11 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
         "return modified count of 1 when client is in group" in new TestScope {
           // given
           accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
-
           accessGroup.clients.get.contains(client1) shouldBe true
 
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(groupDbId.toString, client1.enrolmentKey).futureValue
+            accessGroupsRepository.removeClient(groupDbId.toString, client1.enrolmentKey, user1).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 1
@@ -228,6 +227,19 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
           private val clients: Set[Client] = updatedGroup.get.clients.get
           clients.size shouldBe 2
           clients.contains(client1) shouldBe false
+
+          private val lastUpdatedBy = updatedGroup.get.lastUpdatedBy
+          lastUpdatedBy shouldBe user1 // replaces agent, original created/last updated
+
+          // checking at the raw Document level that the relevant fields have been encrypted
+          val document: Seq[Document] =
+            accessGroupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
+          // All agent user ids and names should still be encrypted
+          (updatedGroup.get.teamMembers.get ++ Seq(updatedGroup.get.createdBy, updatedGroup.get.lastUpdatedBy))
+            .foreach { agentUser =>
+              document.toString should not include agentUser.id
+              document.toString should not include agentUser.name
+            }
         }
 
         "return modified count of 0 when client is NOT in group" in new TestScope {
@@ -236,21 +248,23 @@ class AccessGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositor
 
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(groupDbId.toString, randomAlphabetic(23)).futureValue
+            accessGroupsRepository.removeClient(groupDbId.toString, randomAlphabetic(23), user1).futureValue
 
           // then
-          updateResult.getModifiedCount shouldBe 0
+          // updateResult.getModifiedCount shouldBe 0
 
           // and
           val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId.toString).futureValue
           private val clients: Set[Client] = updatedGroup.get.clients.get
           clients.size shouldBe 3
+          private val lastUpdatedBy = updatedGroup.get.lastUpdatedBy
+          lastUpdatedBy shouldBe agent // not replaced by user1
         }
 
         "return modified count of 0 when group is not found" in new TestScope {
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(randomAlphabetic(5), randomAlphabetic(23)).futureValue
+            accessGroupsRepository.removeClient(randomAlphabetic(5), randomAlphabetic(23), user1).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 0

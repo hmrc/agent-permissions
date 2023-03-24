@@ -200,21 +200,21 @@ class AccessGroupsServiceSpec extends BaseSpec {
       groupId: String,
       member: AgentUser,
       updatedCount: Int = 1
-    ): CallHandler2[String, AgentUser, Future[UpdateResult]] =
+    ): CallHandler3[String, AgentUser, AgentUser, Future[UpdateResult]] =
       (mockAccessGroupsRepository
-        .addTeamMember(_: String, _: AgentUser))
-        .expects(groupId, member)
+        .addTeamMember(_: String, _: AgentUser, _: AgentUser))
+        .expects(groupId, member, user1)
         .returning(Future.successful(UpdateResult.acknowledged(updatedCount, updatedCount, null)))
 
     def mockAddRemoveClientFromGroup(
       groupId: String,
       client: Client,
       updatedCount: Int = 1
-    ): CallHandler2[String, String, Future[UpdateResult]] = {
+    ): CallHandler3[String, String, AgentUser, Future[UpdateResult]] = {
       val updateResult = UpdateResult.acknowledged(updatedCount, updatedCount, null)
       (mockAccessGroupsRepository
-        .removeClient(_: String, _: String))
-        .expects(groupId, client.enrolmentKey)
+        .removeClient(_: String, _: String, _: AgentUser))
+        .expects(groupId, client.enrolmentKey, user)
         .returning(Future.successful(updateResult))
     }
 
@@ -742,7 +742,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
       s"return $AccessGroupUpdatedWithoutAssignmentsPushed" in new TestScope {
         mockAddTeamMemberToGroup(dbId.toString, user, 1)
         accessGroupsService
-          .addMemberToGroup(dbId.toString, user)
+          .addMemberToGroup(dbId.toString, user, user1)
           .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
       }
     }
@@ -750,7 +750,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
     "works as expected when no update made due to group not found or something " should {
       s"return $AccessGroupNotUpdated" in new TestScope {
         mockAddTeamMemberToGroup(dbId.toString, user, 0)
-        accessGroupsService.addMemberToGroup(dbId.toString, user).futureValue shouldBe AccessGroupNotUpdated
+        accessGroupsService.addMemberToGroup(dbId.toString, user, user1).futureValue shouldBe AccessGroupNotUpdated
       }
     }
 
