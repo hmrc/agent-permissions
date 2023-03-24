@@ -1275,35 +1275,49 @@ class AccessGroupsControllerSpec extends BaseSpec {
   }
 
   "Call to add team member to a group" when {
+    s"agent not authorised should return $FORBIDDEN" in new TestScope {
+      // given
+      mockAuthActionGetAuthorisedAgent(None)
+      // when
+      val result =
+        controller.addTeamMemberToGroup(dbId.toHexString)(
+          baseRequest.withBody(jsonPayloadForUpdatingGroup(groupName))
+        )
 
-    "work as expected and" should {
-      s"return $FORBIDDEN" in new TestScope {
-        // given
-        mockAuthActionGetAuthorisedAgent(None)
-        // when
-        val result =
-          controller.addTeamMemberToGroup(dbId.toHexString)(
-            baseRequest.withBody(jsonPayloadForUpdatingGroup(groupName))
-          )
+      // then
+      status(result) shouldBe FORBIDDEN
+    }
 
-        // then
-        status(result) shouldBe FORBIDDEN
+    "agent authorised" should {
+      s"return $OK" when {
+        "payload is good and assignments NOT pushed" in new TestScope {
+          // given
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          // when
+          val request: AddOneTeamMemberToGroupRequest = AddOneTeamMemberToGroupRequest(user)
+          expectAddTeamMemberToGroup(AccessGroupUpdatedWithoutAssignmentsPushed)
+
+          // then
+          val result = controller.addTeamMemberToGroup(dbId.toHexString)(baseRequest.withBody(Json.toJson(request)))
+          status(result) shouldBe OK
+        }
+
+        "payload is good and assignments pushed" in new TestScope {
+          // given
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+
+          // when
+          val request: AddOneTeamMemberToGroupRequest = AddOneTeamMemberToGroupRequest(user)
+          expectAddTeamMemberToGroup(AccessGroupUpdated)
+
+          // then
+          val result = controller.addTeamMemberToGroup(dbId.toHexString)(baseRequest.withBody(Json.toJson(request)))
+          status(result) shouldBe OK
+        }
       }
 
-      s"return $OK when payload is good" in new TestScope {
-        // given
-        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-
-        // when
-        val request: AddOneTeamMemberToGroupRequest = AddOneTeamMemberToGroupRequest(user)
-        expectAddTeamMemberToGroup(AccessGroupUpdatedWithoutAssignmentsPushed)
-
-        // then
-        val result = controller.addTeamMemberToGroup(dbId.toHexString)(baseRequest.withBody(Json.toJson(request)))
-        status(result) shouldBe OK
-      }
-
-      s"return $OK when payload is not good" in new TestScope {
+      s"return $NOT_FOUND when group is not updated" in new TestScope {
         // given
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
 
@@ -1320,18 +1334,42 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
   "Call to remove a client from to a group" when {
 
-    "work as expected and" should {
+    s"agent not authorised should return $FORBIDDEN" in new TestScope {
+      // given
+      mockAuthActionGetAuthorisedAgent(None)
+      // when
+      val result = controller.removeClient(dbId.toHexString, "whatever")(baseRequest)
 
-      s"return $NO_CONTENT when successfully removed client" in new TestScope {
-        // given
-        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        expectRemoveClientFromGroup(AccessGroupUpdatedWithoutAssignmentsPushed)
+      // then
+      status(result) shouldBe FORBIDDEN
+    }
 
-        // when
-        val result = controller.removeClient(dbId.toHexString, "whatever")(baseRequest)
+    "agent authorised" should {
 
-        // then
-        status(result) shouldBe NO_CONTENT
+      s"return $NO_CONTENT if successfully removed client" when {
+        "assignments pushed" in new TestScope {
+          // given
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          expectRemoveClientFromGroup(AccessGroupUpdated)
+
+          // when
+          val result = controller.removeClient(dbId.toHexString, "whatever")(baseRequest)
+
+          // then
+          status(result) shouldBe NO_CONTENT
+        }
+
+        "without assignments pushed" in new TestScope {
+          // given
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          expectRemoveClientFromGroup(AccessGroupUpdatedWithoutAssignmentsPushed)
+
+          // when
+          val result = controller.removeClient(dbId.toHexString, "whatever")(baseRequest)
+
+          // then
+          status(result) shouldBe NO_CONTENT
+        }
       }
 
       s"return $NOT_MODIFIED when client or group not found" in new TestScope {
@@ -1345,36 +1383,50 @@ class AccessGroupsControllerSpec extends BaseSpec {
         // then
         status(result) shouldBe NOT_MODIFIED
       }
-
-      s"return $FORBIDDEN" in new TestScope {
-        // given
-        mockAuthActionGetAuthorisedAgent(None)
-        // when
-        val result = controller.removeClient(dbId.toHexString, "whatever")(baseRequest)
-
-        // then
-        status(result) shouldBe FORBIDDEN
-      }
     }
   }
 
   "Call to remove a team member from to a group" when {
 
-    "work as expected and" should {
+    s"agent not authorised should return $FORBIDDEN" in new TestScope {
+      // given
+      mockAuthActionGetAuthorisedAgent(None)
+      // when
+      val result = controller.removeClient(dbId.toHexString, "whatever")(baseRequest)
 
-      s"return $NO_CONTENT when successfully removed team member" in new TestScope {
-        // given
-        mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        expectRemoveTeamMemberFromGroup(AccessGroupUpdatedWithoutAssignmentsPushed)
+      // then
+      status(result) shouldBe FORBIDDEN
+    }
 
-        // when
-        val result = controller.removeTeamMember(dbId.toHexString, "a valid id")(baseRequest)
+    "agent is authorised" should {
 
-        // then
-        status(result) shouldBe NO_CONTENT
+      s"return $NO_CONTENT if successfully removed team member" when {
+        "assignments pushed" in new TestScope {
+          // given
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          expectRemoveTeamMemberFromGroup(AccessGroupUpdated)
+
+          // when
+          val result = controller.removeTeamMember(dbId.toHexString, "a valid id")(baseRequest)
+
+          // then
+          status(result) shouldBe NO_CONTENT
+        }
+
+        "without assignments pushed" in new TestScope {
+          // given
+          mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+          expectRemoveTeamMemberFromGroup(AccessGroupUpdatedWithoutAssignmentsPushed)
+
+          // when
+          val result = controller.removeTeamMember(dbId.toHexString, "a valid id")(baseRequest)
+
+          // then
+          status(result) shouldBe NO_CONTENT
+        }
       }
 
-      s"return $NOT_MODIFIED when team member or group not found" in new TestScope {
+      s"return $NOT_MODIFIED if team member or group not found" in new TestScope {
         // given
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
         expectRemoveTeamMemberFromGroup(AccessGroupNotUpdated)
@@ -1384,16 +1436,6 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
         // then
         status(result) shouldBe NOT_MODIFIED
-      }
-
-      s"return $FORBIDDEN" in new TestScope {
-        // given
-        mockAuthActionGetAuthorisedAgent(None)
-        // when
-        val result = controller.removeClient(dbId.toHexString, "whatever")(baseRequest)
-
-        // then
-        status(result) shouldBe FORBIDDEN
       }
     }
   }
