@@ -197,10 +197,10 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
       taxGroupsService
         .removeTeamMember(gid, memberId, authorisedAgent.agentUser)
         .map {
-          case AccessGroupNotUpdated =>
+          case TaxServiceGroupNotUpdated =>
             logger.info(s"Tax group '$gid' didn't remove member '$memberId''")
             NotModified
-          case AccessGroupUpdated =>
+          case TaxServiceGroupUpdated =>
             logger.info(s"Tax group removed a team member")
             NoContent
         }

@@ -207,8 +207,8 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
         .returning(Future.successful(count))
 
     def expectRemoveTeamMemberFromGroup(
-      accessGroupUpdateStatus: AccessGroupUpdateStatus
-    ): CallHandler5[String, String, AgentUser, HeaderCarrier, ExecutionContext, Future[AccessGroupUpdateStatus]] =
+      accessGroupUpdateStatus: TaxServiceGroupUpdateStatus
+    ): CallHandler5[String, String, AgentUser, HeaderCarrier, ExecutionContext, Future[TaxServiceGroupUpdateStatus]] =
       (mockTaxGroupsService
         .removeTeamMember(_: String, _: String, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *, *)
@@ -1028,7 +1028,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       s"return $NO_CONTENT when successfully removed team member" in new TestScope {
         // given
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        expectRemoveTeamMemberFromGroup(AccessGroupUpdated)
+        expectRemoveTeamMemberFromGroup(TaxServiceGroupUpdated)
 
         // when
         val result = controller.removeTeamMember(dbId.toHexString, "a valid id")(baseRequest)
@@ -1040,7 +1040,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       s"return $NOT_MODIFIED when team member or group not found" in new TestScope {
         // given
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
-        expectRemoveTeamMemberFromGroup(AccessGroupNotUpdated)
+        expectRemoveTeamMemberFromGroup(TaxServiceGroupNotUpdated)
 
         // when
         val result = controller.removeTeamMember(dbId.toHexString, "invalid id")(baseRequest)

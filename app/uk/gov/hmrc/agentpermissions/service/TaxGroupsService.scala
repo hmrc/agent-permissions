@@ -75,7 +75,7 @@ trait TaxGroupsService {
   def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[AccessGroupUpdateStatus]
+  ): Future[TaxServiceGroupUpdateStatus]
 
 }
 
@@ -239,7 +239,7 @@ class TaxGroupsServiceImpl @Inject() (
   def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[AccessGroupUpdateStatus] =
+  ): Future[TaxServiceGroupUpdateStatus] =
     taxServiceGroupsRepository
       .findById(groupId)
       .flatMap {
@@ -250,10 +250,10 @@ class TaxGroupsServiceImpl @Inject() (
           taxServiceGroupsRepository
             .update(accessGroup.arn, accessGroup.groupName, updatedGroup)
             .map {
-              case Some(1) => AccessGroupUpdated
-              case _       => AccessGroupNotUpdated
+              case Some(1) => TaxServiceGroupUpdated
+              case _       => TaxServiceGroupNotUpdated
             }
-        case None => Future successful AccessGroupNotUpdated
+        case None => Future successful TaxServiceGroupNotUpdated
       }
 }
 
