@@ -758,7 +758,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
   "Removing a client from a group" when {
 
-    "works as expected when successful " should {
+    "group found" should {
       s"return $AccessGroupUpdated" in new TestScope {
         // expect
         (mockAccessGroupsRepository
@@ -795,14 +795,40 @@ class AccessGroupsServiceSpec extends BaseSpec {
           .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
       }
 
+      s"return $AccessGroupNotUpdated" when {
+        "mongo update count is 0" in new TestScope {
+          (mockAccessGroupsRepository
+            .findById(_: String))
+            .expects(accessGroup._id.toHexString)
+            .returning(Future.successful(Some(accessGroup)))
+          mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
+          mockAccessGroupsRepositoryUpdate(Some(0))
+
+          accessGroupsService
+            .removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user)
+            .futureValue shouldBe AccessGroupNotUpdated
+        }
+        "mongo update count is None" in new TestScope {
+          (mockAccessGroupsRepository
+            .findById(_: String))
+            .expects(accessGroup._id.toHexString)
+            .returning(Future.successful(Some(accessGroup)))
+          mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
+          mockAccessGroupsRepositoryUpdate(None)
+
+          accessGroupsService
+            .removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user)
+            .futureValue shouldBe AccessGroupNotUpdated
+        }
+      }
+    }
+
+    "group not found" should {
       s"return $AccessGroupNotUpdated" in new TestScope {
         (mockAccessGroupsRepository
           .findById(_: String))
           .expects(accessGroup._id.toHexString)
-          .returning(Future.successful(Some(accessGroup)))
-        mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
-        mockAccessGroupsRepositoryUpdate(Some(0))
-        // mockAddRemoveClientFromGroup(dbId.toString, clientVat, 0)
+          .returning(Future.successful(None))
         accessGroupsService
           .removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user)
           .futureValue shouldBe AccessGroupNotUpdated
@@ -812,7 +838,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
   "Removing a team members from a group" when {
 
-    s"works as expected when successful " should {
+    s"group found" should {
       s"return $AccessGroupUpdated" in new TestScope {
         // expect
         (mockAccessGroupsRepository
@@ -852,14 +878,40 @@ class AccessGroupsServiceSpec extends BaseSpec {
         result shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
       }
 
+      s"return $AccessGroupNotUpdated" when {
+        "mongo update count is 0" in new TestScope {
+          (mockAccessGroupsRepository
+            .findById(_: String))
+            .expects(accessGroup._id.toHexString)
+            .returning(Future.successful(Some(accessGroup)))
+          mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
+          mockAccessGroupsRepositoryUpdate(Some(0))
+
+          accessGroupsService
+            .removeTeamMember(accessGroup._id.toHexString, randomAlphabetic(8), user)
+            .futureValue shouldBe AccessGroupNotUpdated
+        }
+        "mongo update count is None" in new TestScope {
+          (mockAccessGroupsRepository
+            .findById(_: String))
+            .expects(accessGroup._id.toHexString)
+            .returning(Future.successful(Some(accessGroup)))
+          mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
+          mockAccessGroupsRepositoryUpdate(None)
+
+          accessGroupsService
+            .removeTeamMember(accessGroup._id.toHexString, randomAlphabetic(8), user)
+            .futureValue shouldBe AccessGroupNotUpdated
+        }
+      }
+    }
+
+    "group not found" should {
       s"return $AccessGroupNotUpdated" in new TestScope {
         (mockAccessGroupsRepository
           .findById(_: String))
           .expects(accessGroup._id.toHexString)
-          .returning(Future.successful(Some(accessGroup)))
-        mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(maybeUserEnrolmentAssignments)
-        mockAccessGroupsRepositoryUpdate(Some(0))
-
+          .returning(Future.successful(None))
         accessGroupsService
           .removeTeamMember(accessGroup._id.toHexString, randomAlphabetic(8), user)
           .futureValue shouldBe AccessGroupNotUpdated
@@ -879,7 +931,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
         private val mockedResponse: PaginatedList[Client] = PaginatedList[Client](
           accessGroup.clients.get.toSeq,
-          PaginationMetaData(false, false, 40, 4, 10, 2, 10, None)
+          PaginationMetaData(lastPage = false, firstPage = false, 40, 4, 10, 2, 10, None)
         )
         mockAccessGroupsRepositoryFindById(Some(accessGroup))
         mockAucdGetPaginatedClientsForArn(accessGroup.arn, PAGE, PAGE_SIZE, SEARCH, FILTER)(mockedResponse)

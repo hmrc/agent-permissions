@@ -45,7 +45,7 @@ trait AccessGroupsRepository {
 
   def get(arn: Arn, groupName: String): Future[Option[CustomGroup]]
 
-  /* TODO APB-7070: add following functionality
+  /* TODO: add following functionality
    *   [ ] pull list of tm from group
    *   [ ] pull list of clients from group
    *   [ ] find client in group by ids
@@ -60,6 +60,9 @@ trait AccessGroupsRepository {
 
   def update(arn: Arn, groupName: String, accessGroup: CustomGroup): Future[Option[Long]]
 
+  /* TODO is it possible to update lastUpdated/lastUpdatedBy fields at the same time for addTeamMember and removeClient?
+  *   if only accomplished by update, remove these methods
+  * */
   def addTeamMember(id: String, toAdd: AgentUser): Future[UpdateResult]
 
   def removeClient(groupId: String, clientId: String): Future[UpdateResult]

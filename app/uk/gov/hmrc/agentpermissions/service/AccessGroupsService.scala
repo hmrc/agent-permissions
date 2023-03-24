@@ -229,20 +229,46 @@ class AccessGroupsServiceImpl @Inject() (
     for {
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
       maybeCalculatedAssignments   <- userEnrolmentAssignmentService.calculateForGroupUpdate(groupId, accessGroup)
+      accessGroupUpdateStatus <- handleUpdate(
+                                   GroupId(accessGroup.arn, accessGroup.groupName),
+                                   accessGroupWithWhoIsUpdating,
+                                   maybeCalculatedAssignments
+                                 )
+    } yield accessGroupUpdateStatus
+
+  /** Updates repo via replace (updated group must have lastUpdatedBy field replaced at same time) Then attempts to push
+    * calculated assignments to EACD and audits outcome
+    *
+    * @param updatedGroup
+    *   must include updated lastUpdatedBy and lastUpdated fields
+    * @return
+    *   AccessGroupUpdateStatus
+    */
+  private def handleUpdate(
+    groupId: GroupId,
+    updatedGroup: CustomGroup,
+    maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupUpdateStatus] =
+    for {
       maybeUpdatedCount <-
         accessGroupsRepository
-          .update(groupId.arn, groupId.groupName, withClientNamesRemoved(accessGroupWithWhoIsUpdating))
+          .update(
+            groupId.arn,
+            groupId.groupName,
+            withClientNamesRemoved(updatedGroup)
+          ) // withClientNamesRemoved unnecessary unless adding clients
       accessGroupUpdateStatus <- maybeUpdatedCount match {
                                    case None =>
-                                     logger.info(s"Access group '${accessGroup.groupName}' not updated")
+                                     logger.info(s"Access group '${updatedGroup.groupName}' not updated")
                                      Future.successful(AccessGroupNotUpdated)
                                    case Some(updatedCount) =>
                                      if (updatedCount == 1L) {
                                        for {
                                          pushStatus <- pushAssignments(maybeCalculatedAssignments)
-                                         _ <- Future successful auditService.auditAccessGroupUpdate(
-                                                accessGroupWithWhoIsUpdating
-                                              )
+                                         _ <-
+                                           Future successful auditService.auditAccessGroupUpdate(
+                                             updatedGroup
+                                           ) // TODO update audit? instead of whole group, log NET change (userToRemove)
                                        } yield pushStatus match {
                                          case AssignmentsPushed =>
                                            AccessGroupUpdated
@@ -251,18 +277,13 @@ class AccessGroupsServiceImpl @Inject() (
                                        }
                                      } else {
                                        logger.warn(
-                                         s"Access group '${accessGroup.groupName}' update count should not have been $updatedCount"
+                                         s"Access group '${updatedGroup.groupName}' update count should not have been $updatedCount"
                                        )
                                        Future.successful(AccessGroupNotUpdated)
                                      }
                                  }
     } yield accessGroupUpdateStatus
 
-  /* TODO APB-7066: updates whoIsUpdating (via repo?)
-   *   + get client & team members in group to calculate assignments
-   *   + push maybe assignments
-   *   + auditing update
-   * */
   def removeClient(groupId: String, clientId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -272,14 +293,15 @@ class AccessGroupsServiceImpl @Inject() (
       .flatMap {
         case Some(accessGroup) =>
           val maybeClients = accessGroup.clients.map(_.filterNot(tm => tm.enrolmentKey == clientId))
-          val clientToRemove = accessGroup.clients.map(_.filter(tm => tm.enrolmentKey == clientId)).get
-          val usersInGroup = accessGroup.teamMembers.getOrElse(Set.empty)
-
           val updatedGroup = accessGroup.copy(
             lastUpdated = LocalDateTime.now(),
             lastUpdatedBy = whoIsUpdating,
             clients = maybeClients
           )
+
+          val clientToRemove = accessGroup.clients.map(_.filter(tm => tm.enrolmentKey == clientId)).get
+          val usersInGroup = accessGroup.teamMembers.getOrElse(Set.empty)
+
           for {
             maybeCalculatedAssignments <-
               userEnrolmentAssignmentService
@@ -288,34 +310,12 @@ class AccessGroupsServiceImpl @Inject() (
                   clientToRemove,
                   usersInGroup
                 )
-            maybeUpdatedCount <- accessGroupsRepository.update(accessGroup.arn, accessGroup.groupName, updatedGroup)
-            updateStatus <- maybeUpdatedCount match {
-                              case Some(updatedCount) =>
-                                if (updatedCount == 1) {
-                                  for {
-                                    pushStatus <- pushAssignments(maybeCalculatedAssignments)
-                                    _ <- Future successful auditService.auditAccessGroupUpdate(
-                                           updatedGroup
-                                         ) // TODO update audit?
-                                  } yield pushStatus match {
-                                    case AssignmentsPushed =>
-                                      AccessGroupUpdated
-                                    case AssignmentsNotPushed =>
-                                      AccessGroupUpdatedWithoutAssignmentsPushed
-                                  }
-                                } else {
-                                  Future successful AccessGroupNotUpdated
-                                }
-                              case _ => Future successful AccessGroupNotUpdated
-                            }
+            updateStatus <-
+              handleUpdate(GroupId(accessGroup.arn, accessGroup.groupName), updatedGroup, maybeCalculatedAssignments)
           } yield updateStatus
         case _ => Future successful AccessGroupNotUpdated
       }
 
-  /* TODO move generic function calls when access group found
-   *  change how whoIsUpdated happens (via repo? - needs encrypting...)
-   *  update auditing, auditService.auditAccessGroupUpdate(updatedGroup) instead of whole group, log NET change (userToRemove)
-   * */
   def removeTeamMember(groupId: String, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -341,48 +341,11 @@ class AccessGroupsServiceImpl @Inject() (
                   clientsInGroup,
                   userToRemove
                 )
-            maybeUpdatedCount <- accessGroupsRepository.update(accessGroup.arn, accessGroup.groupName, updatedGroup)
-            updateStatus <- maybeUpdatedCount match {
-                              case Some(updatedCount) =>
-                                if (updatedCount == 1) {
-                                  for {
-                                    pushStatus <- pushAssignments(maybeCalculatedAssignments)
-                                    _ <- Future successful auditService.auditAccessGroupUpdate(
-                                           updatedGroup
-                                         ) // TODO update audit?
-                                  } yield pushStatus match {
-                                    case AssignmentsPushed =>
-                                      AccessGroupUpdated
-                                    case AssignmentsNotPushed =>
-                                      AccessGroupUpdatedWithoutAssignmentsPushed
-                                  }
-                                } else {
-                                  Future successful AccessGroupNotUpdated
-                                }
-                              case _ => Future successful AccessGroupNotUpdated
-                            }
+            updateStatus <-
+              handleUpdate(GroupId(accessGroup.arn, accessGroup.groupName), updatedGroup, maybeCalculatedAssignments)
           } yield updateStatus
         case _ => Future successful AccessGroupNotUpdated
       }
-
-//  def attemptPushAssignments(maybeUpdatedCount: Option[Long], maybeCalculatedAssignments: Option[UserEnrolmentAssignments]) =
-//    maybeUpdatedCount match {
-//    case Some(updatedCount) =>
-//      if (updatedCount == 1) {
-//        for {
-//          pushStatus <- pushAssignments(maybeCalculatedAssignments)
-//        } yield pushStatus match {
-//          case AssignmentsPushed =>
-//            AccessGroupUpdated
-//          case AssignmentsNotPushed =>
-//            AccessGroupUpdatedWithoutAssignmentsPushed
-//        }
-//      } else {
-//        Future successful AccessGroupNotUpdated
-//      }
-//    case _ => Future successful AccessGroupNotUpdated
-//  }
-//
 
   // TODO move below to groups summary service
   override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
