@@ -20,7 +20,7 @@ import play.api.Logging
 import play.api.libs.json._
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client}
-import uk.gov.hmrc.crypto.{Crypted, Decrypter, Encrypter, Sensitive}
+import uk.gov.hmrc.crypto.{Crypted, Decrypter, Encrypter, PlainText, Sensitive}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
@@ -35,7 +35,6 @@ class LegacyCustomGroupsRepository @Inject() (mongoComponent: MongoComponent)(im
   @Named("aesGcm") crypto: Encrypter with Decrypter
 ) extends PlayMongoRepository[LegacySensitiveAccessGroup](
       collectionName = "access-groups",
-      /* Note: we have to specify manually the encryption algorithm of the legacy DB rather than rely on injection */
       domainFormat = LegacySensitiveAccessGroup.format(crypto),
       mongoComponent = mongoComponent,
       indexes = Seq.empty
@@ -63,10 +62,21 @@ case class LegacySensitiveAccessGroup(override val decryptedValue: LegacyCustomG
     extends Sensitive[LegacyCustomGroup]
 
 object LegacySensitiveAccessGroup {
+  private def encryptAgentUser(plainTextAgentUser: AgentUser)(implicit crypto: Encrypter): AgentUser =
+    plainTextAgentUser.copy(
+      id = crypto.encrypt(PlainText(plainTextAgentUser.id)).value,
+      name = crypto.encrypt(PlainText(plainTextAgentUser.name)).value
+    )
   private def decryptAgentUser(cryptedAgentUser: AgentUser)(implicit crypto: Decrypter): AgentUser =
     cryptedAgentUser.copy(
       id = crypto.decrypt(Crypted(cryptedAgentUser.id)).value,
       name = crypto.decrypt(Crypted(cryptedAgentUser.name)).value
+    )
+  private def encryptFields(accessGroup: LegacyCustomGroup)(implicit crypto: Encrypter): LegacyCustomGroup =
+    accessGroup.copy(
+      createdBy = encryptAgentUser(accessGroup.createdBy),
+      lastUpdatedBy = encryptAgentUser(accessGroup.lastUpdatedBy),
+      teamMembers = accessGroup.teamMembers.map(_.map(encryptAgentUser))
     )
   private def decryptFields(securedAccessGroup: LegacyCustomGroup)(implicit crypto: Decrypter): LegacyCustomGroup =
     securedAccessGroup.copy(
@@ -75,10 +85,10 @@ object LegacySensitiveAccessGroup {
       teamMembers = securedAccessGroup.teamMembers.map(_.map(decryptAgentUser))
     )
 
-  implicit def format(implicit crypto: Decrypter): Format[LegacySensitiveAccessGroup] =
+  implicit def format(implicit crypto: Encrypter with Decrypter): Format[LegacySensitiveAccessGroup] =
     new Format[LegacySensitiveAccessGroup] {
       def reads(json: JsValue): JsResult[LegacySensitiveAccessGroup] =
         Json.fromJson[LegacyCustomGroup](json).map(o => LegacySensitiveAccessGroup(decryptFields(o)))
-      def writes(o: LegacySensitiveAccessGroup): JsValue = throw new NotImplementedError()
+      def writes(o: LegacySensitiveAccessGroup): JsValue = Json.toJson(encryptFields(o.decryptedValue))
     }
 }

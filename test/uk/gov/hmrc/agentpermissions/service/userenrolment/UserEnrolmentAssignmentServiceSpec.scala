@@ -79,6 +79,55 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
         .returning(Future successful pushStatus)
   }
 
+  "Calculating assignments during group creation" should {
+    "return calculated assignments" in new TestScope {
+      mockAccessGroupsRepositoryGetAll(Seq.empty)
+
+      userEnrolmentAssignmentService
+        .calculateForGroupCreation(accessGroup)
+        .futureValue shouldBe maybeUserEnrolmentAssignments
+    }
+  }
+
+  "Calculating assignments during group update" should {
+    "return calculated assignments" in new TestScope {
+      mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+
+      userEnrolmentAssignmentService
+        .calculateForGroupUpdate(arn, groupName, accessGroup)
+        .futureValue shouldBe maybeUserEnrolmentAssignments
+    }
+  }
+
+  "Calculating assignments during group update (add/remove)" should {
+    "return calculated assignments for add to group" in new TestScope {
+      mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+
+      userEnrolmentAssignmentService
+        .calculateForAddToGroup(arn, groupName, accessGroup.clients, accessGroup.teamMembers)
+        .futureValue shouldBe maybeUserEnrolmentAssignments
+    }
+
+    "return calculated assignments for remove from group" in new TestScope {
+      mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+
+      userEnrolmentAssignmentService
+        .calculateForRemoveFromGroup(arn, groupName, accessGroup.clients, accessGroup.teamMembers)
+        .futureValue shouldBe maybeUserEnrolmentAssignments
+    }
+  }
+
+  "Calculating assignments during group delete" should {
+    "return calculated assignments" in new TestScope {
+      mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
+      mockAccessGroupsRepositoryGet(Some(accessGroup))
+
+      userEnrolmentAssignmentService
+        .calculateForGroupDeletion(arn, groupName)
+        .futureValue shouldBe maybeUserEnrolmentAssignments
+    }
+  }
+
   "Pushing assignments" when {
 
     "calculated assignments are nothing" should {

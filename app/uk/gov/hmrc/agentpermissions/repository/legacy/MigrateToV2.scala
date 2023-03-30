@@ -123,6 +123,6 @@ class MigrateToV2 @Inject() (
             newTaxGroupsRepo.collection.drop().toFuture
           )
         )
-        .map(_ => ())
+        .map(_ => throw e)
     }
 }

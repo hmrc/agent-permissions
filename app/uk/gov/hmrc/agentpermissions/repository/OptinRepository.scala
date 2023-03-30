@@ -48,7 +48,6 @@ class OptinRepositoryImpl @Inject() (
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[SensitiveOptinRecord](
       collectionName = "optin",
-      /* Note: we have to specify manually the encryption algorithm of this DB rather than rely on injection as it still uses aesGcm */
       domainFormat = SensitiveOptinRecord.format(crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(

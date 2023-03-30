@@ -19,9 +19,7 @@ package uk.gov.hmrc.agentpermissions.model
 import play.api.libs.json.{Format, Json}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 
-case class UserEnrolment(userId: String, enrolmentKey: String) {
-  override def toString: String = s"$userId:$enrolmentKey"
-}
+case class UserEnrolment(userId: String, enrolmentKey: String)
 
 object UserEnrolment {
   implicit val formats: Format[UserEnrolment] = Json.format
