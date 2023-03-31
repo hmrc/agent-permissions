@@ -65,14 +65,21 @@ class GroupSummaryServiceImpl @Inject() (
   override def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Seq[GroupSummary]] =
+  ): Future[Seq[GroupSummary]] = {
+    val service = if (enrolmentKey.contains("HMRC-TERS")) { "HMRC-TERS" }
+    else enrolmentKey.split('~').head
     for {
       customSummaries <- customGroupsService.getCustomGroupSummariesForClient(arn, enrolmentKey)
-      maybeTaxGroup   <- taxGroupsRepo.getByService(arn, enrolmentKey.split('~').head)
+      maybeTaxGroup   <- taxGroupsRepo.getByService(arn, service)
       maybeTaxGroupSummary =
-        maybeTaxGroup.fold(Seq.empty[GroupSummary])(group => Seq(GroupSummary.of(group)))
+        maybeTaxGroup.fold(Seq.empty[GroupSummary])(group =>
+          if (group.excludedClients.exists(client => client.enrolmentKey == enrolmentKey)) {
+            Seq.empty[GroupSummary]
+          } else Seq(GroupSummary.of(group))
+        )
       combinedSummaries = customSummaries ++ maybeTaxGroupSummary
     } yield combinedSummaries
+  }
 
   override def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
     ec: ExecutionContext
