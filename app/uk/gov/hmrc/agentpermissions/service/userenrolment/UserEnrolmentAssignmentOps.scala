@@ -16,51 +16,39 @@
 
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
-import com.google.inject.ImplementedBy
-import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, CustomGroup, GroupId, UserEnrolment, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 
-import javax.inject.Singleton
+object UserEnrolmentAssignmentOps {
 
-@ImplementedBy(classOf[UserEnrolmentAssignmentCalculatorImpl])
-trait UserEnrolmentAssignmentCalculator {
+  def split(userEnrolmentAssignments: UserEnrolmentAssignments, chunkSize: Int): Seq[UserEnrolmentAssignments] = {
+    val assignsChunks = userEnrolmentAssignments.assign
+      .grouped(chunkSize)
+      .map(assignsChunk =>
+        UserEnrolmentAssignments(
+          assign = assignsChunk,
+          unassign = Set.empty[UserEnrolment],
+          arn = userEnrolmentAssignments.arn
+        )
+      )
+      .toSeq
+
+    val unassignsChunks = userEnrolmentAssignments.unassign
+      .grouped(chunkSize)
+      .map(unassignsChunk =>
+        UserEnrolmentAssignments(
+          assign = Set.empty[UserEnrolment],
+          unassign = unassignsChunk,
+          arn = userEnrolmentAssignments.arn
+        )
+      )
+      .toSeq
+
+    assignsChunks ++ unassignsChunks
+  }
 
   def forGroupCreation(
-    accessGroupToProcess: CustomGroup,
-    existingAccessGroups: Seq[CustomGroup]
-  ): Option[UserEnrolmentAssignments]
-
-  // TODO replace with add and remove
-  def forGroupUpdate(
-    accessGroupToProcess: CustomGroup,
-    existingAccessGroups: Seq[CustomGroup]
-  ): Option[UserEnrolmentAssignments]
-
-  // Could be merged with forRemoveFromGroup if you had a bool for isAssigns :3
-  def forAddToGroup(
-    clients: Set[Client], // need enrolment key
-    teamMembers: Set[AgentUser], // need ids
-    existingAccessGroups: Seq[CustomGroup],
-    groupId: GroupId
-  ): Option[UserEnrolmentAssignments]
-
-  def forRemoveFromGroup(
-    clients: Set[Client], // need enrolment key
-    teamMembers: Set[AgentUser], // need ids
-    existingAccessGroups: Seq[CustomGroup],
-    groupId: GroupId
-  ): Option[UserEnrolmentAssignments]
-
-  def forGroupDeletion(
-    accessGroupToProcess: CustomGroup,
-    existingAccessGroups: Seq[CustomGroup]
-  ): Option[UserEnrolmentAssignments]
-}
-
-@Singleton
-class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalculator with Logging {
-
-  override def forGroupCreation(
     accessGroupToProcess: CustomGroup,
     existingAccessGroups: Seq[CustomGroup]
   ): Option[UserEnrolmentAssignments] = {
@@ -69,11 +57,19 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
 
     val seedUnassigns = Set.empty[UserEnrolment]
 
-    Option(optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns))
+    Option(
+      optimiseUserEnrolmentAssignments(
+        accessGroupToProcess.arn,
+        accessGroupToProcess.groupName,
+        existingAccessGroups,
+        seedAssigns,
+        seedUnassigns
+      )
+    )
   }
 
-  // TODO APB-x: split into forAddToGroup and forRemoveFromGroup
-  override def forGroupUpdate(
+  // TODO: split into forAddToGroup and forRemoveFromGroup
+  def forGroupUpdate(
     accessGroupToProcess: CustomGroup,
     existingAccessGroups: Seq[CustomGroup]
   ): Option[UserEnrolmentAssignments] =
@@ -85,7 +81,13 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
         val seedUnassigns =
           explodeUserEnrolments(accessGroupToProcessPreviousVersion) -- explodeUserEnrolments(accessGroupToProcess)
 
-        optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns)
+        optimiseUserEnrolmentAssignments(
+          accessGroupToProcess.arn,
+          accessGroupToProcess.groupName,
+          existingAccessGroups,
+          seedAssigns,
+          seedUnassigns
+        )
     }
 
   /** Could be merged with forRemoveFromGroup if you had a bool for isAssigns
@@ -102,10 +104,11 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     clients: Set[Client], // need enrolment key
     teamMembers: Set[AgentUser], // need ids
     existingAccessGroups: Seq[CustomGroup],
-    groupId: GroupId
+    arn: Arn,
+    groupName: String
   ): Option[UserEnrolmentAssignments] = {
     val maxNetChange = pairUserEnrolments(teamMembers, clients)
-    Option(optimiseUserEnrolmentAssignmentsSlightlyBetter(groupId, existingAccessGroups, maxNetChange, Set.empty))
+    Option(optimiseUserEnrolmentAssignments(arn, groupName, existingAccessGroups, maxNetChange, Set.empty))
   }
 
   /** One set will always be the remove and the other will be the existing set in the group being changed. For example:
@@ -116,17 +119,18 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
     * @param clients
     *   to remove from group OR existing in group
     */
-  override def forRemoveFromGroup(
+  def forRemoveFromGroup(
     clients: Set[Client], // need enrolment key
     teamMembers: Set[AgentUser], // need ids
     existingAccessGroups: Seq[CustomGroup],
-    groupId: GroupId
+    arn: Arn,
+    groupName: String
   ): Option[UserEnrolmentAssignments] = {
     val maxNetChange = pairUserEnrolments(teamMembers, clients)
-    Option(optimiseUserEnrolmentAssignmentsSlightlyBetter(groupId, existingAccessGroups, Set.empty, maxNetChange))
+    Option(optimiseUserEnrolmentAssignments(arn, groupName, existingAccessGroups, Set.empty, maxNetChange))
   }
 
-  override def forGroupDeletion(
+  def forGroupDeletion(
     accessGroupToProcess: CustomGroup,
     existingAccessGroups: Seq[CustomGroup]
   ): Option[UserEnrolmentAssignments] = {
@@ -135,12 +139,20 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
 
     val seedUnassigns = explodeUserEnrolments(accessGroupToProcess)
 
-    Option(optimiseUserEnrolmentAssignments(accessGroupToProcess, existingAccessGroups, seedAssigns, seedUnassigns))
+    Option(
+      optimiseUserEnrolmentAssignments(
+        accessGroupToProcess.arn,
+        accessGroupToProcess.groupName,
+        existingAccessGroups,
+        seedAssigns,
+        seedUnassigns
+      )
+    )
   }
 
   private def explodeUserEnrolments(accessGroup: CustomGroup): Set[UserEnrolment] = for {
-    userId       <- accessGroup.teamMembers.toSet.flatten.map(_.id);
-    enrolmentKey <- accessGroup.clients.toSet.flatten.map(_.enrolmentKey)
+    userId       <- accessGroup.teamMembers.map(_.id);
+    enrolmentKey <- accessGroup.clients.map(_.enrolmentKey)
   } yield UserEnrolment(userId, enrolmentKey)
 
   /** Returns maximum number of pairs for a NET change to EACD. Can be achieved without the full group since changes are
@@ -161,33 +173,15 @@ class UserEnrolmentAssignmentCalculatorImpl extends UserEnrolmentAssignmentCalcu
   } yield UserEnrolment(userId, enrolmentKey)
 
   private def optimiseUserEnrolmentAssignments(
-    accessGroupToProcess: CustomGroup,
+    arn: Arn,
+    groupName: String,
     existingAccessGroups: Seq[CustomGroup],
     seedAssigns: Set[UserEnrolment],
     seedUnassigns: Set[UserEnrolment]
   ): UserEnrolmentAssignments =
     existingAccessGroups
-      .filterNot(_.groupName.equalsIgnoreCase(accessGroupToProcess.groupName))
-      .foldLeft(UserEnrolmentAssignments(seedAssigns, seedUnassigns, accessGroupToProcess.arn)) {
-        (userEnrolmentAssignments, existingAccessGroup) =>
-          val userEnrolments = explodeUserEnrolments(existingAccessGroup)
-
-          userEnrolmentAssignments.copy(
-            assign = userEnrolmentAssignments.assign -- userEnrolments,
-            unassign = userEnrolmentAssignments.unassign -- userEnrolments
-          )
-      }
-
-  /** optimiseUserEnrolmentAssignments but replaces CustomGroup with groupId */
-  private def optimiseUserEnrolmentAssignmentsSlightlyBetter(
-    groupId: GroupId,
-    existingAccessGroups: Seq[CustomGroup],
-    seedAssigns: Set[UserEnrolment],
-    seedUnassigns: Set[UserEnrolment]
-  ): UserEnrolmentAssignments =
-    existingAccessGroups
-      .filterNot(_.groupName.equalsIgnoreCase(groupId.groupName))
-      .foldLeft(UserEnrolmentAssignments(seedAssigns, seedUnassigns, groupId.arn)) {
+      .filterNot(_.groupName.equalsIgnoreCase(groupName))
+      .foldLeft(UserEnrolmentAssignments(seedAssigns, seedUnassigns, arn)) {
         (userEnrolmentAssignments, existingAccessGroup) =>
           val userEnrolments = explodeUserEnrolments(existingAccessGroup)
 

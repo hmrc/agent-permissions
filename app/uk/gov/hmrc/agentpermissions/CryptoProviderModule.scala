@@ -25,7 +25,14 @@ import java.util.Base64
 
 class CryptoProviderModule extends Module {
 
-  def cryptoInstance(configuration: Configuration): Encrypter with Decrypter = if (
+  def aesCryptoInstance(configuration: Configuration): Encrypter with Decrypter = if (
+    configuration.underlying.getBoolean("fieldLevelEncryption.enable")
+  )
+    SymmetricCryptoFactory.aesCryptoFromConfig("fieldLevelEncryption", configuration.underlying)
+  else
+    NoCrypto
+
+  def aesGcmCryptoInstance(configuration: Configuration): Encrypter with Decrypter = if (
     configuration.underlying.getBoolean("fieldLevelEncryption.enable")
   )
     SymmetricCryptoFactory.aesGcmCryptoFromConfig("fieldLevelEncryption", configuration.underlying)
@@ -33,7 +40,10 @@ class CryptoProviderModule extends Module {
     NoCrypto
 
   override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
-    Seq(bind[Encrypter with Decrypter].toInstance(cryptoInstance(configuration)))
+    Seq(
+      bind[Encrypter with Decrypter].qualifiedWith("aes").toInstance(aesCryptoInstance(configuration)),
+      bind[Encrypter with Decrypter].qualifiedWith("aesGcm").toInstance(aesGcmCryptoInstance(configuration))
+    )
 }
 
 /** Encrypter/decrypter that does nothing (i.e. leaves content in plaintext). Only to be used for debugging.

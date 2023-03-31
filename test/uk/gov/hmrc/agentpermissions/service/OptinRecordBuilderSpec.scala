@@ -16,8 +16,10 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agents.accessgroups.AgentUser
+import uk.gov.hmrc.agents.accessgroups.optin._
 
 import java.time.LocalDateTime
 

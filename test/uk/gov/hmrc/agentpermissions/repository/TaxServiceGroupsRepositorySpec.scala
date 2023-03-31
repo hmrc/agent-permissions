@@ -16,26 +16,28 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
-import org.bson.types.ObjectId
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.result.UpdateResult
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.model.SensitiveTaxServiceGroup
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agentpermissions.repository.storagemodel.SensitiveTaxGroup
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, TaxGroup}
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 
 import java.time.LocalDateTime
+import java.util.UUID
 import scala.concurrent.ExecutionContext
 
-class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[SensitiveTaxServiceGroup] {
+class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[SensitiveTaxGroup] {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
-    val dbId: ObjectId = new ObjectId()
+    val dbId: UUID = GroupId.random()
     val groupName: String = "Some Group".toLowerCase
     val agent: AgentUser = AgentUser("userId", "userName")
     val user1: AgentUser = AgentUser("user1", "User 1")
@@ -53,25 +55,23 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
         now,
         agent,
         agent,
-        Some(Set(agent, user1, user2)),
+        Set(agent, user1, user2),
         "HMRC-MTD-VAT",
         automaticUpdates = false,
-        Some(Set(client1, client2))
+        Set(client1, client2)
       )
 
     def now: LocalDateTime = LocalDateTime.now()
 
-    val groupsRepositoryImpl: TaxServiceGroupsRepositoryImpl = repository.asInstanceOf[TaxServiceGroupsRepositoryImpl]
+    val groupsRepositoryImpl: TaxGroupsRepositoryV2Impl = repository.asInstanceOf[TaxGroupsRepositoryV2Impl]
     // trying to use trait interface as much as possible
-    val groupsRepository: TaxServiceGroupsRepository = groupsRepositoryImpl
+    val groupsRepository: TaxGroupsRepositoryV2 = groupsRepositoryImpl
   }
 
   "TaxServiceGroupsRepository" when {
 
     "set up" should {
       "have correct indexes" in new TestScope {
-        groupsRepositoryImpl.collectionName shouldBe "tax-service-groups"
-
         groupsRepositoryImpl.indexes.size shouldBe 2
         val collectionIndexes: Seq[IndexModel] = groupsRepositoryImpl.indexes
 
@@ -102,7 +102,7 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
 
       "group of that name does not exist" should {
         "return nothing" in new TestScope {
-          groupsRepository.findById(dbId.toHexString).futureValue shouldBe None
+          groupsRepository.findById(dbId).futureValue shouldBe None
         }
       }
     }
@@ -137,7 +137,7 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
           val document = groupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
           document.toString should include(accessGroup.groupName) // the group name should be in plaintext
           // But the agent user ids and names should be encrypted
-          (accessGroup.teamMembers.get ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>
+          (accessGroup.teamMembers ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>
             document.toString should not include agentUser.id
             document.toString should not include agentUser.name
           }
@@ -199,16 +199,15 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
           val agentToAdd: AgentUser = AgentUser("user10", "Bob Smith")
 
           // when
-          val updateResult: UpdateResult = groupsRepository.addTeamMember(dbId.toString, agentToAdd).futureValue
+          val updateResult: UpdateResult = groupsRepository.addTeamMember(dbId, agentToAdd).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 1
 
           // and
-          val updatedGroup: Option[TaxGroup] = groupsRepository.findById(dbId.toString).futureValue
-          updatedGroup.get.teamMembers.isDefined shouldBe true
-          updatedGroup.get.teamMembers.get.contains(agentToAdd) shouldBe true
-          updatedGroup.get.teamMembers.get.size shouldBe 4
+          val updatedGroup: Option[TaxGroup] = groupsRepository.findById(dbId).futureValue
+          updatedGroup.get.teamMembers.contains(agentToAdd) shouldBe true
+          updatedGroup.get.teamMembers.size shouldBe 4
 
         }
       }
@@ -231,6 +230,6 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
     }
   }
 
-  override protected def repository: PlayMongoRepository[SensitiveTaxServiceGroup] =
-    new TaxServiceGroupsRepositoryImpl(mongoComponent, aesGcmCrypto)
+  override protected def repository: PlayMongoRepository[SensitiveTaxGroup] =
+    new TaxGroupsRepositoryV2Impl(mongoComponent, aesCrypto)
 }

@@ -19,12 +19,14 @@ package uk.gov.hmrc.agentpermissions.service
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import org.scalamock.handlers.{CallHandler0, CallHandler3, CallHandler4}
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
-import uk.gov.hmrc.agentpermissions.repository.{AccessGroupsRepository, EacdSyncRecord, EacdSyncRepository, TaxServiceGroupsRepository}
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, EacdSyncRecord, EacdSyncRepository, TaxGroupsRepositoryV2}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
+import uk.gov.hmrc.agents.accessgroups.{AccessGroup, AgentUser, Client, CustomGroup, TaxGroup, UserDetails}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.{Instant, LocalDateTime}
@@ -233,8 +235,7 @@ class EacdSynchronizerSpec extends BaseSpec {
         val updatedGroup = eacdSynchronizer.applyRemovalSet(accessGroup, removalSet, agentUser1).futureValue
 
         updatedGroup should matchPattern {
-          case cg: CustomGroup
-              if cg.clients.contains(Set(clientVat, clientCgt)) && cg.teamMembers.contains(Set(agentUser1)) =>
+          case cg: CustomGroup if cg.clients == Set(clientVat, clientCgt) && cg.teamMembers == Set(agentUser1) =>
         }
       }
 
@@ -250,8 +251,7 @@ class EacdSynchronizerSpec extends BaseSpec {
         val accessGroup: TaxGroup =
           buildTaxGroup("HMRC-MTD-VAT", Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt, clientTrust))
         eacdSynchronizer.applyRemovalSet(accessGroup, removalSet, agentUser1).futureValue should matchPattern {
-          case tg: TaxGroup
-              if tg.teamMembers.contains(Set(agentUser1)) && tg.excludedClients.contains(Set(clientVat, clientCgt)) =>
+          case tg: TaxGroup if tg.teamMembers == Set(agentUser1) && tg.excludedClients == Set(clientVat, clientCgt) =>
         }
       }
     }
@@ -372,11 +372,11 @@ class EacdSynchronizerSpec extends BaseSpec {
     val clientTrust: Client = Client(s"$serviceTrust~$serviceIdentifierKeyTrust~0123456789", "Trust Client")
 
     implicit val materializer: Materializer = Materializer(ActorSystem())
-    val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
+    val mockAccessGroupsRepository: CustomGroupsRepositoryV2 = mock[CustomGroupsRepositoryV2]
     val stubUserClientDetailsConnector: UserClientDetailsConnector = stub[UserClientDetailsConnector]
     val mockAuditService: AuditService = mock[AuditService]
     val stubEacdSyncRepository: EacdSyncRepository = stub[EacdSyncRepository]
-    val stubTaxServiceGroupsRepository: TaxServiceGroupsRepository = stub[TaxServiceGroupsRepository]
+    val stubTaxServiceGroupsRepository: TaxGroupsRepositoryV2 = stub[TaxGroupsRepositoryV2]
     val stubAppConfig: AppConfig = stub[AppConfig]
     val actorSystem: ActorSystem = ActorSystem("test")
 
@@ -396,28 +396,30 @@ class EacdSynchronizerSpec extends BaseSpec {
 
     def buildCustomGroup(teamMembers: Set[AgentUser], clients: Set[Client]): CustomGroup =
       CustomGroup(
+        GroupId.random(),
         arn,
         groupName,
         now,
         now,
         agentUser1,
         agentUser1,
-        Some(teamMembers),
-        Some(clients)
+        teamMembers,
+        clients
       )
 
     def buildTaxGroup(service: String, teamMembers: Set[AgentUser], excludedClients: Set[Client]): TaxGroup =
       TaxGroup(
+        GroupId.random(),
         arn,
         groupName,
         now,
         now,
         agentUser1,
         agentUser1,
-        Some(teamMembers),
+        teamMembers,
         service,
         false,
-        Some(excludedClients)
+        excludedClients
       )
 
     def expectAccessGroupsRepositoryUpdate(

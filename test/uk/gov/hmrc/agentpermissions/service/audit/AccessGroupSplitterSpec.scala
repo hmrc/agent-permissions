@@ -16,8 +16,10 @@
 
 package uk.gov.hmrc.agentpermissions.service.audit
 
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, CustomGroup}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agents.accessgroups.CustomGroup
 
 import java.time.LocalDateTime
 
@@ -28,37 +30,38 @@ class AccessGroupSplitterSpec extends BaseSpec with AuditTestSupport {
       val chunkSize = 50
 
       val accessGroup: CustomGroup = CustomGroup(
+        GroupId.random(),
         Arn("KARN1234567"),
         "some group",
         LocalDateTime.now(),
         LocalDateTime.now(),
         teamMember(),
         teamMember(),
-        Some((1 to 99).map(_ => teamMember()).toSet),
-        Some((1 to 199).map(_ => client()).toSet)
+        (1 to 99).map(_ => teamMember()).toSet,
+        (1 to 199).map(_ => client()).toSet
       )
 
       val chunkedAccessGroups = AccessGroupSplitter.split(accessGroup, chunkSize)
 
       chunkedAccessGroups.size shouldBe 6
 
-      chunkedAccessGroups.head.clients.get.size shouldBe chunkSize
+      chunkedAccessGroups.head.clients.size shouldBe chunkSize
       chunkedAccessGroups.head.teamMembers shouldBe empty
 
-      chunkedAccessGroups(1).clients.get.size shouldBe chunkSize
+      chunkedAccessGroups(1).clients.size shouldBe chunkSize
       chunkedAccessGroups(1).teamMembers shouldBe empty
 
-      chunkedAccessGroups(2).clients.get.size shouldBe chunkSize
+      chunkedAccessGroups(2).clients.size shouldBe chunkSize
       chunkedAccessGroups(2).teamMembers shouldBe empty
 
-      chunkedAccessGroups(3).clients.get.size shouldBe 49
+      chunkedAccessGroups(3).clients.size shouldBe 49
       chunkedAccessGroups(3).teamMembers shouldBe empty
 
       chunkedAccessGroups(4).clients shouldBe empty
-      chunkedAccessGroups(4).teamMembers.get.size shouldBe chunkSize
+      chunkedAccessGroups(4).teamMembers.size shouldBe chunkSize
 
       chunkedAccessGroups(5).clients shouldBe empty
-      chunkedAccessGroups(5).teamMembers.get.size shouldBe 49
+      chunkedAccessGroups(5).teamMembers.size shouldBe 49
     }
   }
 

@@ -18,9 +18,11 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.libs.json._
 import play.api.mvc._
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.model.{AddMembersToTaxServiceGroupRequest, AddOneTeamMemberToGroupRequest, CreateTaxServiceGroupRequest, UpdateTaxServiceGroupRequest}
+import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.service._
+import uk.gov.hmrc.agents.accessgroups.{GroupSummary, TaxGroup}
 import uk.gov.hmrc.auth.core.AuthorisationException
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -75,13 +77,13 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         taxGroupsService
           .getAllTaxServiceGroups(arn)
-          .map(groups => Ok(Json.toJson(groups.map(group => GroupSummary.fromAccessGroup(group)))))
+          .map(groups => Ok(Json.toJson(groups.map(group => GroupSummary.of(group)))))
       }
     } transformWith failureHandler
   }
 
   // gets a tax service group ONLY
-  def getGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
+  def getGroup(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       taxGroupsService.getById(gid) map {
         case None =>
@@ -99,7 +101,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
 
   def getGroupByService(arn: Arn, service: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
-      taxGroupsService.get(arn, service) map {
+      taxGroupsService.getByService(arn, service).map {
         case None =>
           NotFound
         case Some(accessGroup) =>
@@ -113,11 +115,11 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
+  def deleteGroup(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
-      withGroupId(gid, authorisedAgent.arn) { (groupId, _) =>
+      withTaxGroup(gid, authorisedAgent.arn) { taxGroup =>
         for {
-          groupDeletionStatus <- taxGroupsService.delete(groupId, authorisedAgent.agentUser)
+          groupDeletionStatus <- taxGroupsService.delete(taxGroup.arn, taxGroup.groupName, authorisedAgent.agentUser)
         } yield groupDeletionStatus match {
           case TaxServiceGroupNotDeleted =>
             logger.info("Access group was not deleted")
@@ -129,16 +131,21 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  def updateGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def updateGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[UpdateTaxServiceGroupRequest] { updateGroupRequest =>
-        withGroupId(gid, authorisedAgent.arn) { (groupId, existingAccessGroup) =>
+        withTaxGroup(gid, authorisedAgent.arn) { existingAccessGroup =>
           val mergedAccessGroup = updateGroupRequest.merge(existingAccessGroup)
 
           if (mergedAccessGroup.groupName.length > MAX_LENGTH_GROUP_NAME) {
             badRequestGroupNameMaxLength
           } else {
-            taxGroupsService.update(groupId, mergedAccessGroup, authorisedAgent.agentUser) map {
+            taxGroupsService.update(
+              existingAccessGroup.arn,
+              existingAccessGroup.groupName,
+              mergedAccessGroup,
+              authorisedAgent.agentUser
+            ) map {
               case TaxServiceGroupNotUpdated =>
                 logger.info("Access group was not updated")
                 NotFound
@@ -154,19 +161,24 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  def addUnassignedMembers(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def addUnassignedMembers(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddMembersToTaxServiceGroupRequest] { updateGroupRequest =>
-        withGroupId(gid, authorisedAgent.arn) { (groupId, group) =>
+        withTaxGroup(gid, authorisedAgent.arn) { group =>
           val groupWithExcludedClientsAdded = updateGroupRequest.excludedClients.fold(group)(enrolments =>
-            group.copy(excludedClients = Some(group.excludedClients.getOrElse(Set.empty) ++ enrolments))
+            group.copy(excludedClients = group.excludedClients ++ enrolments)
           )
           val groupWithTeamMembersAdded = updateGroupRequest.teamMembers.fold(groupWithExcludedClientsAdded)(tms =>
-            group.copy(teamMembers = Some(group.teamMembers.getOrElse(Set.empty) ++ tms))
+            group.copy(teamMembers = group.teamMembers ++ tms)
           )
-          taxGroupsService.update(groupId, groupWithTeamMembersAdded, authorisedAgent.agentUser) map {
+          taxGroupsService.update(
+            group.arn,
+            group.groupName,
+            groupWithTeamMembersAdded,
+            authorisedAgent.agentUser
+          ) map {
             case TaxServiceGroupNotUpdated =>
-              logger.info(s"Access group '${groupId.groupName}' was not updated")
+              logger.info(s"Access group '${group.groupName}' was not updated")
               NotFound
             case TaxServiceGroupUpdated =>
               Ok
@@ -179,7 +191,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  def addTeamMemberToGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def addTeamMemberToGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { _ =>
       withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
         taxGroupsService.addMemberToGroup(gid, addRequest.teamMember) map {
@@ -192,7 +204,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     }
   }
 
-  def removeTeamMember(gid: String, memberId: String): Action[AnyContent] = Action.async { implicit request =>
+  def removeTeamMember(gid: GroupId, memberId: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       taxGroupsService
         .removeTeamMember(gid, memberId, authorisedAgent.agentUser)
@@ -228,20 +240,19 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
   }
 
   // TODO move to separate GroupAction
-  private def withGroupId(gid: String, authorisedArn: Arn)(
-    body: (GroupId, TaxGroup) => Future[Result]
+  private def withTaxGroup(gid: GroupId, authorisedArn: Arn)(
+    body: TaxGroup => Future[Result]
   )(implicit hc: HeaderCarrier): Future[Result] =
     taxGroupsService.getById(gid) flatMap {
       case None =>
         logger.warn(s"Group not found for '$gid', cannot update")
         Future.successful(BadRequest(s"Check provided gid '$gid"))
       case Some(accessGroup) =>
-        val groupId = GroupId(accessGroup.arn, accessGroup.groupName)
-        if (groupId.arn != authorisedArn) {
+        if (accessGroup.arn != authorisedArn) {
           logger.warn("ARN obtained from provided group id did not match with that identified by auth")
           Future.successful(Forbidden)
         } else {
-          body(groupId, accessGroup)
+          body(accessGroup)
         }
     }
 

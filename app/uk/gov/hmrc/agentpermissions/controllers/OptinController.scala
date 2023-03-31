@@ -18,9 +18,10 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.libs.json.JsString
 import play.api.mvc._
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptedIn, OptedOut}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.service.OptinService
+import uk.gov.hmrc.agents.accessgroups.optin._
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import javax.inject.{Inject, Singleton}

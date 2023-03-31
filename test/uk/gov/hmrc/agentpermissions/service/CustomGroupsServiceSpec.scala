@@ -16,23 +16,24 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import akka.stream.Materializer
 import com.mongodb.client.result.UpdateResult
 import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
-import org.bson.types.ObjectId
 import org.scalamock.handlers._
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, AssignedClient, GroupDelegatedEnrolments, PaginatedList, PaginationMetaData}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
-import uk.gov.hmrc.agentpermissions.repository.AccessGroupsRepository
+import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup, GroupSummary, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
-class AccessGroupsServiceSpec extends BaseSpec {
+class CustomGroupsServiceSpec extends BaseSpec {
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -46,33 +47,33 @@ class AccessGroupsServiceSpec extends BaseSpec {
     val clientPpt: Client = Client(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", "Frank Wright")
     val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
 
-    val groupId: GroupId = GroupId(arn, groupName)
-    val dbId: ObjectId = new ObjectId()
+    val dbId: GroupId = GroupId.random()
 
     val accessGroup: CustomGroup = CustomGroup(
+      GroupId.random(),
       arn,
       groupName,
       now,
       now,
       user,
       user,
-      Some(Set(user, user1, user2)),
-      Some(Set(clientVat, clientPpt, clientCgt))
+      Set(user, user1, user2),
+      Set(clientVat, clientPpt, clientCgt)
     )
 
     val taxServiceGroup: TaxGroup =
       TaxGroup(
-        new ObjectId(),
+        GroupId.random(),
         arn,
         groupName,
         now,
         now,
         user,
         user,
-        Some(Set.empty),
+        Set.empty,
         serviceVat,
         automaticUpdates = true,
-        Some(Set.empty)
+        Set.empty
       )
 
     val clients = Seq(clientVat, clientPpt, clientCgt)
@@ -84,14 +85,14 @@ class AccessGroupsServiceSpec extends BaseSpec {
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    val mockAccessGroupsRepository: AccessGroupsRepository = mock[AccessGroupsRepository]
+    val mockAccessGroupsRepository: CustomGroupsRepositoryV2 = mock[CustomGroupsRepositoryV2]
     val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
     val mockTaxGroupsService: TaxGroupsService = mock[TaxGroupsService]
     val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
     val mockAuditService: AuditService = mock[AuditService]
 
-    val accessGroupsService: AccessGroupsService =
-      new AccessGroupsServiceImpl(
+    val accessGroupsService: CustomGroupsService =
+      new CustomGroupsServiceImpl(
         mockAccessGroupsRepository,
         mockUserEnrolmentAssignmentService,
         mockTaxGroupsService,
@@ -118,10 +119,10 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     def mockAccessGroupsRepositoryFindById(
       maybeAccessGroup: Option[CustomGroup]
-    ): CallHandler1[String, Future[Option[CustomGroup]]] =
+    ): CallHandler1[GroupId, Future[Option[CustomGroup]]] =
       (mockAccessGroupsRepository
-        .findById(_: String))
-        .expects(accessGroup._id.toHexString)
+        .findById(_: GroupId))
+        .expects(accessGroup.id)
         .returning(Future.successful(maybeAccessGroup))
 
     def mockAccessGroupsRepositoryGetAll(
@@ -150,34 +151,38 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
     def mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler2[GroupId, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+    ): CallHandler3[Arn, String, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForGroupDeletion(_: GroupId)(_: ExecutionContext))
-        .expects(groupId, *)
+        .calculateForGroupDeletion(_: Arn, _: String)(_: ExecutionContext))
+        .expects(arn, groupName, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
     def mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler3[GroupId, CustomGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+    ): CallHandler4[Arn, String, CustomGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForGroupUpdate(_: GroupId, _: CustomGroup)(_: ExecutionContext))
-        .expects(groupId, accessGroup, *)
+        .calculateForGroupUpdate(_: Arn, _: String, _: CustomGroup)(_: ExecutionContext))
+        .expects(arn, groupName, accessGroup, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
     def mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler4[GroupId, Set[Client], Set[AgentUser], ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+    ): CallHandler5[Arn, String, Set[Client], Set[AgentUser], ExecutionContext, Future[
+      Option[UserEnrolmentAssignments]
+    ]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForRemoveFromGroup(_: GroupId, _: Set[Client], _: Set[AgentUser])(_: ExecutionContext))
-        .expects(*, *, *, *)
+        .calculateForRemoveFromGroup(_: Arn, _: String, _: Set[Client], _: Set[AgentUser])(_: ExecutionContext))
+        .expects(*, *, *, *, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
     def mockUserEnrolmentAssignmentServiceCalculateForAddToGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-    ): CallHandler4[GroupId, Set[Client], Set[AgentUser], ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
+    ): CallHandler5[Arn, String, Set[Client], Set[AgentUser], ExecutionContext, Future[
+      Option[UserEnrolmentAssignments]
+    ]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForAddToGroup(_: GroupId, _: Set[Client], _: Set[AgentUser])(_: ExecutionContext))
-        .expects(*, *, *, *)
+        .calculateForAddToGroup(_: Arn, _: String, _: Set[Client], _: Set[AgentUser])(_: ExecutionContext))
+        .expects(*, *, *, *, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
     def mockAccessGroupsRepositoryDelete(
@@ -197,23 +202,23 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .returning(Future.successful(maybeModifiedCount))
 
     def mockAddTeamMemberToGroup(
-      groupId: String,
+      groupId: GroupId,
       member: AgentUser,
       updatedCount: Int = 1
-    ): CallHandler2[String, AgentUser, Future[UpdateResult]] =
+    ): CallHandler2[GroupId, AgentUser, Future[UpdateResult]] =
       (mockAccessGroupsRepository
-        .addTeamMember(_: String, _: AgentUser))
+        .addTeamMember(_: GroupId, _: AgentUser))
         .expects(groupId, member)
         .returning(Future.successful(UpdateResult.acknowledged(updatedCount, updatedCount, null)))
 
     def mockAddRemoveClientFromGroup(
-      groupId: String,
+      groupId: GroupId,
       client: Client,
       updatedCount: Int = 1
-    ): CallHandler2[String, String, Future[UpdateResult]] = {
+    ): CallHandler2[GroupId, String, Future[UpdateResult]] = {
       val updateResult = UpdateResult.acknowledged(updatedCount, updatedCount, null)
       (mockAccessGroupsRepository
-        .removeClient(_: String, _: String))
+        .removeClient(_: GroupId, _: String))
         .expects(groupId, client.enrolmentKey)
         .returning(Future.successful(updateResult))
     }
@@ -243,14 +248,6 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .pushCalculatedAssignments(_: Option[UserEnrolmentAssignments])(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful eacdAssignmentsPushStatus)
-
-    def mockUserClientDetailsConnectorGetClientsWithAssignedUsers(
-      maybeGroupDelegatedEnrolments: Option[GroupDelegatedEnrolments]
-    ): CallHandler4[Arn, HeaderCarrier, ExecutionContext, Materializer, Future[Option[GroupDelegatedEnrolments]]] =
-      (mockUserClientDetailsConnector
-        .getClientsWithAssignedUsers(_: Arn)(_: HeaderCarrier, _: ExecutionContext, _: Materializer))
-        .expects(arn, *, *, *)
-        .returning(Future successful maybeGroupDelegatedEnrolments)
 
     def mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(
       maybeOutstandingAssignmentsWorkItemsExist: Option[Boolean]
@@ -304,7 +301,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         .returning(())
 
     def withClientNamesRemoved(accessGroup: CustomGroup): CustomGroup =
-      accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = ""))))
+      accessGroup.copy(clients = accessGroup.clients.map(_.copy(friendlyName = "")))
   }
 
   "Calling create" when {
@@ -397,7 +394,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockAccessGroupsRepositoryGet(Some(accessGroupInMongo))
         mockUserClientDetailsConnectorGetClients(Some(clients))
 
-        accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+        accessGroupsService.get(arn, groupName).futureValue shouldBe
           Some(accessGroup)
       }
     }
@@ -407,8 +404,8 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockAccessGroupsRepositoryGet(Some(accessGroupInMongo))
         mockUserClientDetailsConnectorGetClients(Some(Seq.empty))
 
-        accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
-          Some(accessGroup.copy(clients = accessGroup.clients.map(_.map(_.copy(friendlyName = "")))))
+        accessGroupsService.get(arn, groupName).futureValue shouldBe
+          Some(accessGroup.copy(clients = accessGroup.clients.map(_.copy(friendlyName = ""))))
       }
     }
 
@@ -416,18 +413,18 @@ class AccessGroupsServiceSpec extends BaseSpec {
       "return no group" in new TestScope {
         mockAccessGroupsRepositoryGet(None)
 
-        accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
+        accessGroupsService.get(arn, groupName).futureValue shouldBe
           None
       }
     }
 
     "group with no clients" should {
       "return the group" in new TestScope {
-        mockAccessGroupsRepositoryGet(Some(accessGroup.copy(clients = None)))
+        mockAccessGroupsRepositoryGet(Some(accessGroup.copy(clients = Set.empty)))
         mockUserClientDetailsConnectorGetClients(Some(clients))
 
-        accessGroupsService.get(GroupId(arn, groupName)).futureValue shouldBe
-          Some(accessGroup.copy(clients = None))
+        accessGroupsService.get(arn, groupName).futureValue shouldBe
+          Some(accessGroup.copy(clients = Set.empty))
       }
     }
   }
@@ -438,7 +435,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
       "return corresponding summaries" in new TestScope {
 
         val ag1: CustomGroup = accessGroup
-        val ag2: CustomGroup = accessGroup.copy(groupName = "group 2", clients = Some(Set(clientVat)))
+        val ag2: CustomGroup = accessGroup.copy(groupName = "group 2", clients = Set(clientVat))
 
         mockAccessGroupsRepositoryGetAll(
           Seq(withClientNamesRemoved(ag1), withClientNamesRemoved(ag2))
@@ -447,7 +444,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         accessGroupsService
           .getCustomGroupSummariesForClient(arn, s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789")
           .futureValue shouldBe
-          Seq(GroupSummary(ag1._id.toHexString, "some group", Some(3), 3))
+          Seq(GroupSummary(ag1.id, "some group", Some(3), 3))
       }
     }
   }
@@ -458,14 +455,14 @@ class AccessGroupsServiceSpec extends BaseSpec {
       "return corresponding summaries" in new TestScope {
 
         val ag1: CustomGroup = accessGroup
-        val ag2: CustomGroup = accessGroup.copy(groupName = "group 2", teamMembers = Some(Set(user3)))
+        val ag2: CustomGroup = accessGroup.copy(groupName = "group 2", teamMembers = Set(user3))
 
         mockAccessGroupsRepositoryGetAll(
           Seq(withClientNamesRemoved(ag1), withClientNamesRemoved(ag2))
         )
 
         accessGroupsService.getCustomGroupSummariesForTeamMember(arn, "user3").futureValue shouldBe
-          Seq(GroupSummary(ag2._id.toHexString, "group 2", Some(3), 1))
+          Seq(GroupSummary(ag2.id, "group 2", Some(3), 1))
       }
     }
   }
@@ -475,12 +472,12 @@ class AccessGroupsServiceSpec extends BaseSpec {
     "group exists" should {
       "return corresponding summaries" in new TestScope {
         (mockAccessGroupsRepository
-          .findById(_: String))
-          .expects(dbId.toHexString)
+          .findById(_: GroupId))
+          .expects(dbId)
           .returning(Future.successful(Some(accessGroupInMongo)))
         mockUserClientDetailsConnectorGetClients(Some(clients))
 
-        accessGroupsService.getById(dbId.toHexString).futureValue shouldBe
+        accessGroupsService.getById(dbId).futureValue shouldBe
           Some(accessGroup)
       }
     }
@@ -493,7 +490,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(None)
         mockAccessGroupsRepositoryDelete(None)
 
-        accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupNotDeleted
+        accessGroupsService.delete(arn, groupName, user).futureValue shouldBe AccessGroupNotDeleted
       }
     }
 
@@ -504,7 +501,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(maybeUserEnrolmentAssignments)
           mockAccessGroupsRepositoryDelete(Some(0L))
 
-          accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupNotDeleted
+          accessGroupsService.delete(arn, groupName, user).futureValue shouldBe AccessGroupNotDeleted
         }
       }
 
@@ -518,7 +515,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
             mockAuditServiceAuditEsAssignmentUnassignments()
             mockAuditServiceAuditAccessGroupDeletion()
 
-            accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupDeleted
+            accessGroupsService.delete(arn, groupName, user).futureValue shouldBe AccessGroupDeleted
           }
         }
 
@@ -529,7 +526,9 @@ class AccessGroupsServiceSpec extends BaseSpec {
             mockUserEnrolmentAssignmentServicePushCalculatedAssignments(AssignmentsNotPushed)
             mockAuditServiceAuditAccessGroupDeletion()
 
-            accessGroupsService.delete(groupId, user).futureValue shouldBe AccessGroupDeletedWithoutAssignmentsPushed
+            accessGroupsService
+              .delete(arn, groupName, user)
+              .futureValue shouldBe AccessGroupDeletedWithoutAssignmentsPushed
           }
         }
       }
@@ -544,7 +543,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(None)
         mockAccessGroupsRepositoryUpdate(None)
 
-        accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
+        accessGroupsService.update(arn, groupName, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
       }
     }
 
@@ -553,7 +552,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(maybeUserEnrolmentAssignments)
         mockAccessGroupsRepositoryUpdate(Some(0))
 
-        accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
+        accessGroupsService.update(arn, groupName, accessGroup, user).futureValue shouldBe AccessGroupNotUpdated
       }
     }
 
@@ -567,7 +566,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockAuditServiceAuditEsAssignmentUnassignments()
           mockAuditServiceAuditAccessGroupUpdate()
 
-          accessGroupsService.update(groupId, accessGroup, user).futureValue shouldBe AccessGroupUpdated
+          accessGroupsService.update(arn, groupName, accessGroup, user).futureValue shouldBe AccessGroupUpdated
         }
       }
 
@@ -579,7 +578,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockAuditServiceAuditAccessGroupUpdate()
 
           accessGroupsService
-            .update(groupId, accessGroup, user)
+            .update(arn, groupName, accessGroup, user)
             .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
         }
       }
@@ -719,7 +718,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         val enrolmentKeyVAT = "HMRC-MTD-VAT~VRN~123456789"
         val enrolmentKeyPPT = "HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345"
         val taxServiceAccessGroup =
-          taxServiceGroup.copy(service = "HMRC-PPT-ORG", excludedClients = Some(Set(Client(enrolmentKeyPPT, "bar"))))
+          taxServiceGroup.copy(service = "HMRC-PPT-ORG", excludedClients = Set(Client(enrolmentKeyPPT, "bar")))
 
         mockUserClientDetailsConnectorGetClients(
           Some(
@@ -752,7 +751,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
         // then
         accessGroupsService
-          .addMemberToGroup(accessGroup._id.toHexString, user, user1)
+          .addMemberToGroup(accessGroup.id, user, user1)
           .futureValue shouldBe AccessGroupUpdated
       }
 
@@ -765,7 +764,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
         // then
         accessGroupsService
-          .addMemberToGroup(accessGroup._id.toHexString, user, user1)
+          .addMemberToGroup(accessGroup.id, user, user1)
           .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
       }
 
@@ -776,7 +775,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockAccessGroupsRepositoryUpdate(Some(0))
           // then
           accessGroupsService
-            .addMemberToGroup(accessGroup._id.toHexString, user, user1)
+            .addMemberToGroup(accessGroup.id, user, user1)
             .futureValue shouldBe AccessGroupNotUpdated
         }
         "mongo update count is None" in new TestScope {
@@ -785,7 +784,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockAccessGroupsRepositoryUpdate(None)
 
           accessGroupsService
-            .addMemberToGroup(accessGroup._id.toHexString, user, user1)
+            .addMemberToGroup(accessGroup.id, user, user1)
             .futureValue shouldBe AccessGroupNotUpdated
         }
       }
@@ -796,7 +795,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockAccessGroupsRepositoryFindById(None)
         // then
         accessGroupsService
-          .addMemberToGroup(accessGroup._id.toHexString, user, user1)
+          .addMemberToGroup(accessGroup.id, user, user1)
           .futureValue shouldBe AccessGroupNotUpdated
       }
     }
@@ -817,7 +816,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
         // when
         private val result =
-          accessGroupsService.removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user).futureValue
+          accessGroupsService.removeClient(accessGroup.id, clientVat.enrolmentKey, user).futureValue
 
         // then
         result shouldBe AccessGroupUpdated
@@ -831,7 +830,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
         mockAuditServiceAuditAccessGroupUpdate()
         // then
         accessGroupsService
-          .removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user)
+          .removeClient(accessGroup.id, clientVat.enrolmentKey, user)
           .futureValue shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
       }
 
@@ -842,7 +841,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockAccessGroupsRepositoryUpdate(Some(0))
           // then
           accessGroupsService
-            .removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user)
+            .removeClient(accessGroup.id, clientVat.enrolmentKey, user)
             .futureValue shouldBe AccessGroupNotUpdated
         }
         "mongo update count is None" in new TestScope {
@@ -851,7 +850,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockAccessGroupsRepositoryUpdate(None)
 
           accessGroupsService
-            .removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user)
+            .removeClient(accessGroup.id, clientVat.enrolmentKey, user)
             .futureValue shouldBe AccessGroupNotUpdated
         }
       }
@@ -861,7 +860,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
       s"return $AccessGroupNotUpdated" in new TestScope {
         mockAccessGroupsRepositoryFindById(None)
         accessGroupsService
-          .removeClient(accessGroup._id.toHexString, clientVat.enrolmentKey, user)
+          .removeClient(accessGroup.id, clientVat.enrolmentKey, user)
           .futureValue shouldBe AccessGroupNotUpdated
       }
     }
@@ -881,7 +880,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
         // when
         private val result =
-          accessGroupsService.removeTeamMember(accessGroup._id.toHexString, user1.id, user).futureValue
+          accessGroupsService.removeTeamMember(accessGroup.id, user1.id, user).futureValue
 
         // then
         result shouldBe AccessGroupUpdated
@@ -897,7 +896,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
 
         // when
         private val result =
-          accessGroupsService.removeTeamMember(accessGroup._id.toHexString, user1.id, user).futureValue
+          accessGroupsService.removeTeamMember(accessGroup.id, user1.id, user).futureValue
 
         // then
         result shouldBe AccessGroupUpdatedWithoutAssignmentsPushed
@@ -910,7 +909,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockAccessGroupsRepositoryUpdate(Some(0))
 
           accessGroupsService
-            .removeTeamMember(accessGroup._id.toHexString, randomAlphabetic(8), user)
+            .removeTeamMember(accessGroup.id, randomAlphabetic(8), user)
             .futureValue shouldBe AccessGroupNotUpdated
         }
         "mongo update count is None" in new TestScope {
@@ -919,7 +918,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
           mockAccessGroupsRepositoryUpdate(None)
 
           accessGroupsService
-            .removeTeamMember(accessGroup._id.toHexString, randomAlphabetic(8), user)
+            .removeTeamMember(accessGroup.id, randomAlphabetic(8), user)
             .futureValue shouldBe AccessGroupNotUpdated
         }
       }
@@ -929,7 +928,7 @@ class AccessGroupsServiceSpec extends BaseSpec {
       s"return $AccessGroupNotUpdated" in new TestScope {
         mockAccessGroupsRepositoryFindById(None)
         accessGroupsService
-          .removeTeamMember(accessGroup._id.toHexString, randomAlphabetic(8), user)
+          .removeTeamMember(accessGroup.id, randomAlphabetic(8), user)
           .futureValue shouldBe AccessGroupNotUpdated
       }
     }
@@ -946,26 +945,26 @@ class AccessGroupsServiceSpec extends BaseSpec {
         private val FILTER: Some[String] = Some("VAT")
 
         private val mockedResponse: PaginatedList[Client] = PaginatedList[Client](
-          accessGroup.clients.get.toSeq,
+          accessGroup.clients.toSeq,
           PaginationMetaData(lastPage = false, firstPage = false, 40, 4, 10, 2, 10, None)
         )
         (mockAccessGroupsRepository
-          .findById(_: String))
-          .expects(dbId.toHexString)
+          .findById(_: GroupId))
+          .expects(dbId)
           .returning(Future.successful(Some(accessGroup)))
         mockAucdGetPaginatedClientsForArn(accessGroup.arn, PAGE, PAGE_SIZE, SEARCH, FILTER)(mockedResponse)
 
         // when
         val response =
           accessGroupsService
-            .getGroupByIdWithPageOfClientsToAdd(dbId.toString, PAGE, PAGE_SIZE, SEARCH, FILTER)
+            .getGroupByIdWithPageOfClientsToAdd(dbId, PAGE, PAGE_SIZE, SEARCH, FILTER)
             .futureValue
 
         // then
         response should not equal None
         response.get._1.groupName shouldBe accessGroup.groupName
-        response.get._1.groupId shouldBe accessGroup._id.toString
-        response.get._2.pageContent.length shouldBe accessGroup.clients.get.size
+        response.get._1.groupId shouldBe accessGroup.id
+        response.get._2.pageContent.length shouldBe accessGroup.clients.size
       }
     }
   }

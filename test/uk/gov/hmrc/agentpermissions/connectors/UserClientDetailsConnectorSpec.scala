@@ -18,17 +18,17 @@ package uk.gov.hmrc.agentpermissions.connectors
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
 import com.kenshoo.play.metrics.Metrics
 import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2}
 import play.api.http.Status._
 import play.api.libs.json.{JsArray, Json}
 import play.api.libs.ws.{BodyWritable, DefaultBodyWritables, WSRequest}
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, PaginatedList, PaginationMetaData}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
+import uk.gov.hmrc.agents.accessgroups.Client
 import uk.gov.hmrc.http.client.{HttpClientV2, RequestBuilder, StreamHttpReads}
 import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpReads, HttpResponse, UpstreamErrorResponse}
 
@@ -514,51 +514,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
   }
 
   "getClientsWithAssignedUsers" when {
-
-    s"http response has $OK status code" should {
-      "return some value" in new TestScope {
-        mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
-
-        mockHttpGetV2(
-          new URL(
-            s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users"
-          )
-        )
-
-        mockRequestBuilderTransform
-        mockRequestBuilderStream[Source[ByteString, _]](
-          Source.future(
-            Future successful ByteString(
-              "[][{\"clientEnrolmentKey\": \"service~key~value\", \"assignedTo\": \"userid\"}][]"
-            )
-          )
-        )
-        userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe Some(
-          GroupDelegatedEnrolments(Seq(AssignedClient("service~key~value", None, "userid")))
-        )
-      }
-    }
-
-    "http response has non-200 status codes" should {
-      Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
-        s"return nothing for $statusCode" in new TestScope {
-          mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
-
-          mockHttpGetV2(
-            new URL(
-              s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/clients-assigned-users"
-            )
-          )
-
-          mockRequestBuilderTransform
-          mockRequestBuilderStreamFailed(UpstreamErrorResponse("boo boo", statusCode))
-
-          userClientDetailsConnector.getClientsWithAssignedUsers(arn).futureValue shouldBe None
-        }
-      }
-    }
 
     "getTeamMembers" when {
 

@@ -17,10 +17,11 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.CallHandler3
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, OptedOutEligible, OptedOutSingleUser, OptedOutWrongClientCount}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agents.accessgroups.optin._
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.{ExecutionContext, Future}

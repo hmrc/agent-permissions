@@ -17,12 +17,14 @@
 package uk.gov.hmrc.agentpermissions.service.audit
 
 import com.google.inject.ImplementedBy
-import org.bson.types.ObjectId
 import play.api.Logging
 import play.api.libs.json._
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentsSplitter
+import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentOps
+import uk.gov.hmrc.agents.accessgroups.{AccessGroup, AgentUser, Client, CustomGroup, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
@@ -78,21 +80,18 @@ object AuditUserEnrolmentAssignments {
 }
 
 case class AuditAccessGroup(
-  _id: ObjectId,
+  _id: GroupId,
   agentReferenceNumber: String,
   groupName: String,
   created: LocalDateTime,
   lastUpdated: LocalDateTime,
   createdBy: AgentUser,
   lastUpdatedBy: AgentUser,
-  teamMembers: Option[Set[AgentUser]],
-  clients: Option[Set[Client]]
+  teamMembers: Set[AgentUser],
+  clients: Set[Client]
 )
 
 object AuditAccessGroup {
-
-  implicit val objectIdFormat: Format[ObjectId] = CustomGroup.objectIdFormat
-
   implicit val formatAccessGroup: OFormat[AuditAccessGroup] = Json.format[AuditAccessGroup]
 }
 
@@ -109,7 +108,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
         .split(accessGroup, appConfig.accessGroupChunkSize)
         .map(accessGroup =>
           AuditAccessGroup(
-            accessGroup._id,
+            accessGroup.id,
             accessGroup.arn.value,
             accessGroup.groupName,
             accessGroup.created,
@@ -131,7 +130,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
         .split(accessGroup, appConfig.accessGroupChunkSize)
         .map(accessGroup =>
           AuditAccessGroup(
-            accessGroup._id,
+            accessGroup.id,
             accessGroup.arn.value,
             accessGroup.groupName,
             accessGroup.created,
@@ -157,7 +156,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
     userEnrolmentAssignments: UserEnrolmentAssignments
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit = {
     val splitUserEnrolmentAssignments =
-      UserEnrolmentAssignmentsSplitter
+      UserEnrolmentAssignmentOps
         .split(userEnrolmentAssignments, appConfig.useEnrolmentAssignmentsChunkSize)
         .map(userEnrolmentAssignments =>
           AuditUserEnrolmentAssignments(
@@ -194,7 +193,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       AccessGroupClientsRemoval
         .split(
           customGroup.arn.value,
-          customGroup._id,
+          customGroup.id,
           customGroup.groupName,
           clientsToRemove,
           chunkSize = appConfig.clientsRemovalChunkSize
@@ -210,7 +209,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       AccessGroupClientsRemoval
         .split(
           taxGroup.arn.value,
-          taxGroup._id,
+          taxGroup.id,
           taxGroup.groupName,
           clientsToRemove,
           chunkSize = appConfig.clientsRemovalChunkSize
@@ -225,7 +224,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       "GranularPermissionsAccessGroupTeamMembersRemoval",
       AccessGroupTeamMembersRemoval.split(
         accessGroup.arn.value,
-        accessGroup._id,
+        accessGroup.id,
         accessGroup.groupName,
         teamMembersToRemove,
         chunkSize = appConfig.teamMembersRemovalChunkSize

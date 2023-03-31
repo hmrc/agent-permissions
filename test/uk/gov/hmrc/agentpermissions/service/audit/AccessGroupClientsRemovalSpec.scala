@@ -16,14 +16,14 @@
 
 package uk.gov.hmrc.agentpermissions.service.audit
 
-import org.bson.types.ObjectId
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.models.GroupId
 
 class AccessGroupClientsRemovalSpec extends BaseSpec with AuditTestSupport {
 
   "Split" should {
     "create chunks correctly" in {
-      val accessGroupId = new ObjectId()
+      val accessGroupId = GroupId.random()
       val groupName = "some group"
       val chunkSize = 10
 

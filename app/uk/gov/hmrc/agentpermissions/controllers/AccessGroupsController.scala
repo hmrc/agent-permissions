@@ -18,10 +18,12 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.libs.json._
 import play.api.mvc._
-import uk.gov.hmrc.agentmtdidentifiers.model._
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentmtdidentifiers.utils.PaginatedListBuilder
 import uk.gov.hmrc.agentpermissions.model.{AddMembersToAccessGroupRequest, AddOneTeamMemberToGroupRequest, CreateAccessGroupRequest, UpdateAccessGroupRequest}
+import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.service._
+import uk.gov.hmrc.agents.accessgroups.{Client, CustomGroup, GroupSummary}
 import uk.gov.hmrc.auth.core.AuthorisationException
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -32,8 +34,8 @@ import scala.util.{Failure, Success, Try}
 
 @Singleton()
 class AccessGroupsController @Inject() (
-  accessGroupsService: AccessGroupsService, // TODO rename to customGroupsService
-  groupsService: GroupsService,
+  accessGroupsService: CustomGroupsService, // TODO rename to customGroupsService
+  groupsService: GroupSummaryService,
   eacdSynchronizer: EacdSynchronizer
 )(implicit authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
     extends BackendController(cc) with AuthorisedAgentSupport {
@@ -164,14 +166,14 @@ class AccessGroupsController @Inject() (
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         accessGroupsService
           .getAllCustomGroups(arn)
-          .map(groups => Ok(Json.toJson(groups.map(GroupSummary.fromAccessGroup))))
+          .map(groups => Ok(Json.toJson(groups.map(GroupSummary.of(_)))))
       }
     } transformWith failureHandler
   }
 
   // gets a custom access group ONLY
   @deprecated("group could be too big with 5000+ clients - use getCustomGroupSummary & paginated lists instead")
-  def getGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
+  def getGroup(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       accessGroupsService.getById(gid) map {
         case None =>
@@ -187,7 +189,7 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def getCustomGroupSummary(gid: String): Action[AnyContent] = Action.async { implicit request =>
+  def getCustomGroupSummary(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       accessGroupsService.getById(gid) map {
         case None =>
@@ -197,14 +199,14 @@ class AccessGroupsController @Inject() (
             logger.info("ARN obtained from provided group id did not match with that identified by auth")
             Forbidden
           } else {
-            Ok(Json.toJson(GroupSummary.fromAccessGroup(accessGroup)))
+            Ok(Json.toJson(GroupSummary.of(accessGroup)))
           }
       }
     } transformWith failureHandler
   }
 
   def getPaginatedClientsForGroup(
-    gid: String,
+    gid: GroupId,
     page: Int = 1,
     pageSize: Int = 20,
     search: Option[String] = None,
@@ -219,7 +221,7 @@ class AccessGroupsController @Inject() (
             logger.info("ARN obtained from provided group id did not match with that identified by auth")
             Forbidden
           } else {
-            val groupClients = accessGroup.clients.getOrElse(Set.empty)
+            val groupClients = accessGroup.clients
             val clientsMatchingSearch = search.fold(groupClients) { searchTerm =>
               groupClients.filter(c => c.friendlyName.toLowerCase.contains(searchTerm.toLowerCase))
             }
@@ -235,7 +237,7 @@ class AccessGroupsController @Inject() (
   }
 
   def getPaginatedClientsForAddingToGroup(
-    gid: String,
+    gid: GroupId,
     page: Int = 1,
     pageSize: Int = 20,
     search: Option[String] = None,
@@ -252,11 +254,12 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def deleteGroup(gid: String): Action[AnyContent] = Action.async { implicit request =>
+  def deleteGroup(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
-      withGroupId(gid, authorisedAgent.arn) { (groupId, _) =>
+      withCustomGroup(gid, authorisedAgent.arn) { customGroup =>
         for {
-          groupDeletionStatus <- accessGroupsService.delete(groupId, authorisedAgent.agentUser)
+          groupDeletionStatus <-
+            accessGroupsService.delete(customGroup.arn, customGroup.groupName, authorisedAgent.agentUser)
         } yield groupDeletionStatus match {
           case AccessGroupNotDeleted =>
             logger.info("Access group was not deleted")
@@ -271,16 +274,21 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def updateGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def updateGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[UpdateAccessGroupRequest] { updateAccessGroupRequest =>
-        withGroupId(gid, authorisedAgent.arn) { (groupId, existingAccessGroup) =>
+        withCustomGroup(gid, authorisedAgent.arn) { existingAccessGroup =>
           val mergedAccessGroup = updateAccessGroupRequest.merge(existingAccessGroup)
 
           if (mergedAccessGroup.groupName.length > MAX_LENGTH_GROUP_NAME) {
             badRequestGroupNameMaxLength
           } else {
-            accessGroupsService.update(groupId, mergedAccessGroup, authorisedAgent.agentUser) map {
+            accessGroupsService.update(
+              existingAccessGroup.arn,
+              existingAccessGroup.groupName,
+              mergedAccessGroup,
+              authorisedAgent.agentUser
+            ) map {
               case AccessGroupNotUpdated =>
                 logger.info("Custom group was not updated")
                 NotFound
@@ -296,7 +304,7 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def removeClient(gid: String, clientId: String): Action[AnyContent] = Action.async { implicit request =>
+  def removeClient(gid: GroupId, clientId: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       accessGroupsService
         .removeClient(gid, clientId, authorisedAgent.agentUser)
@@ -312,7 +320,7 @@ class AccessGroupsController @Inject() (
     }
   }
 
-  def removeTeamMember(gid: String, memberId: String): Action[AnyContent] = Action.async { implicit request =>
+  def removeTeamMember(gid: GroupId, memberId: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       accessGroupsService
         .removeTeamMember(gid, memberId, authorisedAgent.agentUser)
@@ -328,24 +336,29 @@ class AccessGroupsController @Inject() (
     }
   }
 
-  def addUnassignedMembers(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def addUnassignedMembers(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddMembersToAccessGroupRequest] { updateAccessGroupRequest =>
-        withGroupId(gid, authorisedAgent.arn) { (groupId, group) =>
+        withCustomGroup(gid, authorisedAgent.arn) { group =>
           val groupWithClientsAdded = updateAccessGroupRequest.clients.fold(group)(enrolments =>
-            group.copy(clients = Some(group.clients.getOrElse(Set.empty) ++ enrolments))
+            group.copy(clients = group.clients ++ enrolments)
           )
           val groupWithTeamMembersAdded = updateAccessGroupRequest.teamMembers.fold(groupWithClientsAdded)(tms =>
-            group.copy(teamMembers = Some(group.teamMembers.getOrElse(Set.empty) ++ tms))
+            group.copy(teamMembers = group.teamMembers ++ tms)
           )
-          accessGroupsService.update(groupId, groupWithTeamMembersAdded, authorisedAgent.agentUser) map {
+          accessGroupsService.update(
+            group.arn,
+            group.groupName,
+            groupWithTeamMembersAdded,
+            authorisedAgent.agentUser
+          ) map {
             case AccessGroupNotUpdated =>
-              logger.info(s"Access group '${groupId.groupName}' was not updated")
+              logger.info(s"Access group '${group.groupName}' was not updated")
               NotFound
             case AccessGroupUpdated =>
               Ok
             case AccessGroupUpdatedWithoutAssignmentsPushed =>
-              logger.warn(s"Access group '${groupId.groupName}' was updated, but assignments were not pushed")
+              logger.warn(s"Access group '${group.groupName}' was updated, but assignments were not pushed")
               Ok
           }
         }
@@ -353,7 +366,7 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def addTeamMemberToGroup(gid: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def addTeamMemberToGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
         accessGroupsService
@@ -388,20 +401,19 @@ class AccessGroupsController @Inject() (
     }.transformWith(failureHandler)
   }
 
-  private def withGroupId(gid: String, authorisedArn: Arn)(
-    body: (GroupId, CustomGroup) => Future[Result]
+  private def withCustomGroup(gid: GroupId, authorisedArn: Arn)(
+    body: CustomGroup => Future[Result]
   )(implicit hc: HeaderCarrier): Future[Result] =
     accessGroupsService.getById(gid) flatMap {
       case None =>
         logger.warn(s"Group not found for '$gid', cannot update")
         Future.successful(BadRequest(s"Check provided gid '$gid"))
       case Some(accessGroup) =>
-        val groupId = GroupId(accessGroup.arn, accessGroup.groupName)
-        if (groupId.arn != authorisedArn) {
+        if (accessGroup.arn != authorisedArn) {
           logger.warn("ARN obtained from provided group id did not match with that identified by auth")
           Future.successful(Forbidden)
         } else {
-          body(groupId, accessGroup)
+          body(accessGroup)
         }
     }
 

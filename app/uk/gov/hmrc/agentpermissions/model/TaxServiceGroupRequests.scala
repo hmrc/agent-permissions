@@ -17,7 +17,9 @@
 package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.{Json, OFormat}
-import uk.gov.hmrc.agentmtdidentifiers.model.{AgentUser, Arn, Client, TaxGroup}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, TaxGroup}
 
 import java.time.LocalDateTime
 
@@ -35,16 +37,17 @@ case class CreateTaxServiceGroupRequest(
     val now = LocalDateTime.now()
 
     TaxGroup(
+      GroupId.random(),
       arn,
       Option(groupName).map(_.trim).getOrElse(""),
       now,
       now,
       agentUser,
       agentUser,
-      teamMembers,
+      teamMembers.getOrElse(Set.empty),
       service,
       autoUpdate,
-      excludedClients
+      excludedClients.getOrElse(Set.empty)
     )
   }
 }
@@ -66,11 +69,10 @@ case class UpdateTaxServiceGroupRequest(
       groupName.fold(existingGroup)(name => existingGroup.copy(groupName = Option(name).map(_.trim).getOrElse("")))
 
     val withMergedTeamMembers =
-      teamMembers.fold(withMergedGroupName)(tms => withMergedGroupName.copy(teamMembers = Some(tms)))
+      teamMembers.fold(withMergedGroupName)(tms => withMergedGroupName.copy(teamMembers = tms))
 
-    val withExcludedClients = excludedClients.fold(withMergedTeamMembers)(exClients =>
-      withMergedTeamMembers.copy(excludedClients = Some(exClients))
-    )
+    val withExcludedClients =
+      excludedClients.fold(withMergedTeamMembers)(exClients => withMergedTeamMembers.copy(excludedClients = exClients))
 
     autoUpdate.fold(withExcludedClients)(au => withExcludedClients.copy(automaticUpdates = au))
   }

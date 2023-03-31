@@ -16,24 +16,23 @@
 
 package uk.gov.hmrc.agentpermissions.service.audit
 
-import org.bson.types.ObjectId
-import play.api.libs.json.{JsString, Json, Writes}
-import uk.gov.hmrc.agentmtdidentifiers.model.Client
+import play.api.libs.json.{Json, Writes}
+import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agents.accessgroups.Client
 
 case class AccessGroupClientsRemoval(
   agentReferenceNumber: String,
-  accessGroupId: ObjectId,
+  accessGroupId: GroupId,
   accessGroupName: String,
   clients: Set[Client]
 )
 
 object AccessGroupClientsRemoval {
-  implicit val objectIdWrites: Writes[ObjectId] = Writes[ObjectId]((o: ObjectId) => JsString(o.toHexString))
   implicit val writes: Writes[AccessGroupClientsRemoval] = Json.writes[AccessGroupClientsRemoval]
 
   def split(
     agentReferenceNumber: String,
-    accessGroupId: ObjectId,
+    accessGroupId: GroupId,
     groupName: String,
     clientsToRemove: Set[Client],
     chunkSize: Int

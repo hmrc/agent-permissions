@@ -36,14 +36,25 @@ class CryptoProviderModuleSpec extends BaseSpec {
   "CryptoProviderModule" should {
     "provide a real crypto instance if field-level encryption is enabled in config" in {
       val x =
-        new CryptoProviderModule().cryptoInstance(configuration(fieldLevelEncryptionEnabled = true))
+        new CryptoProviderModule().aesCryptoInstance(configuration(fieldLevelEncryptionEnabled = true))
       x should not be a[NoCrypto]
     }
     "provide a no-op crypto instance if field-level encryption is enabled in config" in {
       val x =
-        new CryptoProviderModule().cryptoInstance(configuration(fieldLevelEncryptionEnabled = false))
+        new CryptoProviderModule().aesCryptoInstance(configuration(fieldLevelEncryptionEnabled = false))
       x shouldBe a[NoCrypto]
     }
+
+//    "provide the correct implementation based on name" in {
+//      val aes = fakeApplication().injector.instanceOf(
+//        BindingKey(classOf[Encrypter with Decrypter], qualifier = Some(QualifierInstance(Named("aes"))))
+//      )
+//      aes.encrypt(PlainText("foo")) shouldBe aes.encrypt(PlainText("foo"))
+//      val aesGcm = fakeApplication().injector.instanceOf(
+//        BindingKey(classOf[Encrypter with Decrypter], qualifier = Some(QualifierInstance(Named("aesGcm"))))
+//      )
+//      aesGcm.encrypt(PlainText("foo")) should not be aesGcm.encrypt(PlainText("foo"))
+//    }
   }
 
   "NoCrypto" should {
