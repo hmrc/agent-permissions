@@ -36,6 +36,7 @@ abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures 
   val serviceIdentifierKeyCgt = "CgtRef"
   val serviceIdentifierKeyMtdit = "MTDITID"
   val serviceIdentifierKeyTrust = "SAUTR"
+  val serviceIdentifierKeyNTTrust = "URN"
 
   // Note: This is simply a randomly-chosen secret key to run tests
   val aesCrypto: Encrypter with Decrypter =

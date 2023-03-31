@@ -39,9 +39,11 @@ class GroupsServiceSpec extends BaseSpec {
     val user2: AgentUser = AgentUser("user2", "User 2")
     val user3: AgentUser = AgentUser("user3", "User 3")
 
-    val client1: Client = Client("HMRC-MTD-VAT~VRN~101747641", "John Innes")
-    val client2: Client = Client("HMRC-MTD-VAT~VRN~101746700", "Ann Von-Innes")
+    val client1: Client = Client(s"$serviceVat~VRN~101747641", "John Innes")
+    val client2: Client = Client(s"$serviceVat~VRN~101746700", "Ann Von-Innes")
     val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
+    val trustClient1: Client = Client(s"$serviceTrust~$serviceIdentifierKeyTrust~1234567890", "George Floyd")
+    val trustClient2: Client = Client(s"$serviceNTTrust~URN~XATRUST87165231", "George Corn")
 
     val taxGroup: TaxGroup = TaxGroup(
       GroupId.random(),
@@ -247,12 +249,38 @@ class GroupsServiceSpec extends BaseSpec {
   "Fetching all groups summaries for client" should {
 
     "return corresponding summaries" when {
-      "custom summaries and tax group found" in new TestScope {
-        mockCustomGroupsServiceGetGroupSummariesForClient(customSummaries)
-        mockTaxGroupsRepositoryGetByService(Some(taxGroup))
+      "custom summaries and tax group found" when {
+        "client is not a trust client" in new TestScope {
+          mockCustomGroupsServiceGetGroupSummariesForClient(customSummaries)
+          mockTaxGroupsRepositoryGetByService(Some(taxGroup))
 
-        groupsService.getAllGroupSummariesForClient(arn, clientCgt.enrolmentKey).futureValue shouldBe
-          customSummaries ++ Seq(GroupSummary.of(taxGroup))
+          groupsService.getAllGroupSummariesForClient(arn, clientCgt.enrolmentKey).futureValue shouldBe
+            customSummaries ++ Seq(GroupSummary.of(taxGroup))
+        }
+
+        "client is a taxable trust" in new TestScope {
+          mockCustomGroupsServiceGetGroupSummariesForClient(customSummaries)
+          mockTaxGroupsRepositoryGetByService(Some(taxGroup), service = "HMRC-TERS")
+
+          groupsService.getAllGroupSummariesForClient(arn, trustClient1.enrolmentKey).futureValue shouldBe
+            customSummaries ++ Seq(GroupSummary.of(taxGroup))
+        }
+
+        "client is a non-taxable trust" in new TestScope {
+          mockCustomGroupsServiceGetGroupSummariesForClient(customSummaries)
+          mockTaxGroupsRepositoryGetByService(Some(taxGroup), service = "HMRC-TERS")
+
+          groupsService.getAllGroupSummariesForClient(arn, trustClient2.enrolmentKey).futureValue shouldBe
+            customSummaries ++ Seq(GroupSummary.of(taxGroup))
+        }
+
+        "client is excluded from tax group" in new TestScope {
+          mockCustomGroupsServiceGetGroupSummariesForClient(customSummaries)
+          mockTaxGroupsRepositoryGetByService(Some(taxGroup), service = serviceVat)
+
+          groupsService.getAllGroupSummariesForClient(arn, client1.enrolmentKey).futureValue shouldBe
+            customSummaries
+        }
       }
 
       "custom summaries found but no tax group found" in new TestScope {
