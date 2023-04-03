@@ -476,11 +476,11 @@ class EacdSynchronizerSpec extends BaseSpec {
         .returns(Future.successful(itemsExist))
 
     def syncRepoCanBeAcquired(): Unit = (stubEacdSyncRepository
-      .acquire(_: Arn, _: Int))
-      .when(arn, *)
+      .acquire(_: Arn))
+      .when(arn)
       .returns(Future.successful(Some(EacdSyncRecord(arn, Instant.now()))))
     def syncRepoCannotBeAcquired(): Unit =
-      (stubEacdSyncRepository.acquire(_: Arn, _: Int)).when(arn, *).returns(Future.successful(None))
+      (stubEacdSyncRepository.acquire(_: Arn)).when(arn).returns(Future.successful(None))
   }
 
 }

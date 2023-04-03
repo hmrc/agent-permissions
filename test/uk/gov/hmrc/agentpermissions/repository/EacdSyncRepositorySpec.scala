@@ -18,6 +18,7 @@ package uk.gov.hmrc.agentpermissions.repository
 
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 
@@ -34,7 +35,7 @@ class EacdSyncRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySup
 
     "entry does not exist for ARN" should {
       "return value" in new TestScope {
-        eacdSyncRepository.acquire(arn, notBeforeSeconds = 10).futureValue.get.arn shouldBe arn
+        eacdSyncRepository.acquire(arn).futureValue.get.arn shouldBe arn
       }
     }
 
@@ -43,12 +44,12 @@ class EacdSyncRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySup
       "entry was last updated outside of refresh interval" should {
         "return value" in new TestScope {
 
-          val refreshInterval = 10
+          val refreshInterval = mockAppConfig.eacdSyncNotBeforeSeconds
           val lastUpdatedAt: Instant = Instant.now().minusSeconds(refreshInterval + 2)
 
           val eacdSyncRecord: EacdSyncRecord = (for {
             _                   <- repository.collection.insertOne(EacdSyncRecord(arn, lastUpdatedAt)).toFutureOption()
-            maybeEacdSyncRecord <- eacdSyncRepository.acquire(arn, notBeforeSeconds = refreshInterval)
+            maybeEacdSyncRecord <- eacdSyncRepository.acquire(arn)
           } yield maybeEacdSyncRecord).futureValue.get
 
           eacdSyncRecord.arn shouldBe arn
@@ -64,7 +65,7 @@ class EacdSyncRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySup
 
           (for {
             _                   <- repository.collection.insertOne(EacdSyncRecord(arn, lastUpdatedAt)).toFutureOption()
-            maybeEacdSyncRecord <- eacdSyncRepository.acquire(arn, notBeforeSeconds = refreshInterval)
+            maybeEacdSyncRecord <- eacdSyncRepository.acquire(arn)
           } yield maybeEacdSyncRecord).futureValue shouldBe None
         }
       }
@@ -75,6 +76,19 @@ class EacdSyncRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySup
     val arn: Arn = Arn("KARN1234567")
   }
 
+  // forced to do this as for some reason I can't get a functioning mock in this setup
+  private def mockAppConfig = new AppConfig {
+    override def agentUserClientDetailsBaseUrl: String = ""
+    override def agentSizeMaxClientCountAllowed: Int = 1000
+    override def checkArnAllowList: Boolean = false
+    override def allowedArns: Seq[String] = Seq.empty
+    override def clientsRemovalChunkSize: Int = 100
+    override def teamMembersRemovalChunkSize: Int = 100
+    override def accessGroupChunkSize: Int = 100
+    override def useEnrolmentAssignmentsChunkSize: Int = 100
+    override def eacdSyncNotBeforeSeconds: Int = 10 // <- The value we care about in this test
+  }
+
   override protected def repository: PlayMongoRepository[EacdSyncRecord] =
-    new EacdSyncRepositoryImpl(mongoComponent)
+    new EacdSyncRepositoryImpl(mongoComponent, mockAppConfig)
 }

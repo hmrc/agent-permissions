@@ -18,28 +18,31 @@ package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
 import com.mongodb.MongoWriteException
-import org.mongodb.scala.model.Filters.{and, equal, lt}
+import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.Indexes.ascending
-import org.mongodb.scala.model.{IndexModel, IndexOptions, ReplaceOptions}
+import org.mongodb.scala.model.{Filters, IndexModel, IndexOptions, ReplaceOptions}
 import play.api.Logging
 import play.api.libs.json.{Format, Json}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
 
 import java.time.Instant
 import javax.inject.{Inject, Singleton}
+import scala.concurrent.duration.SECONDS
 import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[EacdSyncRepositoryImpl])
 trait EacdSyncRepository {
-  def acquire(arn: Arn, notBeforeSeconds: Int): Future[Option[EacdSyncRecord]]
+  def acquire(arn: Arn): Future[Option[EacdSyncRecord]]
 }
 
 @Singleton
-class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent)(implicit ec: ExecutionContext)
-    extends {
+class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent, appConfig: AppConfig)(implicit
+  ec: ExecutionContext
+) extends {
       private val ARN = "arn"
       private val UPDATED_AT = "updatedAt"
     } with PlayMongoRepository[EacdSyncRecord](
@@ -47,27 +50,41 @@ class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent)(implicit
       domainFormat = EacdSyncRecord.format,
       mongoComponent = mongoComponent,
       indexes = Seq(
-        IndexModel(ascending(ARN), new IndexOptions().name("arnIdx").unique(true))
+        IndexModel(ascending(ARN), new IndexOptions().name("arnIdx").unique(true)),
+        IndexModel(
+          ascending(UPDATED_AT),
+          IndexOptions()
+            .background(false)
+            .name("idxUpdatedAt")
+            .expireAfter(appConfig.eacdSyncNotBeforeSeconds, SECONDS)
+        )
       )
     ) with EacdSyncRepository with Logging {
 
-  private val replaceOptions = ReplaceOptions().upsert(true)
-
-  override def acquire(arn: Arn, notBeforeSeconds: Int): Future[Option[EacdSyncRecord]] = {
-    lazy val beforeInstant = Instant.now().minusSeconds(notBeforeSeconds)
-    val searchFilters = and(equal(ARN, arn.value), lt(UPDATED_AT, beforeInstant))
-
-    val eacdSyncRecord = EacdSyncRecord(arn, Instant.now())
-
-    collection
-      .replaceOne(searchFilters, eacdSyncRecord, replaceOptions)
-      .headOption()
-      .map(_.flatMap(_ => Some(eacdSyncRecord)))
-      .recoverWith {
-        case ex: MongoWriteException if ex.getError.getCode == 11000 =>
-          logger.debug(s"Cannot acquire as being tried within refresh interval")
-          Future successful Option.empty[EacdSyncRecord]
-      }
+  override def acquire(arn: Arn): Future[Option[EacdSyncRecord]] = {
+    val newRecord = EacdSyncRecord(arn, Instant.now())
+    for {
+      // We are doing some overkill sanity deleting of old records as we have had some problems before
+      _ <- collection
+             .deleteMany(
+               Filters.and(
+                 Filters.equal(ARN, arn.value),
+                 Filters.lt(UPDATED_AT, Instant.now().minusSeconds(appConfig.eacdSyncNotBeforeSeconds))
+               )
+             )
+             .toFuture
+      syncRecords <- collection.find(equal(ARN, arn.value)).toFuture
+      maybeNewRecord <- syncRecords.toList match {
+                          case Nil =>
+                            collection
+                              .replaceOne(equal(ARN, arn.value), newRecord, ReplaceOptions().upsert(true))
+                              .headOption()
+                              .map(_.map(_ => newRecord))
+                          case _ =>
+                            logger.debug(s"Cannot acquire as an un-expired record already exists in the collection")
+                            Future.successful(None) // There are existing records in db; cannot acquire
+                        }
+    } yield maybeNewRecord
   }
 }
 

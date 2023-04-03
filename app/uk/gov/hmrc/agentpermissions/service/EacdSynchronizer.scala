@@ -200,7 +200,10 @@ class EacdSynchronizerImpl @Inject() (
       // return value is Future of (userId, Success(bool: updated or not)) or (userId, Failure(exception))
       }
       .map { fullSyncResults =>
-        val resyncedCount = fullSyncResults.count { case (_, Success(isChanged)) => isChanged }
+        val resyncedCount = fullSyncResults.count {
+          case (_, Success(isChanged)) => isChanged
+          case _                       => false
+        }
         val exceptions = fullSyncResults.collect { case (userId, Failure(e)) => (userId, e) }
         val failuresText = if (exceptions.isEmpty) "No failures." else s"${exceptions.size} failures."
         logger.info(
@@ -245,7 +248,7 @@ class EacdSynchronizerImpl @Inject() (
                                  "Could not ensure that outstanding assignment queue was empty. Not doing sync"
                                )
                                Future.successful(None)
-                             case Some(false) => eacdSyncRepository.acquire(arn, appConfig.eacdSyncNotBeforeSeconds)
+                             case Some(false) => eacdSyncRepository.acquire(arn)
                            }
 
     result <- maybeEacdSyncRecord match {
