@@ -136,10 +136,9 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
           // checking at the raw Document level that the relevant fields have been encrypted
           val document = groupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
           document.toString should include(accessGroup.groupName) // the group name should be in plaintext
-          // But the agent user ids and names should be encrypted
+          // But the agent user ids should be encrypted
           (accessGroup.teamMembers ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>
             document.toString should not include agentUser.id
-            document.toString should not include agentUser.name
           }
         }
       }

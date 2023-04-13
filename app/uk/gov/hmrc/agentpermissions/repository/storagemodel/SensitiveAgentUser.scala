@@ -22,13 +22,13 @@ import uk.gov.hmrc.crypto.{Decrypter, Encrypter, Sensitive}
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption
 
-case class SensitiveAgentUser(id: SensitiveString, name: SensitiveString) extends Sensitive[AgentUser] {
-  def decryptedValue: AgentUser = AgentUser(id = id.decryptedValue, name = name.decryptedValue)
+case class SensitiveAgentUser(id: SensitiveString, name: String) extends Sensitive[AgentUser] {
+  def decryptedValue: AgentUser = AgentUser(id = id.decryptedValue, name = name)
 }
 
 object SensitiveAgentUser {
   def apply(agentUser: AgentUser): SensitiveAgentUser =
-    SensitiveAgentUser(id = SensitiveString(agentUser.id), name = SensitiveString(agentUser.name))
+    SensitiveAgentUser(id = SensitiveString(agentUser.id), name = agentUser.name)
   implicit def formatAgentUser(implicit crypto: Encrypter with Decrypter): OFormat[SensitiveAgentUser] = {
     implicit val sensitiveStringFormat: Format[SensitiveString] =
       JsonEncryption.sensitiveEncrypterDecrypter(SensitiveString.apply)
