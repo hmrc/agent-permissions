@@ -27,11 +27,11 @@ import java.time.LocalDateTime
 
 class SensitiveCustomGroupSpec extends BaseSpec {
 
-  val agentUser1 = SensitiveAgentUser(SensitiveString("agentUser1"), SensitiveString("Robert Smith"))
-  val agentUser2 = SensitiveAgentUser(SensitiveString("agentUser2"), SensitiveString("Sandy Jones"))
-  val client1 = SensitiveClient(SensitiveString("HMRC-MTD-VAT~VRN~123456789"), SensitiveString(""))
+  val agentUser1 = SensitiveAgentUser(SensitiveString("agentUser1"), "Robert Smith")
+  val agentUser2 = SensitiveAgentUser(SensitiveString("agentUser2"), "Sandy Jones")
+  val client1 = SensitiveClient(SensitiveString("HMRC-MTD-VAT~VRN~123456789"), "")
   val client2 =
-    SensitiveClient(SensitiveString("HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345"), SensitiveString(""))
+    SensitiveClient(SensitiveString("HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345"), "")
 
   val sensitiveCustomGroup = SensitiveCustomGroup(
     _id = GroupId.random().toString,
@@ -57,9 +57,9 @@ class SensitiveCustomGroupSpec extends BaseSpec {
       implicit val crypto: Encrypter with Decrypter = aesCrypto
       val json = Json.toJson(sensitiveCustomGroup)
       (json \ "createdBy" \ "id").as[String] should not be sensitiveCustomGroup.createdBy.id
-      (json \ "createdBy" \ "name").as[String] should not be sensitiveCustomGroup.createdBy.name
+      (json \ "createdBy" \ "name").as[String] shouldBe sensitiveCustomGroup.createdBy.name
       (json \ "lastUpdatedBy" \ "id").as[String] should not be sensitiveCustomGroup.lastUpdatedBy.id
-      (json \ "lastUpdatedBy" \ "name").as[String] should not be sensitiveCustomGroup.lastUpdatedBy.name
+      (json \ "lastUpdatedBy" \ "name").as[String] shouldBe sensitiveCustomGroup.lastUpdatedBy.name
       val memberIds = sensitiveCustomGroup.teamMembers.toSeq.indices.map { index =>
         (json \ "teamMembers" \ index \ "id").as[String]
       }
@@ -67,7 +67,7 @@ class SensitiveCustomGroupSpec extends BaseSpec {
         (json \ "teamMembers" \ index \ "name").as[String]
       }
       memberIds should contain noElementsOf sensitiveCustomGroup.teamMembers.map(_.id)
-      memberNames should contain noElementsOf sensitiveCustomGroup.teamMembers.map(_.name)
+      memberNames should contain allElementsOf sensitiveCustomGroup.teamMembers.map(_.name)
     }
   }
 }

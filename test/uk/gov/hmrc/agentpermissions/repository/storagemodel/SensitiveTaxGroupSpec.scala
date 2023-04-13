@@ -27,9 +27,9 @@ import java.time.LocalDateTime
 
 class SensitiveTaxGroupSpec extends BaseSpec {
 
-  val agentUser1 = SensitiveAgentUser(SensitiveString("agentUser1"), SensitiveString("Robert Smith"))
-  val agentUser2 = SensitiveAgentUser(SensitiveString("agentUser2"), SensitiveString("Sandy Jones"))
-  val client1 = SensitiveClient(SensitiveString("HMRC-MTD-VAT~VRN~123456789"), SensitiveString(""))
+  val agentUser1 = SensitiveAgentUser(SensitiveString("agentUser1"), "Robert Smith")
+  val agentUser2 = SensitiveAgentUser(SensitiveString("agentUser2"), "Sandy Jones")
+  val client1 = SensitiveClient(SensitiveString("HMRC-MTD-VAT~VRN~123456789"), "")
 
   val sensitiveTaxGroup = SensitiveTaxGroup(
     _id = GroupId.random().toString,
@@ -57,9 +57,9 @@ class SensitiveTaxGroupSpec extends BaseSpec {
       implicit val crypto: Encrypter with Decrypter = aesCrypto
       val json = Json.toJson(sensitiveTaxGroup)
       (json \ "createdBy" \ "id").as[String] should not be sensitiveTaxGroup.createdBy.id
-      (json \ "createdBy" \ "name").as[String] should not be sensitiveTaxGroup.createdBy.name
+      (json \ "createdBy" \ "name").as[String] shouldBe sensitiveTaxGroup.createdBy.name
       (json \ "lastUpdatedBy" \ "id").as[String] should not be sensitiveTaxGroup.lastUpdatedBy.id
-      (json \ "lastUpdatedBy" \ "name").as[String] should not be sensitiveTaxGroup.lastUpdatedBy.name
+      (json \ "lastUpdatedBy" \ "name").as[String] shouldBe sensitiveTaxGroup.lastUpdatedBy.name
       val memberIds = sensitiveTaxGroup.teamMembers.toSeq.indices.map { index =>
         (json \ "teamMembers" \ index \ "id").as[String]
       }
@@ -67,7 +67,7 @@ class SensitiveTaxGroupSpec extends BaseSpec {
         (json \ "teamMembers" \ index \ "name").as[String]
       }
       memberIds should contain noElementsOf sensitiveTaxGroup.teamMembers.map(_.id)
-      memberNames should contain noElementsOf sensitiveTaxGroup.teamMembers.map(_.name)
+      memberNames should contain allElementsOf sensitiveTaxGroup.teamMembers.map(_.name)
     }
   }
 }
