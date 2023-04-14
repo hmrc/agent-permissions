@@ -27,7 +27,7 @@ import uk.gov.hmrc.agentpermissions.repository.legacy._
 import uk.gov.hmrc.agentpermissions.repository.storagemodel.SensitiveCustomGroup
 import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.crypto.SymmetricCryptoFactory
-import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, MongoSupport}
+import uk.gov.hmrc.mongo.test.CleanMongoCollectionSupport
 
 import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext
@@ -64,9 +64,19 @@ class MigrateToV2Spec extends BaseSpec with CleanMongoCollectionSupport with Moc
     val oldTaxRepo = new LegacyTaxServiceGroupsRepository(mongoComponent)(implicitly[ExecutionContext], aesGcmCrypto)
     val newCustomRepo = new CustomGroupsRepositoryV2Impl(mongoComponent, aesCrypto)
     val newTaxRepo = new TaxGroupsRepositoryV2Impl(mongoComponent, aesCrypto)
+    val oldOptInRepo = new LegacyOptinRepositoryImpl(mongoComponent, aesCrypto)
+    val newOptInRepo = new OptinRepositoryImpl(mongoComponent, aesCrypto)
 
     val migrateFunctionality =
-      new MigrateToV2(oldCustomRepo, oldTaxRepo, newCustomRepo, newTaxRepo, stub[Configuration])
+      new MigrateToV2(
+        oldCustomRepo,
+        oldTaxRepo,
+        newCustomRepo,
+        newTaxRepo,
+        oldOptInRepo,
+        newOptInRepo,
+        stub[Configuration]
+      )
 
     val oldCustomGroup = LegacyCustomGroup(
       _id = new ObjectId().toString,

@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
 @deprecated("This repository will be migrated away from")
 class LegacyCustomGroupsRepository @Inject() (mongoComponent: MongoComponent)(implicit
   ec: ExecutionContext,
-  @Named("aesGcm") crypto: Encrypter with Decrypter
+  @Named("legacyAesGcm") crypto: Encrypter with Decrypter
 ) extends PlayMongoRepository[LegacySensitiveAccessGroup](
       collectionName = "access-groups",
       domainFormat = LegacySensitiveAccessGroup.format(crypto),

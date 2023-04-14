@@ -35,7 +35,8 @@ case class SensitiveTaxGroup(
   teamMembers: Set[SensitiveAgentUser],
   service: String, // Nice to use Service but want flexibility for Trusts
   automaticUpdates: Boolean,
-  excludedClients: Set[SensitiveClient]
+  excludedClients: Set[SensitiveClient],
+  formatVersion: String = "2"
 ) extends Sensitive[TaxGroup] {
   def decryptedValue: TaxGroup = TaxGroup(
     id = GroupId.fromString(_id),
