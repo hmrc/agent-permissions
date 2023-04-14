@@ -237,8 +237,8 @@ class CustomGroupsServiceImpl @Inject() (
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
       maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupUpdate(arn, groupName, accessGroup)
       accessGroupUpdateStatus <- handleUpdate(
-                                   accessGroup.arn,
-                                   accessGroup.groupName,
+                                   arn,
+                                   groupName,
                                    accessGroupWithWhoIsUpdating,
                                    maybeCalculatedAssignments
                                  )
