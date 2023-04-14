@@ -16,9 +16,12 @@
 
 package uk.gov.hmrc.agentpermissions.repository.legacy
 
+import org.mongodb.scala.model.Filters
 import play.api.{Configuration, Logging}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2Impl, TaxGroupsRepositoryV2Impl}
+import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2Impl, LegacyOptinRepositoryImpl, OptinRepositoryImpl, TaxGroupsRepositoryV2Impl}
 import uk.gov.hmrc.agents.accessgroups.{CustomGroup, TaxGroup}
 
 import javax.inject.{Inject, Singleton}
@@ -31,6 +34,8 @@ class MigrateToV2 @Inject() (
   oldTaxGroupsRepo: LegacyTaxServiceGroupsRepository,
   newCustomGroupsRepo: CustomGroupsRepositoryV2Impl,
   newTaxGroupsRepo: TaxGroupsRepositoryV2Impl,
+  oldOptInRepo: LegacyOptinRepositoryImpl,
+  newOptInRepo: OptinRepositoryImpl,
   config: Configuration
 )(implicit ec: ExecutionContext)
     extends Logging {
@@ -111,6 +116,22 @@ class MigrateToV2 @Inject() (
       _ = require(readbackNewTaxGroups.length == allOldTaxGroups.length)
       _ = require(allNewCustomGroups.sortBy(_.arn.value) == readbackNewCustomGroups.sortBy(_.arn.value))
       _ = require(allNewTaxGroups.sortBy(_.arn.value) == readbackNewTaxGroups.sortBy(_.arn.value))
+      _ = logger.warn("Data integrity passed.")
+
+      _ = logger.warn("Migrating opt-in repository...")
+      allOptInRecords <- oldOptInRepo.collection.find().toFuture.map(_.map(_.decryptedValue))
+      _ = logger.warn("Backing up legacy records...")
+      backupOptInRecords = allOptInRecords.map(oir => oir.copy(arn = Arn("BACKUP" + oir.arn.value)))
+      _ <- if (backupOptInRecords.nonEmpty)
+             oldOptInRepo.collection.insertMany(backupOptInRecords.map(SensitiveOptinRecord(_))).toFuture
+           else Future.successful(())
+      _ = logger.warn("Inserting updated records...")
+      _ <- Future.traverse(allOptInRecords)(newOptInRepo.upsert)
+      _ = logger.warn("Verifying opt-in integrity...")
+      backedUpRecordCount <- newOptInRepo.collection.countDocuments(Filters.regex("arn", "^BACKUP")).toFuture
+      normalRecordCount   <- newOptInRepo.collection.countDocuments(Filters.regex("arn", "^.ARN")).toFuture
+      _ = require(backedUpRecordCount == normalRecordCount)
+      _ = logger.warn("Opt-in migration done.")
 
       _ = logger.warn("[IMPORTANT] Now disable the migration task in config and restart the service.")
       _ = logger.warn("========== Access groups migration finished ==========")

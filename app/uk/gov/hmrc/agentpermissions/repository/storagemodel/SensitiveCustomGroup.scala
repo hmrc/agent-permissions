@@ -33,7 +33,8 @@ case class SensitiveCustomGroup(
   createdBy: SensitiveAgentUser,
   lastUpdatedBy: SensitiveAgentUser,
   teamMembers: Set[SensitiveAgentUser],
-  clients: Set[SensitiveClient]
+  clients: Set[SensitiveClient],
+  formatVersion: String = "2"
 ) extends Sensitive[CustomGroup] {
   def decryptedValue: CustomGroup = CustomGroup(
     id = GroupId.fromString(_id),
