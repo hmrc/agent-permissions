@@ -14,17 +14,21 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.repository
+package uk.gov.hmrc.agentpermissions.repository.legacy
 
 import org.mongodb.scala.bson.ObjectId
+import org.mongodb.scala.model.Filters
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.IntegrationPatience
 import play.api.Configuration
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agentpermissions.repository.legacy._
-import uk.gov.hmrc.agentpermissions.repository.storagemodel.SensitiveCustomGroup
+import uk.gov.hmrc.agentpermissions.repository._
+import uk.gov.hmrc.agentpermissions.repository.storagemodel.{SensitiveCustomGroup, SensitiveTaxGroup}
+import uk.gov.hmrc.agents.accessgroups.optin.{OptedIn, OptinEvent, OptinRecord}
 import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.crypto.SymmetricCryptoFactory
 import uk.gov.hmrc.mongo.test.CleanMongoCollectionSupport
@@ -38,7 +42,8 @@ class MigrateToV2Spec extends BaseSpec with CleanMongoCollectionSupport with Moc
   "migration functionality" should {
 
     // Note: This is simply a randomly-chosen secret key to run tests
-    val someKey = "hWmZq3t6w9zrCeF5JiNcRfUjXn2r5u7x"
+    val someOldKey = "hWmZq3t6w9zrCeF5JiNcRfUjXn2r5u7x"
+    val someNewKey = "oxKL65sEH2MT6xBVXX3QFwZi+a8P1B/5"
 
     val arn1 = Arn("KARN1234567")
     val arn2 = Arn("XARN0112233")
@@ -57,18 +62,23 @@ class MigrateToV2Spec extends BaseSpec with CleanMongoCollectionSupport with Moc
     val client1 = Client("HMRC-MTD-VAT~VRN~123456789", "Johnny Vat")
     val client2 = Client("HMRC-PPT-ORG~EtmpRegistrationNUmber~XAPPT0000012345", "Johnny Plastic")
 
-    val aesGcmCrypto = SymmetricCryptoFactory.aesGcmCrypto(someKey)
-    val aesCrypto = SymmetricCryptoFactory.aesCrypto(someKey)
+    val legacyCrypto = SymmetricCryptoFactory.aesGcmCrypto(someOldKey)
+    val aesCrypto = SymmetricCryptoFactory.aesCrypto(someNewKey)
 
-    val oldCustomRepo = new LegacyCustomGroupsRepository(mongoComponent)(implicitly[ExecutionContext], aesGcmCrypto)
-    val oldTaxRepo = new LegacyTaxServiceGroupsRepository(mongoComponent)(implicitly[ExecutionContext], aesGcmCrypto)
+    val oldCustomRepo = new LegacyCustomGroupsRepository(mongoComponent)(implicitly[ExecutionContext], legacyCrypto)
+    val oldTaxRepo = new LegacyTaxServiceGroupsRepository(mongoComponent)(implicitly[ExecutionContext], legacyCrypto)
+    val oldOptInRepo = new LegacyOptinRepositoryImpl(mongoComponent, legacyCrypto)
+
     val newCustomRepo = new CustomGroupsRepositoryV2Impl(mongoComponent, aesCrypto)
     val newTaxRepo = new TaxGroupsRepositoryV2Impl(mongoComponent, aesCrypto)
-    val oldOptInRepo = new LegacyOptinRepositoryImpl(mongoComponent, aesCrypto)
     val newOptInRepo = new OptinRepositoryImpl(mongoComponent, aesCrypto)
+
+    val appConfigStub = stub[AppConfig]
+    val syncRepo = new EacdSyncRepositoryImpl(mongoComponent, appConfigStub)
 
     val migrateFunctionality =
       new MigrateToV2(
+        syncRepo,
         oldCustomRepo,
         oldTaxRepo,
         newCustomRepo,
@@ -105,17 +115,38 @@ class MigrateToV2Spec extends BaseSpec with CleanMongoCollectionSupport with Moc
     )
 
     "correctly migrate all data" in {
+      (appConfigStub.eacdSyncNotBeforeSeconds _).when().returns(300)
+
+      val optinRecord = OptinRecord(
+        Arn("AARN0123456"),
+        List(OptinEvent(OptedIn, AgentUser("userid", "name"), LocalDateTime.now()))
+      )
 
       oldCustomRepo.collection.insertOne(LegacySensitiveAccessGroup(oldCustomGroup)).toFuture.futureValue
       oldTaxRepo.collection.insertOne(LegacySensitiveTaxServiceGroup(oldTaxGroup)).toFuture.futureValue
+      oldOptInRepo.collection.insertOne(SensitiveOptinRecord(optinRecord)).toFuture.futureValue
 
       migrateFunctionality.doTheMigration().futureValue
 
       val customGroupsAfterMigration = newCustomRepo.collection.find().toFuture.futureValue
       val taxGroupsAfterMigration = newTaxRepo.collection.find().toFuture.futureValue
+      val optInRecordsAfterMigration = newOptInRepo.collection
+        .find(Filters.regex("arn", "^.ARN" /* filter out the 'backup' ones */ ))
+        .map(_.decryptedValue)
+        .toFuture
+        .futureValue
+      oldOptInRepo.collection
+        .find(Filters.regex("arn", "^.ARN" /* filter out the 'backup' ones */ ))
+        .toFuture
+        .map(_.map(_.decryptedValue))
+        .failed
+        .futureValue shouldBe an[Exception] // if the old encryption algorithm tries to read it back, it should fail!
 
       customGroupsAfterMigration.length shouldBe 1
       taxGroupsAfterMigration.length shouldBe 1
+      optInRecordsAfterMigration shouldBe Seq(
+        optinRecord
+      ) // we should find the same opt-in record - but re-encrypted with the new algorithm
 
       val newCustomGroup = customGroupsAfterMigration.head.decryptedValue
       val newTaxGroup = taxGroupsAfterMigration.head.decryptedValue
@@ -161,7 +192,61 @@ class MigrateToV2Spec extends BaseSpec with CleanMongoCollectionSupport with Moc
         .toFuture
         .futureValue
 
-      migrateFunctionality.doTheMigration().failed.futureValue shouldBe an[Exception]
+      migrateFunctionality.doTheMigration().failed.futureValue should matchPattern {
+        case MigrationAbortedException(_, false) => // no cleanup
+      }
+    }
+
+    "fail if lock cannot be acquired" in {
+      (appConfigStub.eacdSyncNotBeforeSeconds _).when().returns(300)
+
+      syncRepo
+        .acquire(Arn("MIGRATELOCK"))
+        .futureValue // Already acquire the lock so the migration cannot re-acquire it later
+      migrateFunctionality.doTheMigration().failed.futureValue should matchPattern {
+        case MigrationAbortedException(_, false) => // no cleanup
+      }
+    }
+
+    "clean up data correctly in case of failure" in {
+      (appConfigStub.eacdSyncNotBeforeSeconds _).when().returns(300)
+
+      val optinTime = LocalDateTime.now()
+
+      // set up
+      (for {
+        _ <- oldCustomRepo.collection.insertOne(LegacySensitiveAccessGroup(oldCustomGroup)).toFuture
+        _ <- oldTaxRepo.collection.insertOne(LegacySensitiveTaxServiceGroup(oldTaxGroup)).toFuture
+        _ <- newCustomRepo.collection
+               .insertOne(SensitiveCustomGroup(migrateFunctionality.migrateCustomGroup(oldCustomGroup)))
+               .toFuture
+        _ <-
+          newTaxRepo.collection.insertOne(SensitiveTaxGroup(migrateFunctionality.migrateTaxGroup(oldTaxGroup))).toFuture
+        _ <- oldOptInRepo.collection
+               .insertOne(
+                 SensitiveOptinRecord(
+                   OptinRecord(
+                     Arn("BACKUPAARN0123456"),
+                     List(OptinEvent(OptedIn, AgentUser("userid", "name"), optinTime))
+                   )
+                 )
+               )
+               .toFuture
+        _ <-
+          newOptInRepo.collection.insertOne(SensitiveOptinRecord(OptinRecord(Arn("BARN0987654"), List.empty))).toFuture
+      } yield ()).futureValue
+
+      migrateFunctionality.cleanup().futureValue
+
+      // verification
+      oldCustomRepo.collection.countDocuments.toFuture.futureValue shouldBe 1 // old repo should be intact
+      newCustomRepo.collection.countDocuments.toFuture.futureValue shouldBe 0 // new repo should be deleted
+      oldTaxRepo.collection.countDocuments.toFuture.futureValue shouldBe 1 // old repo should be intact
+      newTaxRepo.collection.countDocuments.toFuture.futureValue shouldBe 0 // new repo should be deleted
+      // opt in record should have the old data with "backup" tags removed. Any new data should be deleted.
+      oldOptInRepo.collection.find(Filters.empty).map(_.decryptedValue).toFuture.futureValue shouldBe Seq(
+        OptinRecord(Arn("AARN0123456"), List(OptinEvent(OptedIn, AgentUser("userid", "name"), optinTime)))
+      )
     }
   }
 }

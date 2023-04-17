@@ -21,15 +21,18 @@ import play.api.{Configuration, Logging}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2Impl, LegacyOptinRepositoryImpl, OptinRepositoryImpl, TaxGroupsRepositoryV2Impl}
+import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2Impl, EacdSyncRepository, LegacyOptinRepositoryImpl, OptinRepositoryImpl, TaxGroupsRepositoryV2Impl}
 import uk.gov.hmrc.agents.accessgroups.{CustomGroup, TaxGroup}
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
+case class MigrationAbortedException(message: String, needsCleanup: Boolean) extends RuntimeException
+
 @Singleton
 class MigrateToV2 @Inject() (
+  syncRepo: EacdSyncRepository,
   oldCustomGroupsRepo: LegacyCustomGroupsRepository,
   oldTaxGroupsRepo: LegacyTaxServiceGroupsRepository,
   newCustomGroupsRepo: CustomGroupsRepositoryV2Impl,
@@ -39,6 +42,8 @@ class MigrateToV2 @Inject() (
   config: Configuration
 )(implicit ec: ExecutionContext)
     extends Logging {
+
+  private def check(predicate: Boolean, exception: Exception): Unit = if (predicate) () else throw exception
 
   /* DO IT */
   Try(config.get[String]("migrateData")) match {
@@ -75,6 +80,11 @@ class MigrateToV2 @Inject() (
 
   def doTheMigration(): Future[Unit] =
     (for {
+      maybeLock <- syncRepo.acquire(Arn("MIGRATELOCK")) // abusing the EACD sync repo to acquire a migration lock
+      _ = if (maybeLock.isEmpty) {
+            logger.error("Could not acquire migration lock. Aborting.")
+            throw MigrationAbortedException("Could not acquire migration lock", needsCleanup = false)
+          }
       nrNewCustomGroups <- newCustomGroupsRepo.collection.countDocuments().toFuture
       nrNewTaxGroups    <- newTaxGroupsRepo.collection.countDocuments().toFuture
       _ = logger.warn("========== Access groups migration started ==========")
@@ -84,7 +94,7 @@ class MigrateToV2 @Inject() (
             logger.warn("Nothing in V2 repositories yet. Migration can proceed.")
           else {
             logger.warn("There is existing data in V2 repositories! Migration aborted.")
-            throw new IllegalStateException("V2 migration aborted due to existing data in V2 repositories.")
+            throw MigrationAbortedException("There is existing data in V2 repositories.", needsCleanup = false)
           }
       nrOldCustomGroups <- oldCustomGroupsRepo.collection.countDocuments().toFuture
       nrOldTaxGroups    <- oldTaxGroupsRepo.collection.countDocuments().toFuture
@@ -112,10 +122,22 @@ class MigrateToV2 @Inject() (
           s"After migration there are ${readbackNewCustomGroups.length} custom groups and ${readbackNewTaxGroups.length} tax groups in the V2 repository."
         )
       _ = logger.warn("Verifying data integrity...")
-      _ = require(readbackNewCustomGroups.length == allOldCustomGroups.length)
-      _ = require(readbackNewTaxGroups.length == allOldTaxGroups.length)
-      _ = require(allNewCustomGroups.sortBy(_.arn.value) == readbackNewCustomGroups.sortBy(_.arn.value))
-      _ = require(allNewTaxGroups.sortBy(_.arn.value) == readbackNewTaxGroups.sortBy(_.arn.value))
+      _ = check(
+            readbackNewCustomGroups.length == allOldCustomGroups.length,
+            MigrationAbortedException("Custom groups size check failed", needsCleanup = true)
+          )
+      _ = check(
+            readbackNewTaxGroups.length == allOldTaxGroups.length,
+            MigrationAbortedException("Tax groups size check failed", needsCleanup = true)
+          )
+      _ = check(
+            allNewCustomGroups.sortBy(_.arn.value) == readbackNewCustomGroups.sortBy(_.arn.value),
+            MigrationAbortedException("Custom groups comparison check failed", needsCleanup = true)
+          )
+      _ = check(
+            allNewTaxGroups.sortBy(_.arn.value) == readbackNewTaxGroups.sortBy(_.arn.value),
+            MigrationAbortedException("Tax groups comparison check failed", needsCleanup = true)
+          )
       _ = logger.warn("Data integrity passed.")
 
       _ = logger.warn("Migrating opt-in repository...")
@@ -130,20 +152,40 @@ class MigrateToV2 @Inject() (
       _ = logger.warn("Verifying opt-in integrity...")
       backedUpRecordCount <- newOptInRepo.collection.countDocuments(Filters.regex("arn", "^BACKUP")).toFuture
       normalRecordCount   <- newOptInRepo.collection.countDocuments(Filters.regex("arn", "^.ARN")).toFuture
-      _ = require(backedUpRecordCount == normalRecordCount)
+      _ = check(
+            backedUpRecordCount == normalRecordCount,
+            MigrationAbortedException("Opt-in check failed", needsCleanup = true)
+          )
       _ = logger.warn("Opt-in migration done.")
 
       _ = logger.warn("[IMPORTANT] Now disable the migration task in config and restart the service.")
       _ = logger.warn("========== Access groups migration finished ==========")
-    } yield ()).recoverWith { case e =>
-      logger.error("The migration failed! Deleting V2 repositories.")
-      Future
-        .sequence(
-          Seq(
-            newCustomGroupsRepo.collection.drop().toFuture,
-            newTaxGroupsRepo.collection.drop().toFuture
-          )
-        )
-        .map(_ => throw e)
+    } yield ()).recoverWith {
+      case e @ MigrationAbortedException(message, false) =>
+        logger.error("Migration aborted cleanly: " + message)
+        throw e
+      case e @ MigrationAbortedException(message, true) =>
+        logger.error("Migration aborted! cleaning up: " + message)
+        cleanup().map(_ => throw e)
+      case e =>
+        logger.error("Migration aborted for unexpected reason! cleaning up: " + e)
+        cleanup().map(_ => throw e)
     }
+
+  def cleanup(): Future[Unit] = (for {
+    _ <- newCustomGroupsRepo.collection.drop().toFuture
+    _ = logger.warn("Cleaned up custom groups collection.")
+    _ <- newTaxGroupsRepo.collection.drop().toFuture
+    _ = logger.warn("Cleaned up tax groups collection.")
+    backedUpOirs <- oldOptInRepo.collection.find(Filters.regex("arn", "^BACKUP")).map(_.decryptedValue).toFuture
+    oirs = backedUpOirs.map(oir => oir.copy(arn = Arn(oir.arn.value.replace("BACKUP", ""))))
+    _ <- oldOptInRepo.collection.drop().toFuture
+    _ <- if (oirs.nonEmpty) oldOptInRepo.collection.insertMany(oirs.map(SensitiveOptinRecord(_))).toFuture
+         else Future.successful(())
+    _ = logger.warn("Cleaned up opt-in record collection.")
+    _ = logger.warn("Cleanup successful.")
+  } yield ()).recover { case e =>
+    logger.error("Cleanup failed! " + e)
+    throw e
+  }
 }
