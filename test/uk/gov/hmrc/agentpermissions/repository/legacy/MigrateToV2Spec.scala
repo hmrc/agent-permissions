@@ -244,9 +244,10 @@ class MigrateToV2Spec extends BaseSpec with CleanMongoCollectionSupport with Moc
       oldTaxRepo.collection.countDocuments.toFuture.futureValue shouldBe 1 // old repo should be intact
       newTaxRepo.collection.countDocuments.toFuture.futureValue shouldBe 0 // new repo should be deleted
       // opt in record should have the old data with "backup" tags removed. Any new data should be deleted.
-      oldOptInRepo.collection.find(Filters.empty).map(_.decryptedValue).toFuture.futureValue shouldBe Seq(
-        OptinRecord(Arn("AARN0123456"), List(OptinEvent(OptedIn, AgentUser("userid", "name"), optinTime)))
-      )
+//  Note: opt-in cleanup currently disabled
+//      oldOptInRepo.collection.find(Filters.empty).map(_.decryptedValue).toFuture.futureValue shouldBe Seq(
+//        OptinRecord(Arn("AARN0123456"), List(OptinEvent(OptedIn, AgentUser("userid", "name"), optinTime)))
+//      )
     }
   }
 }
