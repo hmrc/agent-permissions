@@ -177,12 +177,12 @@ class MigrateToV2 @Inject() (
     _ = logger.warn("Cleaned up custom groups collection.")
     _ <- newTaxGroupsRepo.collection.drop().toFuture
     _ = logger.warn("Cleaned up tax groups collection.")
-    backedUpOirs <- oldOptInRepo.collection.find(Filters.regex("arn", "^BACKUP")).map(_.decryptedValue).toFuture
-    oirs = backedUpOirs.map(oir => oir.copy(arn = Arn(oir.arn.value.replace("BACKUP", ""))))
-    _ <- oldOptInRepo.collection.drop().toFuture
-    _ <- if (oirs.nonEmpty) oldOptInRepo.collection.insertMany(oirs.map(SensitiveOptinRecord(_))).toFuture
-         else Future.successful(())
-    _ = logger.warn("Cleaned up opt-in record collection.")
+//    backedUpOirs <- oldOptInRepo.collection.find(Filters.regex("arn", "^BACKUP")).map(_.decryptedValue).toFuture
+//    oirs = backedUpOirs.map(oir => oir.copy(arn = Arn(oir.arn.value.replace("BACKUP", ""))))
+//    _ <- oldOptInRepo.collection.drop().toFuture
+//    _ <- if (oirs.nonEmpty) oldOptInRepo.collection.insertMany(oirs.map(SensitiveOptinRecord(_))).toFuture
+//         else Future.successful(())
+//    _ = logger.warn("Cleaned up opt-in record collection.")
     _ = logger.warn("Cleanup successful.")
   } yield ()).recover { case e =>
     logger.error("Cleanup failed! " + e)
