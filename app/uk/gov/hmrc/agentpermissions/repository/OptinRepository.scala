@@ -18,7 +18,6 @@ package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.{IndexOptions, ReplaceOptions}
-import org.mongodb.scala.MongoCollection
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.Indexes.ascending
@@ -40,15 +39,21 @@ trait OptinRepository {
   def getAll(): Future[Seq[OptinRecord]]
 }
 
-// TODO This class has been made abstract to allow simultaneous instances to be injected with different encryption algorithms.
-// Can be simplified after migration.
+/** Note: This implementation stores some fields encrypted in mongo. (APB-6461)
+  */
 @Singleton
-trait AbstractOptinRepositoryImpl extends OptinRepository with Logging {
-
-  // abstract values
-  val collection: MongoCollection[SensitiveOptinRecord]
-  implicit val ec: ExecutionContext
-
+class OptinRepositoryImpl @Inject() (
+  mongoComponent: MongoComponent,
+  @Named("aes") crypto: Encrypter with Decrypter
+)(implicit val ec: ExecutionContext)
+    extends PlayMongoRepository[SensitiveOptinRecord](
+      collectionName = "optin",
+      domainFormat = SensitiveOptinRecord.format(crypto),
+      mongoComponent = mongoComponent,
+      indexes = Seq(
+        IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true))
+      )
+    ) with OptinRepository with Logging {
   def get(arn: Arn): Future[Option[OptinRecord]] =
     collection.find(equal("arn", arn.value)).headOption().map(_.map(_.decryptedValue))
 
@@ -70,35 +75,3 @@ trait AbstractOptinRepositoryImpl extends OptinRepository with Logging {
 
   private def upsertOptions = new ReplaceOptions().upsert(true)
 }
-
-// TODO! After migration this class can be binned
-@Singleton
-class LegacyOptinRepositoryImpl @Inject() (
-  mongoComponent: MongoComponent,
-  @Named("legacyAesGcm") crypto: Encrypter with Decrypter
-)(implicit val ec: ExecutionContext)
-    extends PlayMongoRepository[SensitiveOptinRecord](
-      collectionName = "optin",
-      domainFormat = SensitiveOptinRecord.format(crypto),
-      mongoComponent = mongoComponent,
-      indexes = Seq(
-        IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true))
-      )
-    ) with AbstractOptinRepositoryImpl with Logging
-
-// TODO! After migration this class can be merged back with AbstractOptInRepositoryImpl
-/** Note: This implementation stores some fields encrypted in mongo. (APB-6461)
-  */
-@Singleton
-class OptinRepositoryImpl @Inject() (
-  mongoComponent: MongoComponent,
-  @Named("aes") crypto: Encrypter with Decrypter
-)(implicit val ec: ExecutionContext)
-    extends PlayMongoRepository[SensitiveOptinRecord](
-      collectionName = "optin",
-      domainFormat = SensitiveOptinRecord.format(crypto),
-      mongoComponent = mongoComponent,
-      indexes = Seq(
-        IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true))
-      )
-    ) with AbstractOptinRepositoryImpl with Logging

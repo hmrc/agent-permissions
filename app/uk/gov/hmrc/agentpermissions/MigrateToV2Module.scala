@@ -17,9 +17,9 @@
 package uk.gov.hmrc.agentpermissions
 
 import com.google.inject.AbstractModule
-import uk.gov.hmrc.agentpermissions.repository.legacy.MigrateToV2
+import uk.gov.hmrc.agentpermissions.repository.migration.MigrateTool
 
 class MigrateToV2Module extends AbstractModule {
   override def configure(): Unit =
-    bind(classOf[MigrateToV2]).asEagerSingleton()
+    bind(classOf[MigrateTool]).asEagerSingleton()
 }
