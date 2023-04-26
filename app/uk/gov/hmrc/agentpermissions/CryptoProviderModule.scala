@@ -32,21 +32,9 @@ class CryptoProviderModule extends Module {
   else
     NoCrypto
 
-  def aesGcmCryptoInstance(configuration: Configuration): Encrypter with Decrypter = if (
-    configuration.underlying.getBoolean("fieldLevelEncryption.enable")
-  )
-    SymmetricCryptoFactory.aesGcmCryptoFromConfig("fieldLevelEncryption", configuration.underlying)
-  else
-    NoCrypto
-
   override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
     Seq(
-      bind[Encrypter with Decrypter].qualifiedWith("aes").toInstance(aesCryptoInstance(configuration)),
-      bind[Encrypter with Decrypter].qualifiedWith("aesGcm").toInstance(aesGcmCryptoInstance(configuration)),
-      // Remove the following instance after migration.
-      bind[Encrypter with Decrypter]
-        .qualifiedWith("legacyAesGcm")
-        .toInstance(SymmetricCryptoFactory.aesGcmCrypto("hWmZq3t6w9zrCeF5JiNcRfUjXn2r5u7x"))
+      bind[Encrypter with Decrypter].qualifiedWith("aes").toInstance(aesCryptoInstance(configuration))
     )
 }
 
