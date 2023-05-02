@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.service
 import com.mongodb.client.result.UpdateResult
 import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.scalamock.handlers._
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, AssignedClient, GroupDelegatedEnrolments, PaginatedList, PaginationMetaData}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, AssignedClient, PaginatedList, PaginationMetaData}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}

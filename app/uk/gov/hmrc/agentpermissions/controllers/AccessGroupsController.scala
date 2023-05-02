@@ -172,7 +172,10 @@ class AccessGroupsController @Inject() (
   }
 
   // gets a custom access group ONLY
-  @deprecated("group could be too big with 5000+ clients - use getCustomGroupSummary & paginated lists instead")
+  @deprecated(
+    message = "group could be too big with 5000+ clients - use getCustomGroupSummary & paginated lists instead",
+    since = "1.0"
+  )
   def getGroup(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       accessGroupsService.getById(gid) map {
@@ -243,13 +246,12 @@ class AccessGroupsController @Inject() (
     search: Option[String] = None,
     filter: Option[String] = None
   ): Action[AnyContent] = Action.async { implicit request =>
-    withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
+    withAuthorisedAgent(allowStandardUser = true) { _ =>
       accessGroupsService
         .getGroupByIdWithPageOfClientsToAdd(gid, page, pageSize, search, filter)
         .map {
-          case None => NotFound
-          case Some((groupSummary, clients)) =>
-            Ok(Json.toJson(groupSummary, clients))
+          case None                          => NotFound
+          case Some((groupSummary, clients)) => Ok(Json.toJson((groupSummary, clients)))
         }
     } transformWith failureHandler
   }
@@ -443,7 +445,9 @@ class AccessGroupsController @Inject() (
   private def badRequestInvalidArn(arn: Arn): Future[Result] =
     Future.successful(BadRequest(Json.obj("message" -> JsString(s"Invalid arn value: '${arn.value}' provided"))))
 
-  private def badRequestJsonParsing(errors: Seq[(JsPath, Seq[JsonValidationError])]): Future[Result] =
+  private def badRequestJsonParsing(
+    errors: collection.Seq[(JsPath, collection.Seq[JsonValidationError])]
+  ): Future[Result] =
     Future.successful(BadRequest(Json.obj("message" -> JsError.toJson(errors))))
 
   private def badRequestGroupNameMaxLength: Future[Result] =

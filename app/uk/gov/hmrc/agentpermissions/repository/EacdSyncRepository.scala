@@ -17,7 +17,6 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
-import com.mongodb.MongoWriteException
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.Indexes.ascending
 import org.mongodb.scala.model.{Filters, IndexModel, IndexOptions, ReplaceOptions}
