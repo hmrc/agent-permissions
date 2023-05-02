@@ -23,11 +23,12 @@ import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
 import uk.gov.hmrc.agents.accessgroups.AgentUser
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
-import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
+import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
 import scala.concurrent.ExecutionContext
 
-class BetaInviteRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[BetaInviteRecord] {
+class BetaInviteRepositorySpec
+    extends BaseSpec with PlayMongoRepositorySupport[BetaInviteRecord] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
@@ -92,6 +93,6 @@ class BetaInviteRepositorySpec extends BaseSpec with DefaultPlayMongoRepositoryS
 
   }
 
-  override protected def repository: PlayMongoRepository[BetaInviteRecord] =
+  override protected lazy val repository: PlayMongoRepository[BetaInviteRecord] =
     new BetaInviteRepositoryImpl(mongoComponent)
 }

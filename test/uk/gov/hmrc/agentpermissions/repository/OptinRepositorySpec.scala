@@ -24,12 +24,13 @@ import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.agents.accessgroups.AgentUser
 import uk.gov.hmrc.agents.accessgroups.optin._
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
-import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
+import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
 import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext
 
-class OptinRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[SensitiveOptinRecord] {
+class OptinRepositorySpec
+    extends BaseSpec with PlayMongoRepositorySupport[SensitiveOptinRecord] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
@@ -107,6 +108,6 @@ class OptinRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySuppor
 
   }
 
-  override protected def repository: PlayMongoRepository[SensitiveOptinRecord] =
+  override protected lazy val repository: PlayMongoRepository[SensitiveOptinRecord] =
     new OptinRepositoryImpl(mongoComponent, aesCrypto)
 }

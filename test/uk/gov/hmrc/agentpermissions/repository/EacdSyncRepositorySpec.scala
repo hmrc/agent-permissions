@@ -20,12 +20,13 @@ import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
-import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
+import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
 import java.time.Instant
 import scala.concurrent.ExecutionContext
 
-class EacdSyncRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[EacdSyncRecord] {
+class EacdSyncRepositorySpec
+    extends BaseSpec with PlayMongoRepositorySupport[EacdSyncRecord] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
 
@@ -89,6 +90,6 @@ class EacdSyncRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySup
     override def eacdSyncNotBeforeSeconds: Int = 10 // <- The value we care about in this test
   }
 
-  override protected def repository: PlayMongoRepository[EacdSyncRecord] =
+  override protected lazy val repository: PlayMongoRepository[EacdSyncRecord] =
     new EacdSyncRepositoryImpl(mongoComponent, mockAppConfig)
 }
