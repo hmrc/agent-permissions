@@ -27,6 +27,7 @@ import uk.gov.hmrc.agents.accessgroups.optin._
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class OptinServiceSpec extends BaseSpec {
@@ -59,6 +60,7 @@ class OptinServiceSpec extends BaseSpec {
     def mockOptinRepositoryGet(maybeOptinRecord: Option[OptinRecord]): CallHandler1[Arn, Future[Option[OptinRecord]]] =
       (mockOptinRepository.get(_: Arn)).expects(arn).returning(Future.successful(maybeOptinRecord))
 
+    @nowarn
     def mockOptinRepositoryGetAll(optinRecords: Seq[OptinRecord]) =
       (mockOptinRepository.getAll: () => Future[Seq[OptinRecord]]).expects().returning(Future successful optinRecords)
 

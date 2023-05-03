@@ -25,13 +25,14 @@ import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.storagemodel.SensitiveTaxGroup
 import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, TaxGroup}
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
-import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
+import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
 import java.time.LocalDateTime
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 
-class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepositorySupport[SensitiveTaxGroup] {
+class TaxServiceGroupsRepositorySpec
+    extends BaseSpec with PlayMongoRepositorySupport[SensitiveTaxGroup] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
@@ -229,6 +230,6 @@ class TaxServiceGroupsRepositorySpec extends BaseSpec with DefaultPlayMongoRepos
     }
   }
 
-  override protected def repository: PlayMongoRepository[SensitiveTaxGroup] =
+  override protected lazy val repository: PlayMongoRepository[SensitiveTaxGroup] =
     new TaxGroupsRepositoryV2Impl(mongoComponent, aesCrypto)
 }

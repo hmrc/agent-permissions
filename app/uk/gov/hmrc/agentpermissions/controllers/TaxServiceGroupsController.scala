@@ -282,7 +282,9 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
   private def badRequestInvalidArn(arn: Arn): Future[Result] =
     Future.successful(BadRequest(Json.obj("message" -> JsString(s"Invalid arn value: '${arn.value}' provided"))))
 
-  private def badRequestJsonParsing(errors: Seq[(JsPath, Seq[JsonValidationError])]): Future[Result] =
+  private def badRequestJsonParsing(
+    errors: collection.Seq[(JsPath, collection.Seq[JsonValidationError])]
+  ): Future[Result] =
     Future.successful(BadRequest(Json.obj("message" -> JsError.toJson(errors))))
 
   private def badRequestGroupNameMaxLength: Future[Result] =
