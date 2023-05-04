@@ -188,32 +188,34 @@ class EacdSynchronizerImpl @Inject() (
     hc: HeaderCarrier
   ): Future[Unit] = {
     logger.info(s"Starting full sync for $arn.")
-    val allUserIds: Set[String] = customGroups.flatMap(_.teamMembers.map(_.id)).toSet
-    Future
-      .traverse(allUserIds) { userId =>
-        val expectedAssignments = customGroups
-          .filter(_.teamMembers.map(_.id).contains(userId))
-          .flatMap(_.clients.map(_.enrolmentKey))
-        userClientDetailsConnector.syncTeamMember(arn, userId, expectedAssignments).transformWith { res =>
-          Future.successful((userId, res))
-        }
-      // return value is Future of (userId, Success(bool: updated or not)) or (userId, Failure(exception))
+    for {
+      usersInAgency <- userClientDetailsConnector.getTeamMembers(arn)
+      userIds = usersInAgency.map(_.userId).collect { case Some(id) => id }.toSet
+      fullSyncResults <- Future.traverse(userIds) { userId =>
+                           val expectedAssignments = customGroups
+                             .filter(_.teamMembers.map(_.id).contains(userId))
+                             .flatMap(_.clients.map(_.enrolmentKey))
+                           userClientDetailsConnector.syncTeamMember(arn, userId, expectedAssignments).transformWith {
+                             res =>
+                               Future.successful((userId, res))
+                           }
+                         // return value is Future of (userId, Success(bool: updated or not)) or (userId, Failure(exception))
+                         }
+    } yield {
+      val resyncedCount = fullSyncResults.count {
+        case (_, Success(isChanged)) => isChanged
+        case _                       => false
       }
-      .map { fullSyncResults =>
-        val resyncedCount = fullSyncResults.count {
-          case (_, Success(isChanged)) => isChanged
-          case _                       => false
-        }
-        val exceptions = fullSyncResults.collect { case (userId, Failure(e)) => (userId, e) }
-        val failuresText = if (exceptions.isEmpty) "No failures." else s"${exceptions.size} failures."
-        logger.info(
-          s"Full sync finished for $arn. $resyncedCount users of ${fullSyncResults.size} needed syncing in EACD. $failuresText"
-        )
-        if (exceptions.nonEmpty) {
-          val failuresDetails = exceptions.map { case (userId, e) => s"userId $userId got ${e.getMessage}" }
-          logger.warn(s"Full sync for $arn failed for the following users: " + failuresDetails.mkString("; "))
-        }
+      val exceptions = fullSyncResults.collect { case (userId, Failure(e)) => (userId, e) }
+      val failuresText = if (exceptions.isEmpty) "No failures." else s"${exceptions.size} failures."
+      logger.info(
+        s"Full sync finished for $arn. $resyncedCount users of ${fullSyncResults.size} needed syncing in EACD. $failuresText"
+      )
+      if (exceptions.nonEmpty) {
+        val failuresDetails = exceptions.map { case (userId, e) => s"userId $userId got ${e.getMessage}" }
+        logger.warn(s"Full sync for $arn failed for the following users: " + failuresDetails.mkString("; "))
       }
+    }
   }
 
   private[service] def persistAccessGroup(accessGroup: AccessGroup)(implicit

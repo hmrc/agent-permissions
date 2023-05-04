@@ -334,17 +334,31 @@ class EacdSynchronizerSpec extends BaseSpec {
     "'full sync'" should {
       "call AUCD once for each member" in new TestScope {
         (stubUserClientDetailsConnector
+          .getTeamMembers(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+          .when(arn, *, *)
+          .returns(
+            Future.successful(
+              Seq(
+                UserDetails(Some(agentUser1.id)),
+                UserDetails(Some(agentUser2.id)),
+                UserDetails(Some("aThirdUserNotInAnyGroup"))
+              )
+            )
+          )
+        (stubUserClientDetailsConnector
           .syncTeamMember(_: Arn, _: String, _: Seq[String])(_: HeaderCarrier, _: ExecutionContext))
           .when(*, *, *, *, *)
           .returns(Future.successful(true))
 
-        eacdSynchronizer.doFullSync(
-          arn,
-          Seq(
-            buildCustomGroup(Set(agentUser1, agentUser2), Set(clientVat)),
-            buildCustomGroup(Set(agentUser2), Set(clientCgt))
+        eacdSynchronizer
+          .doFullSync(
+            arn,
+            Seq(
+              buildCustomGroup(Set(agentUser1, agentUser2), Set(clientVat)),
+              buildCustomGroup(Set(agentUser2), Set(clientCgt))
+            )
           )
-        )
+          .futureValue
 
         (stubUserClientDetailsConnector
           .syncTeamMember(_: Arn, _: String, _: Seq[String])(_: HeaderCarrier, _: ExecutionContext))
@@ -353,6 +367,10 @@ class EacdSynchronizerSpec extends BaseSpec {
         (stubUserClientDetailsConnector
           .syncTeamMember(_: Arn, _: String, _: Seq[String])(_: HeaderCarrier, _: ExecutionContext))
           .verify(arn, agentUser2.id, Seq(clientVat.enrolmentKey, clientCgt.enrolmentKey), *, *)
+          .once
+        (stubUserClientDetailsConnector
+          .syncTeamMember(_: Arn, _: String, _: Seq[String])(_: HeaderCarrier, _: ExecutionContext))
+          .verify(arn, "aThirdUserNotInAnyGroup", Seq.empty, *, *)
           .once
       }
     }
