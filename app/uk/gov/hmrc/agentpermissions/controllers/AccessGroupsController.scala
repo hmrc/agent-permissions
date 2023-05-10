@@ -34,15 +34,15 @@ import scala.util.{Failure, Success, Try}
 
 @Singleton()
 class AccessGroupsController @Inject() (
-  accessGroupsService: CustomGroupsService, // TODO rename to customGroupsService
+  customGroupsService: CustomGroupsService,
   groupsService: GroupSummaryService,
   eacdSynchronizer: EacdSynchronizer
 )(implicit authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
     extends BackendController(cc) with AuthorisedAgentSupport {
 
-  private val MAX_LENGTH_GROUP_NAME = 50 // 32
+  private val MAX_LENGTH_GROUP_NAME = 50
 
-  // checks all group names for duplicates
+  /** Checks group names for duplicates across all types **/
   def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
@@ -58,7 +58,7 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  // sorted by group name A-Z
+  /** Sorted by group name A-Z **/
   def getAllGroupSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
@@ -113,7 +113,7 @@ class AccessGroupsController @Inject() (
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         for {
-          unfilteredClients <- accessGroupsService.getUnassignedClients(arn)
+          unfilteredClients <- customGroupsService.getUnassignedClients(arn)
           filteredClients = filterBySearchTermAndService(unfilteredClients, search, filter)
           sortedClients = filteredClients.toSeq.sortBy(c => c.friendlyName.toLowerCase)
         } yield Ok(
@@ -138,7 +138,7 @@ class AccessGroupsController @Inject() (
           } else {
             for {
               groupCreationStatus <-
-                accessGroupsService
+                customGroupsService
                   .create(createAccessGroupRequest.buildAccessGroup(matchedArn, authorisedAgent.agentUser))
             } yield groupCreationStatus match {
               case AccessGroupExistsForCreation =>
@@ -164,7 +164,7 @@ class AccessGroupsController @Inject() (
   def groups(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
-        accessGroupsService
+        customGroupsService
           .getAllCustomGroups(arn)
           .map(groups => Ok(Json.toJson(groups.map(GroupSummary.of(_)))))
       }
@@ -178,7 +178,7 @@ class AccessGroupsController @Inject() (
   )
   def getGroup(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
-      accessGroupsService.getById(gid) map {
+      customGroupsService.getById(gid) map {
         case None =>
           NotFound
         case Some(accessGroup) =>
@@ -194,7 +194,7 @@ class AccessGroupsController @Inject() (
 
   def getCustomGroupSummary(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
-      accessGroupsService.getById(gid) map {
+      customGroupsService.getById(gid) map {
         case None =>
           NotFound
         case Some(accessGroup) =>
@@ -216,7 +216,7 @@ class AccessGroupsController @Inject() (
     filter: Option[String] = None
   ): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
-      accessGroupsService.getById(gid) map {
+      customGroupsService.getById(gid) map {
         case None =>
           NotFound
         case Some(accessGroup) =>
@@ -247,7 +247,7 @@ class AccessGroupsController @Inject() (
     filter: Option[String] = None
   ): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { _ =>
-      accessGroupsService
+      customGroupsService
         .getGroupByIdWithPageOfClientsToAdd(gid, page, pageSize, search, filter)
         .map {
           case None                          => NotFound
@@ -261,7 +261,7 @@ class AccessGroupsController @Inject() (
       withCustomGroup(gid, authorisedAgent.arn) { customGroup =>
         for {
           groupDeletionStatus <-
-            accessGroupsService.delete(customGroup.arn, customGroup.groupName, authorisedAgent.agentUser)
+            customGroupsService.delete(customGroup.arn, customGroup.groupName, authorisedAgent.agentUser)
         } yield groupDeletionStatus match {
           case AccessGroupNotDeleted =>
             logger.info("Access group was not deleted")
@@ -285,7 +285,7 @@ class AccessGroupsController @Inject() (
           if (mergedAccessGroup.groupName.length > MAX_LENGTH_GROUP_NAME) {
             badRequestGroupNameMaxLength
           } else {
-            accessGroupsService.update(
+            customGroupsService.update(
               existingAccessGroup.arn,
               existingAccessGroup.groupName,
               mergedAccessGroup,
@@ -308,7 +308,7 @@ class AccessGroupsController @Inject() (
 
   def removeClient(gid: GroupId, clientId: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
-      accessGroupsService
+      customGroupsService
         .removeClient(gid, clientId, authorisedAgent.agentUser)
         .map {
           case AccessGroupNotUpdated =>
@@ -324,7 +324,7 @@ class AccessGroupsController @Inject() (
 
   def removeTeamMember(gid: GroupId, memberId: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
-      accessGroupsService
+      customGroupsService
         .removeTeamMember(gid, memberId, authorisedAgent.agentUser)
         .map {
           case AccessGroupNotUpdated =>
@@ -348,7 +348,7 @@ class AccessGroupsController @Inject() (
           val groupWithTeamMembersAdded = updateAccessGroupRequest.teamMembers.fold(groupWithClientsAdded)(tms =>
             group.copy(teamMembers = group.teamMembers ++ tms)
           )
-          accessGroupsService.update(
+          customGroupsService.update(
             group.arn,
             group.groupName,
             groupWithTeamMembersAdded,
@@ -371,7 +371,7 @@ class AccessGroupsController @Inject() (
   def addTeamMemberToGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
-        accessGroupsService
+        customGroupsService
           .addMemberToGroup(gid, addRequest.teamMember, authorisedAgent.agentUser) map {
           case AccessGroupUpdated => Ok
           case AccessGroupUpdatedWithoutAssignmentsPushed =>
@@ -406,7 +406,7 @@ class AccessGroupsController @Inject() (
   private def withCustomGroup(gid: GroupId, authorisedArn: Arn)(
     body: CustomGroup => Future[Result]
   )(implicit hc: HeaderCarrier): Future[Result] =
-    accessGroupsService.getById(gid) flatMap {
+    customGroupsService.getById(gid) flatMap {
       case None =>
         logger.warn(s"Group not found for '$gid', cannot update")
         Future.successful(BadRequest(s"Check provided gid '$gid"))
