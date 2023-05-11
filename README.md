@@ -1,5 +1,6 @@
-
 # agent-permissions
+
+[![Build Status](https://travis-ci.org/hmrc/agent-permissions.svg)](https://travis-ci.org/hmrc/agent-permissions)
 
 Backend service to store opt-in status and any agent-permissions-specific structures, such as groups.
 

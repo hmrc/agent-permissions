@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.service.audit
 
-import uk.gov.hmrc.agents.accessgroups.CustomGroup
+import uk.gov.hmrc.agents.accessgroups.{CustomGroup, TaxGroup}
 
 object AccessGroupSplitter {
 
@@ -38,5 +38,23 @@ object AccessGroupSplitter {
         .toSeq
 
     chunkedAccessGroupsWithClients ++ chunkedAccessGroupsWithTeamMembers
+  }
+
+  def splitTax(tg: TaxGroup, chunkSize: Int): Seq[TaxGroup] = {
+    val chunkedTaxGroupsWithClients = tg.excludedClients
+      .grouped(chunkSize)
+      .map { chunkedClients =>
+        tg.copy(excludedClients = chunkedClients, teamMembers = Set.empty)
+      }
+      .toSeq
+
+    val chunkedTaxGroupsWithTeamMembers =
+      tg.teamMembers
+        .grouped(chunkSize)
+        .map { chunkedTeamMembers =>
+          tg.copy(excludedClients = Set.empty, teamMembers = chunkedTeamMembers)
+        }
+        .toSeq
+    chunkedTaxGroupsWithClients ++ chunkedTaxGroupsWithTeamMembers
   }
 }

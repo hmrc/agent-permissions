@@ -42,7 +42,7 @@ class AccessGroupsController @Inject() (
 
   private val MAX_LENGTH_GROUP_NAME = 50
 
-  /** Checks group names for duplicates across all types **/
+  /** Checks group names for duplicates across all types * */
   def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
@@ -58,7 +58,7 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  /** Sorted by group name A-Z **/
+  /** Sorted by group name A-Z * */
   def getAllGroupSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
