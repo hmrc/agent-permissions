@@ -35,10 +35,9 @@ import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
 class AccessGroupsControllerSpec extends BaseSpec {
-
   val CONTENTTYPE_APPLICATIONJSON: (String, String) = "Content-Type" -> "application/json"
 
-  val arn: Arn = Arn("KARN0762398")
+  override val arn: Arn = Arn("KARN0762398")
   val invalidArn: Arn = Arn("KARN0101010")
   val user: AgentUser = AgentUser("userId", "userName")
   val groupName = "some group"

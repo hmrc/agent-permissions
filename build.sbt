@@ -2,13 +2,15 @@ import uk.gov.hmrc.DefaultBuildSettings.integrationTestSettings
 
 val appName = "agent-permissions"
 
-val silencerVersion = "1.7.8"
-
 lazy val microservice = Project(appName, file("."))
   .enablePlugins(play.sbt.PlayScala, SbtDistributablesPlugin)
   .settings(
     PlayKeys.playDefaultPort         := 9447,
-    routesImport                     ++= Seq("uk.gov.hmrc.agentpermissions.binders.Binders._", "uk.gov.hmrc.agentmtdidentifiers.model.Arn", "uk.gov.hmrc.agentpermissions.models.GroupId"),
+    routesImport                     ++= Seq(
+      "uk.gov.hmrc.agentpermissions.binders.Binders._",
+      "uk.gov.hmrc.agentmtdidentifiers.model.Arn",
+      "uk.gov.hmrc.agentpermissions.models.GroupId"
+    ),
     majorVersion                     := 0,
     scalaVersion                     := "2.13.10",
     Compile / scalafmtOnCompile      := true,
@@ -28,7 +30,6 @@ lazy val microservice = Project(appName, file("."))
       "-Wconf:cat=unused-privates:s",
       "-Wconf:msg=match may not be exhaustive:is", // summarize warnings about non-exhaustive pattern matching
     ),
-    // ***************
   )
   .configs(IntegrationTest)
   .settings(integrationTestSettings(): _*)

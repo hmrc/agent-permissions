@@ -38,7 +38,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
   val CONTENTTYPE_APPLICATIONJSON: (String, String) = "Content-Type" -> "application/json"
 
-  val arn: Arn = Arn("KARN0762398")
+  override val arn: Arn = Arn("KARN0762398")
   val invalidArn: Arn = Arn("KARN0101010")
   val user: AgentUser = AgentUser("userId", "userName")
   val groupName = "some group"
@@ -523,7 +523,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       }
 
       "calls to fetch groups returns empty collections" should {
-        s"return $NOT_FOUND" in new TestScope {
+        s"return $OK" in new TestScope {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockTaxGroupsServiceGetGroups(Seq.empty)
 

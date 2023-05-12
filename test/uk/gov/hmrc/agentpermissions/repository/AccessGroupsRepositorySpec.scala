@@ -20,7 +20,6 @@ import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.result.UpdateResult
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.storagemodel.SensitiveCustomGroup
@@ -38,7 +37,6 @@ class AccessGroupsRepositorySpec
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
   trait TestScope {
-    val arn: Arn = Arn("KARN1234567")
     val groupDbId: UUID = GroupId.random()
     val groupName: String = "Some Group".toLowerCase
     val agent: AgentUser = AgentUser("userId", "userName")

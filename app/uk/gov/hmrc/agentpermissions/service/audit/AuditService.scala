@@ -21,24 +21,25 @@ import play.api.Logging
 import play.api.libs.json._
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
-import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentOps
 import uk.gov.hmrc.agents.accessgroups.{AccessGroup, AgentUser, Client, CustomGroup, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
-import java.time.LocalDateTime
 import java.util.UUID
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.ExecutionContext
 
 @ImplementedBy(classOf[AuditServiceImpl])
 trait AuditService {
+  def auditOptInEvent(arn: Arn, agentUser: AgentUser)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
 
-  def auditAccessGroupCreation(accessGroup: CustomGroup)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
+  def auditOptOutEvent(arn: Arn, agentUser: AgentUser)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
 
-  def auditAccessGroupUpdate(accessGroup: CustomGroup)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
+  def auditAccessGroupCreation(accessGroup: AccessGroup)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
+
+  def auditAccessGroupUpdate(accessGroup: AccessGroup)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
 
   def auditAccessGroupDeletion(arn: Arn, groupName: String, agentUser: AgentUser)(implicit
     hc: HeaderCarrier,
@@ -48,10 +49,6 @@ trait AuditService {
   def auditEsAssignmentUnassignments(
     userEnrolmentAssignments: UserEnrolmentAssignments
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
-
-  def auditOptInEvent(arn: Arn, agentUser: AgentUser)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
-
-  def auditOptOutEvent(arn: Arn, agentUser: AgentUser)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
 
   def auditAccessGroupClientsRemoval(customGroup: CustomGroup, clientsToRemove: Set[Client])(implicit
     hc: HeaderCarrier,
@@ -69,78 +66,98 @@ trait AuditService {
   ): Unit
 }
 
-case class AuditUserEnrolmentAssignments(
-  assign: Set[UserEnrolment],
-  unassign: Set[UserEnrolment],
-  agentReferenceNumber: String
-)
-
-object AuditUserEnrolmentAssignments {
-  implicit val format: Format[AuditUserEnrolmentAssignments] = Json.format
-}
-
-case class AuditAccessGroup(
-  _id: GroupId,
-  agentReferenceNumber: String,
-  groupName: String,
-  created: LocalDateTime,
-  lastUpdated: LocalDateTime,
-  createdBy: AgentUser,
-  lastUpdatedBy: AgentUser,
-  teamMembers: Set[AgentUser],
-  clients: Set[Client]
-)
-
-object AuditAccessGroup {
-  implicit val formatAccessGroup: OFormat[AuditAccessGroup] = Json.format[AuditAccessGroup]
-}
-
 @Singleton
 class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appConfig: AppConfig)
     extends AuditService with Logging {
 
   override def auditAccessGroupCreation(
-    accessGroup: CustomGroup
+    accessGroup: AccessGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit =
     sendChunkedAuditEvents(
       "GranularPermissionsAccessGroupCreated",
-      AccessGroupSplitter
-        .split(accessGroup, appConfig.accessGroupChunkSize)
-        .map(accessGroup =>
-          AuditAccessGroup(
-            accessGroup.id,
-            accessGroup.arn.value,
-            accessGroup.groupName,
-            accessGroup.created,
-            accessGroup.lastUpdated,
-            accessGroup.createdBy,
-            accessGroup.lastUpdatedBy,
-            accessGroup.teamMembers,
-            accessGroup.clients
-          )
-        )
+      accessGroup match {
+        case cg: CustomGroup =>
+          AccessGroupSplitter
+            .forCustom(cg, appConfig.accessGroupChunkSize)
+            .map(_ =>
+              AuditAccessGroup(
+                accessGroup.id,
+                accessGroup.arn.value,
+                accessGroup.groupName,
+                accessGroup.created,
+                accessGroup.lastUpdated,
+                accessGroup.createdBy,
+                accessGroup.lastUpdatedBy,
+                "custom",
+                None,
+                cg.teamMembers,
+                cg.clients
+              )
+            )
+        case tg: TaxGroup =>
+          AccessGroupSplitter
+            .forTax(tg, appConfig.accessGroupChunkSize)
+            .map(_ =>
+              AuditAccessGroup(
+                accessGroup.id,
+                accessGroup.arn.value,
+                accessGroup.groupName,
+                accessGroup.created,
+                accessGroup.lastUpdated,
+                accessGroup.createdBy,
+                accessGroup.lastUpdatedBy,
+                "tax",
+                Some(tg.service),
+                tg.teamMembers,
+                tg.excludedClients
+              )
+            )
+      }
     )
 
   override def auditAccessGroupUpdate(
-    accessGroup: CustomGroup
+    accessGroup: AccessGroup
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit =
     sendChunkedAuditEvents(
       "GranularPermissionsAccessGroupUpdated",
-      AccessGroupSplitter
-        .split(accessGroup, appConfig.accessGroupChunkSize)
-        .map(accessGroup =>
-          AuditAccessGroup(
-            accessGroup.id,
-            accessGroup.arn.value,
-            accessGroup.groupName,
-            accessGroup.created,
-            accessGroup.lastUpdated,
-            accessGroup.createdBy,
-            accessGroup.lastUpdatedBy,
-            accessGroup.teamMembers,
-            accessGroup.clients
-          )
-        )
+      accessGroup match {
+        case cg: CustomGroup =>
+          AccessGroupSplitter
+            .forCustom(cg, appConfig.accessGroupChunkSize)
+            .map(accessGroup =>
+              AuditAccessGroup(
+                accessGroup.id,
+                accessGroup.arn.value,
+                accessGroup.groupName,
+                accessGroup.created,
+                accessGroup.lastUpdated,
+                accessGroup.createdBy,
+                accessGroup.lastUpdatedBy,
+                "custom",
+                None,
+                cg.teamMembers,
+                cg.clients
+              )
+            )
+        case tg: TaxGroup =>
+          AccessGroupSplitter
+            .forTax(tg, appConfig.accessGroupChunkSize)
+            .map(accessGroup =>
+              AuditAccessGroup(
+                accessGroup.id,
+                accessGroup.arn.value,
+                accessGroup.groupName,
+                accessGroup.created,
+                accessGroup.lastUpdated,
+                accessGroup.createdBy,
+                accessGroup.lastUpdatedBy,
+                "tax",
+                Some(tg.service),
+                tg.teamMembers,
+                tg.excludedClients
+              )
+            )
+      }
     )
 
   override def auditAccessGroupDeletion(arn: Arn, groupName: String, agentUser: AgentUser)(implicit

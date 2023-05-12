@@ -30,8 +30,6 @@ import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
 class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
-
-  val arn: Arn = Arn("KARN1234567")
   val user: AgentUser = AgentUser("userId", "userName")
   val groupName = "some group"
   val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)

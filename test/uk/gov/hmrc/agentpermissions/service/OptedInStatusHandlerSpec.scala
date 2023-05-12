@@ -28,8 +28,6 @@ import scala.concurrent.{ExecutionContext, Future}
 class OptedInStatusHandlerSpec extends BaseSpec {
 
   trait TestScope {
-    val arn: Arn = Arn("KARN1234567")
-
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 

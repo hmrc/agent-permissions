@@ -19,14 +19,14 @@ package uk.gov.hmrc.agentpermissions.service.audit
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agents.accessgroups.CustomGroup
+import uk.gov.hmrc.agents.accessgroups.{CustomGroup, TaxGroup}
 
 import java.time.LocalDateTime
 
 class AccessGroupSplitterSpec extends BaseSpec with AuditTestSupport {
 
   "Splitter" should {
-    "create chunks correctly" in {
+    "create chunks correctly for custom groups" in {
       val chunkSize = 50
 
       val accessGroup: CustomGroup = CustomGroup(
@@ -41,7 +41,7 @@ class AccessGroupSplitterSpec extends BaseSpec with AuditTestSupport {
         (1 to 199).map(_ => client()).toSet
       )
 
-      val chunkedAccessGroups = AccessGroupSplitter.split(accessGroup, chunkSize)
+      val chunkedAccessGroups = AccessGroupSplitter.forCustom(accessGroup, chunkSize)
 
       chunkedAccessGroups.size shouldBe 6
 
@@ -61,6 +61,46 @@ class AccessGroupSplitterSpec extends BaseSpec with AuditTestSupport {
       chunkedAccessGroups(4).teamMembers.size shouldBe chunkSize
 
       chunkedAccessGroups(5).clients shouldBe empty
+      chunkedAccessGroups(5).teamMembers.size shouldBe 49
+    }
+
+    "create chunks correctly for tax service groups" in {
+      val chunkSize = 50
+
+      val accessGroup: TaxGroup = TaxGroup(
+        GroupId.random(),
+        Arn("KARN1234567"),
+        "some group",
+        LocalDateTime.now(),
+        LocalDateTime.now(),
+        teamMember(),
+        teamMember(),
+        (1 to 99).map(_ => teamMember()).toSet,
+        "HMRC-TERS",
+        automaticUpdates = true,
+        (1 to 199).map(_ => client()).toSet
+      )
+
+      val chunkedAccessGroups = AccessGroupSplitter.forTax(accessGroup, chunkSize)
+
+      chunkedAccessGroups.size shouldBe 6
+
+      chunkedAccessGroups.head.excludedClients.size shouldBe chunkSize
+      chunkedAccessGroups.head.teamMembers shouldBe empty
+
+      chunkedAccessGroups(1).excludedClients.size shouldBe chunkSize
+      chunkedAccessGroups(1).teamMembers shouldBe empty
+
+      chunkedAccessGroups(2).excludedClients.size shouldBe chunkSize
+      chunkedAccessGroups(2).teamMembers shouldBe empty
+
+      chunkedAccessGroups(3).excludedClients.size shouldBe 49
+      chunkedAccessGroups(3).teamMembers shouldBe empty
+
+      chunkedAccessGroups(4).excludedClients shouldBe empty
+      chunkedAccessGroups(4).teamMembers.size shouldBe chunkSize
+
+      chunkedAccessGroups(5).excludedClients shouldBe empty
       chunkedAccessGroups(5).teamMembers.size shouldBe 49
     }
   }
