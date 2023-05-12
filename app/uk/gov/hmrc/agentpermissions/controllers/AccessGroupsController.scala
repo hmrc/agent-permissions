@@ -338,7 +338,7 @@ class AccessGroupsController @Inject() (
     }
   }
 
-  def addUnassignedMembers(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def addMembers(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddMembersToAccessGroupRequest] { updateAccessGroupRequest =>
         withCustomGroup(gid, authorisedAgent.arn) { group =>

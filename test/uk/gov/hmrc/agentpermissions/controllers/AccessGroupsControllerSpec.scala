@@ -17,8 +17,8 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import akka.actor.ActorSystem
-import org.scalamock.handlers.{CallHandler3, CallHandler4, CallHandler5, CallHandler6, CallHandler7}
-import play.api.libs.json.{JsArray, JsNumber, JsString, JsValue, Json}
+import org.scalamock.handlers._
+import play.api.libs.json._
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
@@ -27,7 +27,7 @@ import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.model.{AddOneTeamMemberToGroupRequest, DisplayClient}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.service._
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup, GroupSummary, TaxGroup}
+import uk.gov.hmrc.agents.accessgroups._
 import uk.gov.hmrc.auth.core.InvalidBearerToken
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -1552,7 +1552,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"return $FORBIDDEN" in new TestScope {
         mockAuthActionGetAuthorisedAgent(None)
 
-        val result = controller.addUnassignedMembers(dbId)(
+        val result = controller.addMembers(dbId)(
           baseRequest.withBody(jsonPayloadForUpdatingGroup(groupName))
         )
         status(result) shouldBe FORBIDDEN
@@ -1561,7 +1561,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     "request does not contain json payload" should {
       s"return $BAD_REQUEST" in new TestScope {
-        val result = controller.addUnassignedMembers(GroupId.random())(baseRequest)
+        val result = controller.addMembers(GroupId.random())(baseRequest)
         status(result) shouldBe BAD_REQUEST
       }
     }
@@ -1570,7 +1570,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"return $BAD_REQUEST" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
 
-        val result = controller.addUnassignedMembers(dbId)(baseRequest.withBody(JsString("")))
+        val result = controller.addMembers(dbId)(baseRequest.withBody(JsString("")))
         status(result) shouldBe BAD_REQUEST
       }
     }
@@ -1592,7 +1592,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
             mockAccessGroupsServiceGetGroupById(Some(group))
             mockAccessGroupsServiceUpdate(AccessGroupUpdated)
 
-            val result = controller.addUnassignedMembers(dbId)(request)
+            val result = controller.addMembers(dbId)(request)
 
             status(result) shouldBe OK
           }
@@ -1608,7 +1608,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
             mockAccessGroupsServiceGetGroupById(Some(group))
             mockAccessGroupsServiceUpdate(AccessGroupUpdatedWithoutAssignmentsPushed)
 
-            val result = controller.addUnassignedMembers(dbId)(request)
+            val result = controller.addMembers(dbId)(request)
 
             status(result) shouldBe OK
           }
@@ -1624,7 +1624,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
             mockAccessGroupsServiceGetGroupById(Some(group))
             mockAccessGroupsServiceUpdate(AccessGroupNotUpdated)
 
-            val result = controller.addUnassignedMembers(dbId)(request)
+            val result = controller.addMembers(dbId)(request)
 
             status(result) shouldBe NOT_FOUND
           }
@@ -1635,7 +1635,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
             mockAccessGroupsServiceGetGroupById(None)
 
-            val result = controller.addUnassignedMembers(dbId)(request)
+            val result = controller.addMembers(dbId)(request)
 
             status(result) shouldBe BAD_REQUEST
           }

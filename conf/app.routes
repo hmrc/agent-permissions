@@ -18,7 +18,7 @@ GET     /groups/:gid                        uk.gov.hmrc.agentpermissions.control
 GET     /custom-group/:gid                  uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getCustomGroupSummary(gid: GroupId)
 DELETE  /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: GroupId)
 PATCH   /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: GroupId)
-PUT     /groups/:gid/add-unassigned         uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addUnassignedMembers(gid: GroupId)
+PUT     /groups/:gid/members/add            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addMembers(gid: GroupId)
 PATCH   /groups/:id/members/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addTeamMemberToGroup(id: GroupId)
 GET     /group/:gid/clients                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForGroup(gid: GroupId, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
 GET     /group/:gid/clients/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForAddingToGroup(gid: GroupId, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
@@ -38,6 +38,7 @@ GET     /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controller
 PATCH   /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.updateGroup(groupId: GroupId)
 DELETE  /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.deleteGroup(groupId: GroupId)
 PATCH   /tax-group/:groupId/members/add  uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.addTeamMemberToGroup(groupId: GroupId)
+PUT     /tax-group/:groupId/members/add  uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.addMembers(groupId: GroupId)
 DELETE  /tax-group/:gid/members/:memberId      uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.removeTeamMember(gid: GroupId, memberId: String)
 
 GET     /arn/:arn/client-count/available-tax-services    uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.clientCountForAvailableTaxServices(arn: Arn)

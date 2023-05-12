@@ -161,7 +161,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  def addUnassignedMembers(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def addMembers(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddMembersToTaxServiceGroupRequest] { updateGroupRequest =>
         withTaxGroup(gid, authorisedAgent.arn) { group =>
