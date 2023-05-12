@@ -112,7 +112,6 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
                 tg.excludedClients
               )
             )
-
       }
     )
 

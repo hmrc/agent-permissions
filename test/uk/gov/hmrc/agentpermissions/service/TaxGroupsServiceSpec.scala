@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import com.mongodb.client.result.UpdateResult
-import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
+import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler5}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
@@ -79,7 +79,8 @@ class TaxGroupsServiceSpec extends BaseSpec {
     val taxGroupsService: TaxGroupsService =
       new TaxGroupsServiceImpl(
         mockTaxServiceGroupsRepository,
-        mockAUCDConnector
+        mockAUCDConnector,
+        mockAuditService
       )
 
     lazy val now: LocalDateTime = LocalDateTime.now()
@@ -168,6 +169,25 @@ class TaxGroupsServiceSpec extends BaseSpec {
         .expects(arn, groupName, *)
         .returning(Future.successful(maybeModifiedCount))
 
+    def mockAuditServiceAuditAccessGroupCreation(): CallHandler3[TaxGroup, HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditService
+        .auditAccessGroupCreation(_: TaxGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(())
+
+    def mockAuditServiceAuditAccessGroupUpdate(): CallHandler3[TaxGroup, HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditService
+        .auditAccessGroupUpdate(_: TaxGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *)
+        .returning(())
+
+    def mockAuditServiceAuditAccessGroupDeletion()
+      : CallHandler5[Arn, String, AgentUser, HeaderCarrier, ExecutionContext, Unit] =
+      (mockAuditService
+        .auditAccessGroupDeletion(_: Arn, _: String, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .expects(*, *, *, *, *)
+        .returning(())
+
   }
 
   "Calling create" when {
@@ -200,6 +220,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
         s"return $TaxServiceGroupCreated" in new TestScope {
           mockTaxGroupsRepositoryGetByService(None)
           mockTaxServiceGroupsRepositoryInsert(taxGroup, Some(insertedId))
+          mockAuditServiceAuditAccessGroupCreation()
 
           taxGroupsService
             .create(taxGroup)
@@ -342,6 +363,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
       "call to delete group indicates one record was deleted" should {
         s"return $TaxServiceGroupDeleted" in new TestScope {
           mockTaxServiceGroupsRepositoryDelete(Some(1L))
+          mockAuditServiceAuditAccessGroupDeletion()
 
           taxGroupsService.delete(arn, groupName, user).futureValue shouldBe TaxServiceGroupDeleted
         }
@@ -371,6 +393,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
     "DB call to update group indicates one record was updated" should {
       s"return $TaxServiceGroupUpdated" in new TestScope {
         mockTaxServiceGroupsRepositoryUpdate(Some(1))
+        mockAuditServiceAuditAccessGroupUpdate()
 
         taxGroupsService.update(arn, groupName, taxGroup, user).futureValue shouldBe TaxServiceGroupUpdated
       }

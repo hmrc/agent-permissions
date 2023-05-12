@@ -22,6 +22,7 @@ import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
+import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agents.accessgroups.{AgentUser, GroupSummary, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -84,7 +85,8 @@ trait TaxGroupsService {
 @Singleton
 class TaxGroupsServiceImpl @Inject() (
   taxServiceGroupsRepository: TaxGroupsRepositoryV2,
-  userClientDetailsConnector: UserClientDetailsConnector
+  userClientDetailsConnector: UserClientDetailsConnector,
+  auditService: AuditService
 ) extends TaxGroupsService with Logging {
 
   override def clientCountForAvailableTaxServices(
@@ -149,7 +151,8 @@ class TaxGroupsServiceImpl @Inject() (
         } yield maybeCreationId match {
           case None =>
             TaxServiceGroupNotCreated
-          case Some(creationId) => // TODO add auditing via audit service
+          case Some(creationId) =>
+            auditService.auditAccessGroupCreation(taxGroup)
             logger.info(s"Created tax service group. Service: ${taxGroup.service} DB id: '$creationId")
             TaxServiceGroupCreated(creationId)
         }
@@ -188,7 +191,8 @@ class TaxGroupsServiceImpl @Inject() (
     for {
       maybeDeletedCount <- taxServiceGroupsRepository.delete(arn, groupName)
       taxServiceGroupDeletionStatus <- maybeDeletedCount match {
-                                         case Some(1L) => // TODO add auditing
+                                         case Some(1L) =>
+                                           auditService.auditAccessGroupDeletion(arn, groupName, agentUser)
                                            Future.successful(TaxServiceGroupDeleted)
                                          case _ =>
                                            Future.successful(TaxServiceGroupNotDeleted)
@@ -206,8 +210,7 @@ class TaxGroupsServiceImpl @Inject() (
           .update(arn, groupName, accessGroupWithWhoIsUpdating)
       accessGroupUpdateStatus <- maybeUpdatedCount match {
                                    case Some(1L) =>
-//                                         _ <- Future successful auditService.auditAccessGroupUpdate(
-//                                                accessGroupWithWhoIsUpdating)
+                                     auditService.auditAccessGroupUpdate(accessGroupWithWhoIsUpdating)
                                      Future.successful(TaxServiceGroupUpdated)
                                    case _ =>
                                      logger.info(

@@ -11,11 +11,14 @@ Tax service access groups only exist within Agent Services as an allowlist of te
 **Enrolments for tax service groups**
 - HMRC-MTD-VAT
 - HMRC-MTD-IT
-- HMRC-TERS-ORG and HMRC-TERSNT-ORG (Trusts)
+- HMRC-TERS-ORG and HMRC-TERSNT-ORG (Trusts, HMRC-TERS)
 - HMRC-CGT-PD
 - HMRC-PPT-ORG
 
 Even though custom access groups and tax service groups are separate, they cannot share the same name
+
+Creating, updating and deleting custom access groups are intensive operations due to the need to reconcile with EACD.
+Transactions can result in potential user level assignments (add clients OR team members) or de-assignments (remove clients OR team members)
 
 ## Endpoints
 
