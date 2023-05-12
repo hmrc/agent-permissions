@@ -24,7 +24,7 @@ import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2}
 import play.api.http.Status._
 import play.api.libs.json.{JsArray, Json}
 import play.api.libs.ws.{BodyWritable, DefaultBodyWritables, WSRequest}
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, PaginatedList, PaginationMetaData}
+import uk.gov.hmrc.agentmtdidentifiers.model.{PaginatedList, PaginationMetaData}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
@@ -36,8 +36,6 @@ import java.net.URL
 import scala.concurrent.{ExecutionContext, Future}
 
 class UserClientDetailsConnectorSpec extends BaseSpec {
-
-  val arn: Arn = Arn("TARN0000001")
 
   val mockHttpClientV2: HttpClientV2 = mock[HttpClientV2]
   val mockRequestBuilder: RequestBuilder = mock[RequestBuilder]

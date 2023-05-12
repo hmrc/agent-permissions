@@ -20,7 +20,7 @@ import uk.gov.hmrc.agents.accessgroups.{CustomGroup, TaxGroup}
 
 object AccessGroupSplitter {
 
-  def split(accessGroup: CustomGroup, chunkSize: Int): Seq[CustomGroup] = {
+  def forCustom(accessGroup: CustomGroup, chunkSize: Int): Seq[CustomGroup] = {
 
     val chunkedAccessGroupsWithClients = accessGroup.clients
       .grouped(chunkSize)
@@ -40,7 +40,7 @@ object AccessGroupSplitter {
     chunkedAccessGroupsWithClients ++ chunkedAccessGroupsWithTeamMembers
   }
 
-  def splitTax(tg: TaxGroup, chunkSize: Int): Seq[TaxGroup] = {
+  def forTax(tg: TaxGroup, chunkSize: Int): Seq[TaxGroup] = {
     val chunkedTaxGroupsWithClients = tg.excludedClients
       .grouped(chunkSize)
       .map { chunkedClients =>

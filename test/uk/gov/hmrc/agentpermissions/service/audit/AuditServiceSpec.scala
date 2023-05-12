@@ -18,12 +18,11 @@ package uk.gov.hmrc.agentpermissions.service.audit
 
 import org.scalamock.handlers.{CallHandler, CallHandler0}
 import play.api.libs.json.JsObject
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
@@ -33,37 +32,67 @@ import scala.concurrent.ExecutionContext
 class AuditServiceSpec extends BaseSpec with AuditTestSupport {
 
   "Access group creation" should {
-    "audit event correctly" in new TestScope {
-      val accessGroup: CustomGroup =
-        buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
+    "audit event correctly" when {
+      "custom group" in new TestScope {
+        val accessGroup: CustomGroup =
+          buildCustomGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
 
-      mockAppConfigAccessGroupChunkSize(1000)
-      mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupCreated", 2)
+        mockAppConfigAccessGroupChunkSize(1000)
+        mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupCreated", 2)
 
-      auditService.auditAccessGroupCreation(accessGroup)
+        auditService.auditAccessGroupCreation(accessGroup)
+      }
+
+      "tax group" in new TestScope {
+        val taxGroup: TaxGroup = buildTaxGroup(Set(agentUser1, agentUser2), Set(clientVat), serviceVat)
+        mockAppConfigAccessGroupChunkSize(1000)
+        mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupCreated", 2)
+
+        auditService.auditAccessGroupCreation(taxGroup)
+      }
     }
   }
 
   "Access group update" should {
-    "audit event correctly" in new TestScope {
-      val accessGroup: CustomGroup =
-        buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
+    "audit event correctly" when {
+      "custom group" in new TestScope {
+        val accessGroup: CustomGroup =
+          buildCustomGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
 
-      mockAppConfigAccessGroupChunkSize(1000)
-      mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated", 2)
+        mockAppConfigAccessGroupChunkSize(1000)
+        mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated", 2)
 
-      auditService.auditAccessGroupUpdate(accessGroup)
+        auditService.auditAccessGroupUpdate(accessGroup)
+      }
+
+      "tax group" in new TestScope {
+        val taxGroup: TaxGroup = buildTaxGroup(Set(agentUser1, agentUser2), Set(clientVat), serviceVat)
+        mockAppConfigAccessGroupChunkSize(1000)
+        mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupUpdated", 2)
+
+        auditService.auditAccessGroupUpdate(taxGroup)
+      }
     }
+
   }
 
   "Access group deletion" should {
-    "audit event correctly" in new TestScope {
-      val accessGroup: CustomGroup =
-        buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
+    "audit event correctly" when {
+      "custom group" in new TestScope {
+        val accessGroup: CustomGroup =
+          buildCustomGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
 
-      mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted", 1)
+        mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted", 1)
 
-      auditService.auditAccessGroupDeletion(accessGroup.arn, accessGroup.groupName, agentUser1)
+        auditService.auditAccessGroupDeletion(accessGroup.arn, accessGroup.groupName, agentUser1)
+      }
+
+      "tax group" in new TestScope {
+        val taxGroup: TaxGroup = buildTaxGroup(Set(agentUser1, agentUser2), Set(clientVat), serviceVat)
+        mockAuditConnectorSendExplicitAudit("GranularPermissionsAccessGroupDeleted", 1)
+
+        auditService.auditAccessGroupDeletion(taxGroup.arn, taxGroup.groupName, agentUser1)
+      }
     }
   }
 
@@ -95,7 +124,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
   "Access group clients removal" should {
     "audit event correctly" in new TestScope {
       val accessGroup: CustomGroup =
-        buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
+        buildCustomGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
 
       val chunkSize = 1000
 
@@ -109,7 +138,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
   "Access group team members removal" should {
     "audit event correctly" in new TestScope {
       val accessGroup: CustomGroup =
-        buildAccessGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
+        buildCustomGroup(Set(agentUser1, agentUser2), Set(clientVat, clientPpt, clientCgt))
 
       val chunkSize = 1000
 
@@ -124,8 +153,6 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
   }
 
   trait TestScope {
-
-    val arn: Arn = Arn("KARN1234567")
     val groupName: String = "groupName"
     val agentUser1: AgentUser = AgentUser("userId1", "userName")
     val agentUser2: AgentUser = AgentUser("userId2", "userName")
@@ -152,7 +179,7 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
     implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    def buildAccessGroup(teamMembers: Set[AgentUser], clients: Set[Client]): CustomGroup =
+    def buildCustomGroup(teamMembers: Set[AgentUser], clients: Set[Client]): CustomGroup =
       CustomGroup(
         GroupId.random(),
         arn,
@@ -162,6 +189,21 @@ class AuditServiceSpec extends BaseSpec with AuditTestSupport {
         agentUser1,
         agentUser1,
         teamMembers,
+        clients
+      )
+
+    def buildTaxGroup(teamMembers: Set[AgentUser], clients: Set[Client], service: String): TaxGroup =
+      TaxGroup(
+        GroupId.random(),
+        arn,
+        groupName,
+        now,
+        now,
+        agentUser1,
+        agentUser1,
+        teamMembers,
+        service,
+        automaticUpdates = true,
         clients
       )
 

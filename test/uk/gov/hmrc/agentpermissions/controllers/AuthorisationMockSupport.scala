@@ -27,10 +27,9 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait AuthorisationMockSupport extends MockFactory {
 
-  val arn = "KARN0762398"
   val agentReferenceNumberIdentifier = "AgentReferenceNumber"
   val agentEnrolmentIdentifiers: Seq[EnrolmentIdentifier] = Seq(
-    EnrolmentIdentifier(agentReferenceNumberIdentifier, arn)
+    EnrolmentIdentifier(agentReferenceNumberIdentifier, "KARN1234567")
   )
   val agentEnrolment = "HMRC-AS-AGENT"
 

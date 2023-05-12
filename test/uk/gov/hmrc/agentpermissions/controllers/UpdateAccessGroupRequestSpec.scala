@@ -15,8 +15,6 @@
  */
 
 package uk.gov.hmrc.agentpermissions.controllers
-
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.model.UpdateAccessGroupRequest
 import uk.gov.hmrc.agentpermissions.models.GroupId
@@ -25,8 +23,6 @@ import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 import java.time.LocalDateTime
 
 class UpdateAccessGroupRequestSpec extends BaseSpec {
-
-  val arn: Arn = Arn("KARN0762398")
   val user: AgentUser = AgentUser("userId", "userName")
   val groupName = "some existing group name"
   lazy val now: LocalDateTime = LocalDateTime.now()

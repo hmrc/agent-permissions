@@ -78,7 +78,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       accessGroup match {
         case cg: CustomGroup =>
           AccessGroupSplitter
-            .split(cg, appConfig.accessGroupChunkSize)
+            .forCustom(cg, appConfig.accessGroupChunkSize)
             .map(_ =>
               AuditAccessGroup(
                 accessGroup.id,
@@ -96,7 +96,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
             )
         case tg: TaxGroup =>
           AccessGroupSplitter
-            .splitTax(tg, appConfig.accessGroupChunkSize)
+            .forTax(tg, appConfig.accessGroupChunkSize)
             .map(_ =>
               AuditAccessGroup(
                 accessGroup.id,
@@ -123,7 +123,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       accessGroup match {
         case cg: CustomGroup =>
           AccessGroupSplitter
-            .split(cg, appConfig.accessGroupChunkSize)
+            .forCustom(cg, appConfig.accessGroupChunkSize)
             .map(accessGroup =>
               AuditAccessGroup(
                 accessGroup.id,
@@ -141,7 +141,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
             )
         case tg: TaxGroup =>
           AccessGroupSplitter
-            .splitTax(tg, appConfig.accessGroupChunkSize)
+            .forTax(tg, appConfig.accessGroupChunkSize)
             .map(accessGroup =>
               AuditAccessGroup(
                 accessGroup.id,

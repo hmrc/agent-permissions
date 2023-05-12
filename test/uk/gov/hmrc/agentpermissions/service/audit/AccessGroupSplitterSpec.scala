@@ -26,7 +26,7 @@ import java.time.LocalDateTime
 class AccessGroupSplitterSpec extends BaseSpec with AuditTestSupport {
 
   "Splitter" should {
-    "create chunks correctly" in {
+    "create chunks correctly for custom groups" in {
       val chunkSize = 50
 
       val accessGroup: CustomGroup = CustomGroup(
@@ -41,7 +41,7 @@ class AccessGroupSplitterSpec extends BaseSpec with AuditTestSupport {
         (1 to 199).map(_ => client()).toSet
       )
 
-      val chunkedAccessGroups = AccessGroupSplitter.split(accessGroup, chunkSize)
+      val chunkedAccessGroups = AccessGroupSplitter.forCustom(accessGroup, chunkSize)
 
       chunkedAccessGroups.size shouldBe 6
 
@@ -81,7 +81,7 @@ class AccessGroupSplitterSpec extends BaseSpec with AuditTestSupport {
         (1 to 199).map(_ => client()).toSet
       )
 
-      val chunkedAccessGroups = AccessGroupSplitter.splitTax(accessGroup, chunkSize)
+      val chunkedAccessGroups = AccessGroupSplitter.forTax(accessGroup, chunkSize)
 
       chunkedAccessGroups.size shouldBe 6
 
