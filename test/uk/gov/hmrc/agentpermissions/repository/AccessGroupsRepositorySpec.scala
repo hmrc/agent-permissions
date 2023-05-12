@@ -20,6 +20,7 @@ import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.result.UpdateResult
+import play.api.test.Helpers.{await, defaultAwaitTimeout}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.storagemodel.SensitiveCustomGroup
@@ -235,13 +236,13 @@ class AccessGroupsRepositorySpec
 
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(groupDbId, randomAlphabetic(23)).futureValue
+            await(accessGroupsRepository.removeClient(groupDbId, randomAlphabetic(23)))
 
           // then
           updateResult.getModifiedCount shouldBe 0
 
           // and
-          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId).futureValue
+          val updatedGroup: Option[CustomGroup] = await(accessGroupsRepository.findById(groupDbId))
           private val clients: Set[Client] = updatedGroup.get.clients
           clients.size shouldBe 3
         }
@@ -249,7 +250,7 @@ class AccessGroupsRepositorySpec
         "return modified count of 0 when group is not found" in new TestScope {
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(GroupId.random(), randomAlphabetic(23)).futureValue
+            await(accessGroupsRepository.removeClient(GroupId.random(), randomAlphabetic(23)))
 
           // then
           updateResult.getModifiedCount shouldBe 0

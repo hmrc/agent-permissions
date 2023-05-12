@@ -903,7 +903,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       s"return $FORBIDDEN" in new TestScope {
         mockAuthActionGetAuthorisedAgent(None)
 
-        val result = controller.addUnassignedMembers(dbId)(
+        val result = controller.addMembers(dbId)(
           baseRequest.withBody(jsonPayloadForUpdatingGroup(groupName))
         )
         status(result) shouldBe FORBIDDEN
@@ -912,7 +912,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
 
     "request does not contain json payload" should {
       s"return $BAD_REQUEST" in new TestScope {
-        val result = controller.addUnassignedMembers(GroupId.random())(baseRequest)
+        val result = controller.addMembers(GroupId.random())(baseRequest)
         status(result) shouldBe BAD_REQUEST
       }
     }
@@ -921,7 +921,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
       s"return $BAD_REQUEST" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
 
-        val result = controller.addUnassignedMembers(dbId)(baseRequest.withBody(JsString("")))
+        val result = controller.addMembers(dbId)(baseRequest.withBody(JsString("")))
         status(result) shouldBe BAD_REQUEST
       }
     }
@@ -943,7 +943,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
             mockTaxGroupsServiceGetGroupById(Some(group))
             mockTaxGroupsServiceUpdate(TaxServiceGroupUpdated)
 
-            val result = controller.addUnassignedMembers(dbId)(request)
+            val result = controller.addMembers(dbId)(request)
 
             status(result) shouldBe OK
           }
@@ -959,7 +959,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
             mockTaxGroupsServiceGetGroupById(Some(group))
             mockTaxGroupsServiceUpdate(TaxServiceGroupNotUpdated)
 
-            val result = controller.addUnassignedMembers(dbId)(request)
+            val result = controller.addMembers(dbId)(request)
 
             status(result) shouldBe NOT_FOUND
           }
@@ -970,7 +970,7 @@ class TaxServiceGroupsControllerSpec extends BaseSpec {
             mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
             mockTaxGroupsServiceGetGroupById(None)
 
-            val result = controller.addUnassignedMembers(dbId)(request)
+            val result = controller.addMembers(dbId)(request)
 
             status(result) shouldBe BAD_REQUEST
           }
