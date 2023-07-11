@@ -387,6 +387,7 @@ class EacdSynchronizerSpec extends BaseSpec {
     val clientPpt: Client = Client(s"$servicePpt~$serviceIdentifierKeyPpt~XAPPT0000012345", "Frank Wright")
     val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
     val clientMtdit: Client = Client(s"$serviceMtdit~$serviceIdentifierKeyMtdit~236216873678126", "Jane Doe")
+    val clientCbc: Client = Client(s"$serviceCbc~$serviceIdentifierKeyCbc~236216873678126", "Colm Doe")
     val clientTrust: Client = Client(s"$serviceTrust~$serviceIdentifierKeyTrust~0123456789", "Trust Client")
 
     implicit val materializer: Materializer = Materializer(ActorSystem())

@@ -70,6 +70,7 @@ class AccessGroupsController @Inject() (
   }
 
   // gets all group summaries for client
+  // Assuming
   def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
     implicit request =>
       withAuthorisedAgent(allowStandardUser = true) { _ =>

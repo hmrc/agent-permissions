@@ -32,6 +32,8 @@ abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures 
   val serviceMtdit = "HMRC-MTD-IT"
   val serviceTrust = "HMRC-TERS-ORG"
   val serviceNTTrust = "HMRC-TERSNT-ORG"
+  val serviceCbcNonUk = "HMRC-CBC-NONUK-ORG"
+  val serviceCbc = "HMRC-CBC-ORG"
   val trustsRegex = "^HMRC-TERS[A-Z]{0,2}-ORG$"
 
   val serviceIdentifierKeyVat = "VRN"
@@ -40,6 +42,7 @@ abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures 
   val serviceIdentifierKeyMtdit = "MTDITID"
   val serviceIdentifierKeyTrust = "SAUTR"
   val serviceIdentifierKeyNTTrust = "URN"
+  val serviceIdentifierKeyCbc = "cbcId"
 
   // Note: This is simply a randomly-chosen secret key to run tests
   val aesCrypto: Encrypter with Decrypter =
