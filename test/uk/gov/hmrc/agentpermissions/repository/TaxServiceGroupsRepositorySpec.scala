@@ -135,7 +135,7 @@ class TaxServiceGroupsRepositorySpec
         s"store the access group with field-level-encryption" in new TestScope {
           groupsRepository.insert(accessGroup).futureValue
           // checking at the raw Document level that the relevant fields have been encrypted
-          val document = groupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
+          val document: Seq[Document] = groupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
           document.toString should include(accessGroup.groupName) // the group name should be in plaintext
           // But the agent user ids should be encrypted
           (accessGroup.teamMembers ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>
@@ -215,7 +215,7 @@ class TaxServiceGroupsRepositorySpec
     }
 
     "groupExistsForTaxService" when {
-      "access group exists for HMRC-TERS-ORG" should {
+      "access group exists for trusts" should {
         "return true when asked for HMRC-TERS-ORG" in new TestScope {
           groupsRepository.insert(accessGroup.copy(service = "HMRC-TERS")).futureValue
 
@@ -225,6 +225,19 @@ class TaxServiceGroupsRepositorySpec
           groupsRepository.insert(accessGroup.copy(service = "HMRC-TERS")).futureValue
 
           groupsRepository.groupExistsForTaxService(arn, "HMRC-TERSNT-ORG").futureValue shouldBe true
+        }
+      }
+
+      "access group exists for country-by-country reports" should {
+        "return true when asked for HMRC-CBC-ORG" in new TestScope {
+          groupsRepository.insert(accessGroup.copy(service = "HMRC-CBC")).futureValue
+
+          groupsRepository.groupExistsForTaxService(arn, "HMRC-CBC-ORG").futureValue shouldBe true
+        }
+        "return true when asked for HMRC-CBC-NONUK-ORG" in new TestScope {
+          groupsRepository.insert(accessGroup.copy(service = "HMRC-CBC")).futureValue
+
+          groupsRepository.groupExistsForTaxService(arn, "HMRC-CBC-NONUK-ORG").futureValue shouldBe true
         }
       }
     }
