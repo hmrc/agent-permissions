@@ -127,11 +127,8 @@ class TaxGroupsServiceImpl @Inject() (
     val TRUSTS = "HMRC-TERS" // taxable "HMRC-TERS-ORG" and non taxable "HMRC-TERSNT-ORG"
     val CBC = "HMRC-CBC" // uk "HMRC-CBC-ORG" and non uk "HMRC-CBC-NONUK-ORG"
 
-    val trustCounts = count.filter(m => m._1.contains(TRUSTS))
-    val combinedTrustCountsValue = trustCounts.values.sum
-
-    val countryByCountryCounts = count.filter(m => m._1.contains(CBC))
-    val combinedCbcCountsValue = countryByCountryCounts.values.sum
+    val combinedTrustCountsValue = count.filter(m => m._1.contains(TRUSTS)).values.sum
+    val combinedCbcCountsValue = count.filter(m => m._1.contains(CBC)).values.sum
 
     val combinedTrustCountMap = Map(TRUSTS -> combinedTrustCountsValue)
     val combinedCbcCountMap = Map(CBC -> combinedCbcCountsValue)
