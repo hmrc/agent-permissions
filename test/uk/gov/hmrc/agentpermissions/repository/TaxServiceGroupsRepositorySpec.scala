@@ -135,7 +135,8 @@ class TaxServiceGroupsRepositorySpec
         s"store the access group with field-level-encryption" in new TestScope {
           groupsRepository.insert(accessGroup).futureValue
           // checking at the raw Document level that the relevant fields have been encrypted
-          val document: Seq[Document] = groupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
+          val document: Seq[Document] =
+            groupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
           document.toString should include(accessGroup.groupName) // the group name should be in plaintext
           // But the agent user ids should be encrypted
           (accessGroup.teamMembers ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>
