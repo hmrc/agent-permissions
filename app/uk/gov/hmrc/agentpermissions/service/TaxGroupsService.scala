@@ -105,7 +105,7 @@ class TaxGroupsServiceImpl @Inject() (
           )
           .map(_.flatten)
           .map(_.toMap)
-          .map(combineTrustClientCount)
+          .map(combineServicesClientCount)
       case None => Future successful Map[String, Int]()
     }
 
@@ -117,20 +117,33 @@ class TaxGroupsServiceImpl @Inject() (
       existingTaxGroups <- getAllTaxServiceGroups(arn)
 
       taxServiceIds = existingTaxGroups.map(groups => groups.service)
-      combinedCount = fullCount.fold(Map.empty[String, Int])(fc => combineTrustClientCount(fc))
+      combinedCount = fullCount.fold(Map.empty[String, Int])(fc => combineServicesClientCount(fc))
 
       groupCount = combinedCount.filter(m => taxServiceIds.contains(m._1))
     } yield groupCount
 
-  private val TRUSTS = "HMRC-TERS" // taxable "HMRC-TERS-ORG" and non taxable "HMRC-TERSNT-ORG"
+  /** Groups together client counts for services which act as 1 entity in the frontend but exist as 2 enrolment keys */
+  private def combineServicesClientCount(count: Map[String, Int]): Map[String, Int] = {
+    val TRUSTS = "HMRC-TERS" // taxable "HMRC-TERS-ORG" and non taxable "HMRC-TERSNT-ORG"
+    val CBC = "HMRC-CBC" // uk "HMRC-CBC-ORG" and non uk "HMRC-CBC-NONUK-ORG"
 
-  private def combineTrustClientCount(count: Map[String, Int]): Map[String, Int] = {
-    val taxableTrustCounts = count.filter(m => m._1.contains(TRUSTS))
-    val combinedTrustCountValue = taxableTrustCounts.values.sum // total
+    val combinedTrustCountsValue = count.filter(m => m._1.contains(TRUSTS)).values.sum
+    val combinedCbcCountsValue = count.filter(m => m._1.contains(CBC)).values.sum
 
-    if (combinedTrustCountValue > 0)
-      count.filterNot(m => m._1.contains(TRUSTS)) ++ Map(TRUSTS -> combinedTrustCountValue)
-    else count.filterNot(m => m._1.contains(TRUSTS)) // removes trusts if agent has no trust clients
+    val combinedTrustCountMap = Map(TRUSTS -> combinedTrustCountsValue)
+    val combinedCbcCountMap = Map(CBC -> combinedCbcCountsValue)
+    val singleServicesMap = count.filterNot(m => m._1.contains(TRUSTS) || m._1.contains(CBC))
+
+    // combines count or removes services if agent has no clients of that type
+    if (combinedTrustCountsValue > 0 && combinedCbcCountsValue > 0) {
+      singleServicesMap ++ combinedTrustCountMap ++ combinedCbcCountMap
+    } else if (combinedTrustCountsValue > 0) {
+      singleServicesMap ++ combinedTrustCountMap
+    } else if (combinedCbcCountsValue > 0) {
+      singleServicesMap ++ combinedCbcCountMap
+    } else {
+      singleServicesMap
+    }
   }
 
   override def getById(
