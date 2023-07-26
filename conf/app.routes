@@ -8,7 +8,7 @@ GET     /arn/:arn/optin-record-exists           uk.gov.hmrc.agentpermissions.con
 
 # Access Groups
 GET     /arn/:arn/access-group-name-check       uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groupNameCheck(arn: Arn, name: String)
-# TODO: Update this one
+
 GET     /arn/:arn/client/:enrolmentKey/groups   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForClient(arn: Arn, enrolmentKey)
 GET     /arn/:arn/team-member/:userId/groups    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroupSummariesForTeamMember(arn: Arn, userId: String)
 GET     /arn/:arn/all-groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getAllGroupSummaries(arn: Arn)

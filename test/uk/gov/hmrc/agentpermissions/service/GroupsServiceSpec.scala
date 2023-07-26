@@ -42,6 +42,7 @@ class GroupsServiceSpec extends BaseSpec {
     val client1: Client = Client(s"$serviceVat~VRN~101747641", "John Innes")
     val client2: Client = Client(s"$serviceVat~VRN~101746700", "Ann Von-Innes")
     val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
+    val clientCbc: Client = Client(s"$serviceCbc~$serviceCbc~XMCGTP123456789", "George Candy")
     val trustClient1: Client = Client(s"$serviceTrust~$serviceIdentifierKeyTrust~1234567890", "George Floyd")
     val trustClient2: Client = Client(s"$serviceNTTrust~URN~XATRUST87165231", "George Corn")
 
@@ -68,7 +69,7 @@ class GroupsServiceSpec extends BaseSpec {
       user,
       user,
       Set(user, user1, user2),
-      Set(client1, client2, clientCgt)
+      Set(client1, client2, clientCgt, clientCgt)
     )
 
     def groupSummary(
