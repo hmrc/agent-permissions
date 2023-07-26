@@ -69,7 +69,7 @@ class GroupsServiceSpec extends BaseSpec {
       user,
       user,
       Set(user, user1, user2),
-      Set(client1, client2, clientCgt, clientCgt)
+      Set(client1, client2, clientCgt, clientCbc)
     )
 
     def groupSummary(
@@ -217,7 +217,7 @@ class GroupsServiceSpec extends BaseSpec {
               1,
               taxService = Some(serviceCgt)
             ),
-            GroupSummary(accessGroup.id, "some group", Some(3), 3),
+            GroupSummary(accessGroup.id, "some group", Some(4), 3),
             GroupSummary(taxGroup.id, "VAT", Some(5), 3, taxService = Some(serviceVat))
           )
       }
