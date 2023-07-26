@@ -366,10 +366,10 @@ class CustomGroupsServiceImpl @Inject() (
       enrolmentKeysInCustomGroups = accessGroups.toSet[CustomGroup].flatMap(_.clients).map(_.enrolmentKey)
       taxServiceGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
     } yield clients.foldLeft(ClientList(Set.empty, Set.empty)) { (clientList, client) =>
-      val serviceKey = EnrolmentKey.deconstruct(client.enrolmentKey) match {
-        case ("HMRC-TERS-ORG", _) | ("HMRC-TERSNT-ORG", _) =>
+      val serviceKey = EnrolmentKey.serviceOf(client.enrolmentKey) match {
+        case "HMRC-TERS-ORG" | "HMRC-TERSNT-ORG" =>
           "HMRC-TERS" // both types of trusts are represented by the same key in tax service groups
-        case (sk, _) => sk
+        case sk => sk
       }
       // The client is considered 'assigned' if: ...
       if (
