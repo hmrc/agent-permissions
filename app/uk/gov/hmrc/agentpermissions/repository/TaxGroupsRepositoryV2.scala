@@ -110,8 +110,12 @@ class TaxGroupsRepositoryV2Impl @Inject() (
       .headOption()
 
   def groupExistsForTaxService(arn: Arn, service: String): Future[Boolean] = {
-    // both trust enrolments (HMRC-TERS-ORG & HMRC-TERSNT-ORG) stored as one group HMRC-TERS
-    val svc = if (service.contains("HMRC-TERS")) "HMRC-TERS" else service
+    // Services as 1 entity with multiple enrolments stored as single group
+    val svc = service match {
+      case _ if service.contains("HMRC-TERS") => "HMRC-TERS" // HMRC-TERS-ORG & HMRC-TERSNT-ORG
+      case _ if service.contains("HMRC-CBC")  => "HMRC-CBC" // HMRC-CBC-ORG & HMRC-CBC-NONUK-ORG
+      case _                                  => service
+    }
     collection
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_SERVICE, svc)))
       .collation(caseInsensitiveCollation)

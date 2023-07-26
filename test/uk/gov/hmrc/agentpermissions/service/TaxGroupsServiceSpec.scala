@@ -61,12 +61,14 @@ class TaxGroupsServiceSpec extends BaseSpec {
     )
 
     val fullCountMap = Map(
-      "HMRC-MTD-VAT"    -> 2,
-      "HMRC-CGT-PD"     -> 3,
-      "HMRC-PPT-ORG"    -> 4,
-      "HMRC-MTD-IT"     -> 5,
-      "HMRC-TERS-ORG"   -> 6,
-      "HMRC-TERSNT-ORG" -> 1
+      "HMRC-MTD-VAT"       -> 2,
+      "HMRC-CGT-PD"        -> 3,
+      "HMRC-PPT-ORG"       -> 4,
+      "HMRC-MTD-IT"        -> 5,
+      "HMRC-TERS-ORG"      -> 6,
+      "HMRC-TERSNT-ORG"    -> 1,
+      "HMRC-CBC-ORG"       -> 6,
+      "HMRC-CBC-NONUK-ORG" -> 2
     )
 
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
@@ -407,6 +409,8 @@ class TaxGroupsServiceSpec extends BaseSpec {
   private val PPT = "HMRC-PPT-ORG"
   private val TERS = "HMRC-TERS-ORG"
   private val TERSNT = "HMRC-TERSNT-ORG"
+  private val CBC = "HMRC-CBC-ORG"
+  private val CBCNONUK = "HMRC-CBC-NONUK-ORG"
 
   "Client count for available tax services" when {
     "agent has all types of clients AND no existing tax groups" should {
@@ -419,13 +423,17 @@ class TaxGroupsServiceSpec extends BaseSpec {
         // Trusts will always expect the same
         mockTaxGroupsRepositoryGroupExistsForService(TERS, result = false)
         mockTaxGroupsRepositoryGroupExistsForService(TERSNT, result = false)
+        // CBC will always expect the same
+        mockTaxGroupsRepositoryGroupExistsForService(CBC, result = false)
+        mockTaxGroupsRepositoryGroupExistsForService(CBCNONUK, result = false)
 
         val expectedCount = Map(
           "HMRC-MTD-VAT" -> 2,
           "HMRC-CGT-PD"  -> 3,
           "HMRC-PPT-ORG" -> 4,
           "HMRC-MTD-IT"  -> 5,
-          "HMRC-TERS"    -> 7 // Combined trusts
+          "HMRC-TERS"    -> 7, // Combined trusts
+          "HMRC-CBC"     -> 8 // Combined country by country
         )
 
         taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
@@ -442,6 +450,9 @@ class TaxGroupsServiceSpec extends BaseSpec {
         // TERS & TERSNT will always be the same
         mockTaxGroupsRepositoryGroupExistsForService(TERS, result = false)
         mockTaxGroupsRepositoryGroupExistsForService(TERSNT, result = false)
+        // CBC will always expect the same
+        mockTaxGroupsRepositoryGroupExistsForService(CBC, result = true)
+        mockTaxGroupsRepositoryGroupExistsForService(CBCNONUK, result = true)
 
         val expectedCount = Map(
           "HMRC-CGT-PD" -> 3,
@@ -463,6 +474,8 @@ class TaxGroupsServiceSpec extends BaseSpec {
         mockTaxGroupsRepositoryGroupExistsForService(PPT, result = true)
         mockTaxGroupsRepositoryGroupExistsForService(TERS, result = true)
         mockTaxGroupsRepositoryGroupExistsForService(TERSNT, result = true)
+        mockTaxGroupsRepositoryGroupExistsForService(CBC, result = true)
+        mockTaxGroupsRepositoryGroupExistsForService(CBCNONUK, result = true)
 
         val expectedCount = Map.empty[String, Int]
 
@@ -472,22 +485,40 @@ class TaxGroupsServiceSpec extends BaseSpec {
 
     "agent has only some types of clients" should {
       "return tax service groups for only those types of clients" in new TestScope {
-        mockAUCDGetClientCount(Some(Map("HMRC-MTD-VAT" -> 12, "HMRC-MTD-IT" -> 3)))
+        mockAUCDGetClientCount(Some(Map("HMRC-MTD-VAT" -> 12, "HMRC-MTD-IT" -> 3, "HMRC-CBC-ORG" -> 2)))
         mockTaxGroupsRepositoryGroupExistsForService(VAT, result = false)
         mockTaxGroupsRepositoryGroupExistsForService(IT, result = false)
+        mockTaxGroupsRepositoryGroupExistsForService(CBC, result = false)
 
-        val expectedCount = Map("HMRC-MTD-VAT" -> 12, "HMRC-MTD-IT" -> 3)
+        val expectedCount = Map("HMRC-MTD-VAT" -> 12, "HMRC-MTD-IT" -> 3, "HMRC-CBC" -> 2)
 
         taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
       }
 
       "return tax service groups for only services where a group does not already exist" in new TestScope {
-        mockAUCDGetClientCount(Some(Map("HMRC-MTD-VAT" -> 12, "HMRC-MTD-IT" -> 3, "HMRC-TERSNT-ORG" -> 8)))
+        mockAUCDGetClientCount(
+          Some(
+            Map(
+              "HMRC-MTD-VAT"       -> 12,
+              "HMRC-MTD-IT"        -> 3,
+              "HMRC-TERSNT-ORG"    -> 8,
+              "HMRC-CBC-ORG"       -> 2,
+              "HMRC-CBC-NONUK-ORG" -> 2
+            )
+          )
+        )
         mockTaxGroupsRepositoryGroupExistsForService(VAT, result = false)
         mockTaxGroupsRepositoryGroupExistsForService(IT, result = false)
         mockTaxGroupsRepositoryGroupExistsForService(TERSNT, result = true)
+        // CBC will always expect the same
+        mockTaxGroupsRepositoryGroupExistsForService(CBC, result = false)
+        mockTaxGroupsRepositoryGroupExistsForService(CBCNONUK, result = false)
 
-        val expectedCount = Map("HMRC-MTD-VAT" -> 12, "HMRC-MTD-IT" -> 3)
+        val expectedCount = Map(
+          "HMRC-MTD-VAT" -> 12,
+          "HMRC-MTD-IT"  -> 3,
+          "HMRC-CBC"     -> 4 // combined cbc count
+        )
 
         taxGroupsService.clientCountForAvailableTaxServices(arn).futureValue shouldBe expectedCount
       }
@@ -573,7 +604,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
 
       "works as expected when successful " should {
         s"return $TaxServiceGroupUpdated" in new TestScope {
-          mockAddTeamMemberToGroup(dbId, user, 1)
+          mockAddTeamMemberToGroup(dbId, user)
           taxGroupsService.addMemberToGroup(dbId, user).futureValue shouldBe TaxServiceGroupUpdated
         }
       }
