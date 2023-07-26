@@ -688,11 +688,12 @@ class CustomGroupsServiceSpec extends BaseSpec {
         val enrolmentKeyPPT = "HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345"
         val enrolmentKeyTrust = "HMRC-TERS-ORG~SAUTR~1731139143"
         val enrolmentKeyTrustNT = "HMRC-TERSNT-ORG~URN~XATRUST73113914"
+        val enrolmentKeyCbcUk = "HMRC-CBC-ORG~UTR~1234567890~cbcId~XACBC1234567890"
 
-        val taxServiceAccessGroupPPT = taxServiceGroup.copy(service = "HMRC-PPT-ORG")
-        val taxServiceAccessGroupTrust = taxServiceGroup.copy(service =
-          "HMRC-TERS"
-        ) // This should include both taxable (TERS) and non-taxable (TERSNT) trusts
+        val taxServiceAccessGroupPPT: TaxGroup = taxServiceGroup.copy(service = "HMRC-PPT-ORG")
+        // These includes both types of trust or cbc client
+        val taxServiceAccessGroupTrust: TaxGroup = taxServiceGroup.copy(service = "HMRC-TERS")
+        val taxServiceAccessGroupCbc: TaxGroup = taxServiceGroup.copy(service = "HMRC-CBC")
 
         mockUserClientDetailsConnectorGetClients(
           Some(
@@ -700,18 +701,21 @@ class CustomGroupsServiceSpec extends BaseSpec {
               Client(enrolmentKeyVAT, "foo"),
               Client(enrolmentKeyPPT, "bar"),
               Client(enrolmentKeyTrust, "baz"),
-              Client(enrolmentKeyTrustNT, "bazNT")
+              Client(enrolmentKeyTrustNT, "bazNT"),
+              Client(enrolmentKeyCbcUk, "alf")
             )
           )
         )
         mockAccessGroupsRepositoryGetAll(Seq.empty)
-        mockTaxGroupsServiceGetGroups(Seq(taxServiceAccessGroupPPT, taxServiceAccessGroupTrust))
+        mockTaxGroupsServiceGetGroups(
+          Seq(taxServiceAccessGroupPPT, taxServiceAccessGroupTrust, taxServiceAccessGroupCbc)
+        )
 
         val result = accessGroupsService.getUnassignedClients(arn).futureValue
 
         result shouldBe Set(
           Client(enrolmentKeyVAT, "foo")
-        ) // don't show neither the PPT nor the trust enrolments as there are already tax service groups for that
+        ) // don't show the PPT, trust or cbc enrolments as there are already tax service groups for that
       }
 
       s"DO report as 'unassigned' clients in tax service groups but who are excluded from them" in new TestScope {

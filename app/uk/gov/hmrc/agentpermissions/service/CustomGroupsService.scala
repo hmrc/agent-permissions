@@ -367,9 +367,10 @@ class CustomGroupsServiceImpl @Inject() (
       taxServiceGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
     } yield clients.foldLeft(ClientList(Set.empty, Set.empty)) { (clientList, client) =>
       val serviceKey = EnrolmentKey.serviceOf(client.enrolmentKey) match {
-        case "HMRC-TERS-ORG" | "HMRC-TERSNT-ORG" =>
-          "HMRC-TERS" // both types of trusts are represented by the same key in tax service groups
-        case sk => sk
+        // both types of trusts and cbc client are represented by a single truncated key in tax service groups
+        case "HMRC-TERS-ORG" | "HMRC-TERSNT-ORG"   => "HMRC-TERS"
+        case "HMRC-CBC-ORG" | "HMRC-CBC-NONUK-ORG" => "HMRC-CBC"
+        case sk                                    => sk
       }
       // The client is considered 'assigned' if: ...
       if (

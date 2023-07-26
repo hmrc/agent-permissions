@@ -81,8 +81,8 @@ Transactions can result in potential user level assignments (add clients OR team
     sbt "clean;coverageOn;test;IntegrationTest/test;coverageReport"
 
 ## Running the app locally
-    sm --start AGENT_ALL -r
-    sm --stop AGENT_PERMISSIONS
+    sm2 --start AGENT_GRAN_PERMS
+    sm2 --stop AGENT_PERMISSIONS
     sbt run
 
 It should then be listening on port 9447
