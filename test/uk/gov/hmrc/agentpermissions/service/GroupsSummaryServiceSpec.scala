@@ -28,7 +28,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
-class GroupsServiceSpec extends BaseSpec {
+class GroupsSummaryServiceSpec extends BaseSpec {
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -42,9 +42,11 @@ class GroupsServiceSpec extends BaseSpec {
     val client1: Client = Client(s"$serviceVat~VRN~101747641", "John Innes")
     val client2: Client = Client(s"$serviceVat~VRN~101746700", "Ann Von-Innes")
     val clientCgt: Client = Client(s"$serviceCgt~$serviceIdentifierKeyCgt~XMCGTP123456789", "George Candy")
-    val clientCbc: Client = Client(s"$serviceCbc~$serviceCbc~XMCGTP123456789", "George Candy")
+    val clientCbcUk: Client =
+      Client(s"$serviceCbc~UTR~1234567890~$serviceIdentifierKeyCbc~XACBC1287165239", "George Candy")
     val trustClient1: Client = Client(s"$serviceTrust~$serviceIdentifierKeyTrust~1234567890", "George Floyd")
     val trustClient2: Client = Client(s"$serviceNTTrust~URN~XATRUST87165231", "George Corn")
+    val cbcNonUkClient: Client = Client(s"$serviceCbcNonUk~$serviceIdentifierKeyCbc~XACBC1287165231", "George Corn")
 
     val taxGroup: TaxGroup = TaxGroup(
       GroupId.random(),
@@ -69,7 +71,7 @@ class GroupsServiceSpec extends BaseSpec {
       user,
       user,
       Set(user, user1, user2),
-      Set(client1, client2, clientCgt, clientCgt)
+      Set(client1, client2, clientCgt, clientCbcUk)
     )
 
     def groupSummary(
@@ -217,7 +219,7 @@ class GroupsServiceSpec extends BaseSpec {
               1,
               taxService = Some(serviceCgt)
             ),
-            GroupSummary(accessGroup.id, "some group", Some(3), 3),
+            GroupSummary(accessGroup.id, "some group", Some(4), 3),
             GroupSummary(taxGroup.id, "VAT", Some(5), 3, taxService = Some(serviceVat))
           )
       }
@@ -272,6 +274,14 @@ class GroupsServiceSpec extends BaseSpec {
           mockTaxGroupsRepositoryGetByService(Some(taxGroup), service = "HMRC-TERS")
 
           groupsService.getAllGroupSummariesForClient(arn, trustClient2.enrolmentKey).futureValue shouldBe
+            customSummaries ++ Seq(GroupSummary.of(taxGroup))
+        }
+
+        "client is non uk cbc" in new TestScope {
+          mockCustomGroupsServiceGetGroupSummariesForClient(customSummaries)
+          mockTaxGroupsRepositoryGetByService(Some(taxGroup), service = "HMRC-CBC")
+
+          groupsService.getAllGroupSummariesForClient(arn, cbcNonUkClient.enrolmentKey).futureValue shouldBe
             customSummaries ++ Seq(GroupSummary.of(taxGroup))
         }
 

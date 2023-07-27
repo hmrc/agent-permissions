@@ -67,6 +67,7 @@ class GroupSummaryServiceImpl @Inject() (
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]] = {
     val service = if (enrolmentKey.contains("HMRC-TERS")) { "HMRC-TERS" }
+    else if (enrolmentKey.contains("HMRC-CBC")) { "HMRC-CBC" }
     else enrolmentKey.split('~').head
     for {
       customSummaries <- customGroupsService.getCustomGroupSummariesForClient(arn, enrolmentKey)

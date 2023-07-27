@@ -69,8 +69,6 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  // gets all group summaries for client
-
   def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
     implicit request =>
       withAuthorisedAgent(allowStandardUser = true) { _ =>
@@ -80,7 +78,6 @@ class AccessGroupsController @Inject() (
       } transformWith failureHandler
   }
 
-  // gets all group summaries for team member
   def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async { implicit request =>
     withAuthorisedAgent(allowStandardUser = true) { _ =>
       groupsService
