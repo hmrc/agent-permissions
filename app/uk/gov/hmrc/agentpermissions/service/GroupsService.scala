@@ -18,16 +18,17 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
-import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
-import uk.gov.hmrc.agents.accessgroups.GroupSummary
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, EnrolmentKey}
+import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, TaxGroupsRepositoryV2}
+import uk.gov.hmrc.agents.accessgroups.{Client, CustomGroup, GroupSummary}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
-@ImplementedBy(classOf[GroupSummaryServiceImpl])
-trait GroupSummaryService {
+@ImplementedBy(classOf[GroupsServiceImpl])
+trait GroupsService {
   def getAllGroupSummaries(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]]
   def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
     hc: HeaderCarrier,
@@ -37,14 +38,22 @@ trait GroupSummaryService {
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]]
 
+  def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList]
+
+  def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
+
+  def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
+
 }
 
 @Singleton
-class GroupSummaryServiceImpl @Inject() (
+class GroupsServiceImpl @Inject() (
   taxGroupsRepo: TaxGroupsRepositoryV2,
+  customGroupsRepository: CustomGroupsRepositoryV2,
+  userClientDetailsConnector: UserClientDetailsConnector,
   customGroupsService: CustomGroupsService,
   taxGroupsService: TaxGroupsService
-) extends GroupSummaryService with Logging {
+) extends GroupsService with Logging {
 
   override def getAllGroupSummaries(
     arn: Arn
@@ -90,5 +99,38 @@ class GroupSummaryServiceImpl @Inject() (
       taxSummaries    <- taxGroupsService.getTaxGroupSummariesForTeamMember(arn, userId)
       combinedSummaries = customSummaries ++ taxSummaries
     } yield combinedSummaries
+
+  override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
+    for {
+      clients      <- userClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
+      accessGroups <- if (clients.nonEmpty) customGroupsRepository.get(arn) else Future.successful(Seq.empty)
+      enrolmentKeysInCustomGroups = accessGroups.toSet[CustomGroup].flatMap(_.clients).map(_.enrolmentKey)
+      taxServiceGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
+    } yield clients.foldLeft(ClientList(Set.empty, Set.empty)) { (clientList, client) =>
+      val serviceKey = EnrolmentKey.serviceOf(client.enrolmentKey) match {
+        // both types of trusts and cbc client are represented by a single truncated key in tax service groups
+        case "HMRC-TERS-ORG" | "HMRC-TERSNT-ORG"   => "HMRC-TERS"
+        case "HMRC-CBC-ORG" | "HMRC-CBC-NONUK-ORG" => "HMRC-CBC"
+        case sk                                    => sk
+      }
+      // The client is considered 'assigned' if: ...
+      if (
+        enrolmentKeysInCustomGroups.contains(client.enrolmentKey) || // ... they are in a custom access group, OR ...
+        taxServiceGroups.exists(tsg => // ... there is a tax service group AND they are not excluded from it.
+          tsg.service == serviceKey &&
+            !tsg.excludedClients.exists(_.enrolmentKey == client.enrolmentKey)
+        )
+      ) {
+        clientList.copy(assigned = clientList.assigned + client)
+      } else {
+        clientList.copy(unassigned = clientList.unassigned + client)
+      }
+    }
+
+  override def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
+    getAllClients(arn).map(_.assigned)
+
+  override def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
+    getAllClients(arn).map(_.unassigned)
 
 }

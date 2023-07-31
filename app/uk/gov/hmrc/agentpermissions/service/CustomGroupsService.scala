@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, EnrolmentKey, PaginatedList}
+import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, PaginatedList}
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.model.{DisplayClient, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.models.GroupId
@@ -83,13 +83,6 @@ trait CustomGroupsService {
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
-
-  def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList]
-
-  def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
-
-  def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
-
 }
 
 case class ClientList(assigned: Set[Client], unassigned: Set[Client])
@@ -98,7 +91,6 @@ case class ClientList(assigned: Set[Client], unassigned: Set[Client])
 class CustomGroupsServiceImpl @Inject() (
   customGroupsRepository: CustomGroupsRepositoryV2,
   userEnrolmentAssignmentService: UserEnrolmentAssignmentService,
-  taxGroupsService: TaxGroupsService,
   userClientDetailsConnector: UserClientDetailsConnector,
   auditService: AuditService
 ) extends CustomGroupsService with Logging {
@@ -357,41 +349,6 @@ class CustomGroupsServiceImpl @Inject() (
           } yield updateStatus
         case _ => Future successful AccessGroupNotUpdated
       }
-
-  // TODO move below to groups summary service
-  override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
-    for {
-      clients      <- userClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
-      accessGroups <- if (clients.nonEmpty) customGroupsRepository.get(arn) else Future.successful(Seq.empty)
-      enrolmentKeysInCustomGroups = accessGroups.toSet[CustomGroup].flatMap(_.clients).map(_.enrolmentKey)
-      taxServiceGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
-    } yield clients.foldLeft(ClientList(Set.empty, Set.empty)) { (clientList, client) =>
-      val serviceKey = EnrolmentKey.serviceOf(client.enrolmentKey) match {
-        // both types of trusts and cbc client are represented by a single truncated key in tax service groups
-        case "HMRC-TERS-ORG" | "HMRC-TERSNT-ORG"   => "HMRC-TERS"
-        case "HMRC-CBC-ORG" | "HMRC-CBC-NONUK-ORG" => "HMRC-CBC"
-        case sk                                    => sk
-      }
-      // The client is considered 'assigned' if: ...
-      if (
-        enrolmentKeysInCustomGroups.contains(client.enrolmentKey) || // ... they are in a custom access group, OR ...
-        taxServiceGroups.exists(tsg => // ... there is a tax service group AND they are not excluded from it.
-          tsg.service == serviceKey &&
-            !tsg.excludedClients.exists(_.enrolmentKey == client.enrolmentKey)
-        )
-      ) {
-        clientList.copy(assigned = clientList.assigned + client)
-      } else {
-        clientList.copy(unassigned = clientList.unassigned + client)
-      }
-    }
-
-  override def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
-    getAllClients(arn).map(_.assigned)
-
-  override def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
-    getAllClients(arn).map(_.unassigned)
-  // TODO move above to groups summary service
 
   private def mergeWhoIsUpdating(accessGroup: CustomGroup, whoIsUpdating: AgentUser): Future[CustomGroup] =
     Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))

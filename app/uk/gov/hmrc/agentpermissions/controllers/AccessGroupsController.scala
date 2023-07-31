@@ -35,7 +35,7 @@ import scala.util.{Failure, Success, Try}
 @Singleton()
 class AccessGroupsController @Inject() (
   customGroupsService: CustomGroupsService,
-  groupsService: GroupSummaryService,
+  groupsService: GroupsService,
   eacdSynchronizer: EacdSynchronizer
 )(implicit authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
     extends BackendController(cc) with AuthorisedAgentSupport {
@@ -111,7 +111,7 @@ class AccessGroupsController @Inject() (
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         for {
-          unfilteredClients <- customGroupsService.getUnassignedClients(arn)
+          unfilteredClients <- groupsService.getUnassignedClients(arn)
           filteredClients = filterBySearchTermAndService(unfilteredClients, search, filter)
           sortedClients = filteredClients.toSeq.sortBy(c => c.friendlyName.toLowerCase)
         } yield Ok(

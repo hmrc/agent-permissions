@@ -81,7 +81,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
     )
 
     val mockAccessGroupsService: CustomGroupsService = mock[CustomGroupsService]
-    val mockGroupsService: GroupSummaryService = mock[GroupSummaryService]
+    val mockGroupsService: GroupsService = mock[GroupsService]
     val mockEacdSynchronizer: EacdSynchronizer = mock[EacdSynchronizer]
     implicit val mockAuthAction: AuthAction = mock[AuthAction]
     implicit val controllerComponents: ControllerComponents = Helpers.stubControllerComponents()
@@ -227,7 +227,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
     def mockAccessGroupsServiceGetUnassignedClients(
       unassignedClients: Set[Client]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Set[Client]]] =
-      (mockAccessGroupsService
+      (mockGroupsService
         .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful unassignedClients)
@@ -254,7 +254,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
     def mockAccessGroupsServiceGetUnassignedClientsWithException(
       ex: Exception
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Set[Client]]] =
-      (mockAccessGroupsService
+      (mockGroupsService
         .getUnassignedClients(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))

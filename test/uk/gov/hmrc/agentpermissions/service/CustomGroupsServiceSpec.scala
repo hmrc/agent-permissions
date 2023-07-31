@@ -27,7 +27,7 @@ import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup, GroupSummary, TaxGroup}
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup, GroupSummary}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -61,21 +61,6 @@ class CustomGroupsServiceSpec extends BaseSpec {
       Set(clientVat, clientPpt, clientCgt)
     )
 
-    val taxServiceGroup: TaxGroup =
-      TaxGroup(
-        GroupId.random(),
-        arn,
-        groupName,
-        now,
-        now,
-        user,
-        user,
-        Set.empty,
-        serviceVat,
-        automaticUpdates = true,
-        Set.empty
-      )
-
     val clients = Seq(clientVat, clientPpt, clientCgt)
 
     val accessGroupInMongo: CustomGroup = withClientNamesRemoved(accessGroup)
@@ -87,7 +72,6 @@ class CustomGroupsServiceSpec extends BaseSpec {
 
     val mockAccessGroupsRepository: CustomGroupsRepositoryV2 = mock[CustomGroupsRepositoryV2]
     val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
-    val mockTaxGroupsService: TaxGroupsService = mock[TaxGroupsService]
     val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
     val mockAuditService: AuditService = mock[AuditService]
 
@@ -95,7 +79,6 @@ class CustomGroupsServiceSpec extends BaseSpec {
       new CustomGroupsServiceImpl(
         mockAccessGroupsRepository,
         mockUserEnrolmentAssignmentService,
-        mockTaxGroupsService,
         mockUserClientDetailsConnector,
         mockAuditService
       )
@@ -222,14 +205,6 @@ class CustomGroupsServiceSpec extends BaseSpec {
         .expects(groupId, client.enrolmentKey)
         .returning(Future.successful(updateResult))
     }
-
-    def mockTaxGroupsServiceGetGroups(
-      groups: Seq[TaxGroup]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxGroup]]] =
-      (mockTaxGroupsService
-        .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
-        .expects(*, *, *)
-        .returning(Future.successful(groups))
 
     def mockUserClientDetailsConnectorGetClients(
       maybeClients: Option[Seq[Client]]
@@ -584,162 +559,6 @@ class CustomGroupsServiceSpec extends BaseSpec {
       }
     }
 
-  }
-
-  "Fetching all clients" when {
-
-    "AUCD connector returns nothing" should {
-      "return no unassigned clients" in new TestScope {
-        mockUserClientDetailsConnectorGetClients(None)
-        mockTaxGroupsServiceGetGroups(Seq.empty)
-
-        accessGroupsService.getAllClients(arn).futureValue shouldBe
-          ClientList(Set.empty, Set.empty)
-      }
-    }
-
-    "AUCD connector returns something" when {
-
-      "AUCD connector returns empty list of clients" should {
-        "return correct clients" in new TestScope {
-          mockUserClientDetailsConnectorGetClients(Some(Seq.empty))
-          mockTaxGroupsServiceGetGroups(Seq.empty)
-
-          accessGroupsService.getAllClients(arn).futureValue shouldBe
-            ClientList(Set.empty, Set.empty)
-        }
-      }
-
-      "AUCD connector returns non-empty list of clients" when {
-
-        "no access groups exist" should {
-          "return correct clients" in new TestScope {
-            val backendClient1: Client = clientVat.copy(friendlyName = "existing client")
-
-            mockUserClientDetailsConnectorGetClients(Some(Seq(backendClient1)))
-            mockAccessGroupsRepositoryGetAll(Seq.empty)
-            mockTaxGroupsServiceGetGroups(Seq.empty)
-
-            accessGroupsService.getAllClients(arn).futureValue shouldBe
-              ClientList(Set.empty, Set(backendClient1))
-          }
-        }
-
-        "access groups exist" when {
-
-          "access group exists whose assigned clients match those returned by AUCD connector" should {
-            "return correct clients" in new TestScope {
-              val backendClient1: Client = clientVat.copy(friendlyName = "existing client")
-              mockUserClientDetailsConnectorGetClients(Some(Seq(backendClient1)))
-              mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
-              mockTaxGroupsServiceGetGroups(Seq.empty)
-
-              accessGroupsService.getAllClients(arn).futureValue shouldBe
-                ClientList(Set(backendClient1), Set.empty)
-            }
-          }
-
-          "access group exists whose assigned clients do not match those returned by AUCD connector" should {
-            "return correct clients" in new TestScope {
-              val backendClient1: Client = Client("HMRC-MTD-VAT~VRN~000000001", "existing client")
-              mockUserClientDetailsConnectorGetClients(Some(Seq(backendClient1)))
-              mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
-              mockTaxGroupsServiceGetGroups(Seq.empty)
-
-              accessGroupsService.getAllClients(arn).futureValue shouldBe
-                ClientList(Set.empty, Set(backendClient1))
-            }
-          }
-        }
-      }
-    }
-  }
-
-  "Fetching assigned clients" when {
-    "access group exists whose assigned clients match some of those returned by AUCD connector" should {
-      "return correct assigned clients" in new TestScope {
-        val backendClient1: Client = clientVat.copy(friendlyName = "existing client")
-        val backendClient2: Client = Client("HMRC-MTD-VAT~VRN~000000001", "existing client2")
-        mockUserClientDetailsConnectorGetClients(Some(Seq(backendClient1, backendClient2)))
-        mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
-        mockTaxGroupsServiceGetGroups(Seq.empty)
-
-        accessGroupsService.getAssignedClients(arn).futureValue shouldBe
-          Set(backendClient1)
-      }
-    }
-  }
-
-  "Fetching unassigned clients" when {
-    "access group exists whose assigned clients match some of those returned by AUCD connector" should {
-      "return correct unassigned clients" in new TestScope {
-        val backendClient1: Client = clientVat.copy(friendlyName = "existing client")
-        val backendClient2: Client = Client("HMRC-MTD-VAT~VRN~000000001", "existing client2")
-        mockUserClientDetailsConnectorGetClients(Some(Seq(backendClient1, backendClient2)))
-        mockAccessGroupsRepositoryGetAll(Seq(accessGroup))
-        mockTaxGroupsServiceGetGroups(Seq.empty)
-
-        accessGroupsService.getUnassignedClients(arn).futureValue shouldBe
-          Set(backendClient2)
-      }
-
-      s"do not report as 'unassigned' any clients already in tax service groups" in new TestScope {
-        val enrolmentKeyVAT = "HMRC-MTD-VAT~VRN~123456789"
-        val enrolmentKeyPPT = "HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345"
-        val enrolmentKeyTrust = "HMRC-TERS-ORG~SAUTR~1731139143"
-        val enrolmentKeyTrustNT = "HMRC-TERSNT-ORG~URN~XATRUST73113914"
-        val enrolmentKeyCbcUk = "HMRC-CBC-ORG~UTR~1234567890~cbcId~XACBC1234567890"
-
-        val taxServiceAccessGroupPPT: TaxGroup = taxServiceGroup.copy(service = "HMRC-PPT-ORG")
-        // These includes both types of trust or cbc client
-        val taxServiceAccessGroupTrust: TaxGroup = taxServiceGroup.copy(service = "HMRC-TERS")
-        val taxServiceAccessGroupCbc: TaxGroup = taxServiceGroup.copy(service = "HMRC-CBC")
-
-        mockUserClientDetailsConnectorGetClients(
-          Some(
-            Seq(
-              Client(enrolmentKeyVAT, "foo"),
-              Client(enrolmentKeyPPT, "bar"),
-              Client(enrolmentKeyTrust, "baz"),
-              Client(enrolmentKeyTrustNT, "bazNT"),
-              Client(enrolmentKeyCbcUk, "alf")
-            )
-          )
-        )
-        mockAccessGroupsRepositoryGetAll(Seq.empty)
-        mockTaxGroupsServiceGetGroups(
-          Seq(taxServiceAccessGroupPPT, taxServiceAccessGroupTrust, taxServiceAccessGroupCbc)
-        )
-
-        val result = accessGroupsService.getUnassignedClients(arn).futureValue
-
-        result shouldBe Set(
-          Client(enrolmentKeyVAT, "foo")
-        ) // don't show the PPT, trust or cbc enrolments as there are already tax service groups for that
-      }
-
-      s"DO report as 'unassigned' clients in tax service groups but who are excluded from them" in new TestScope {
-        val enrolmentKeyVAT = "HMRC-MTD-VAT~VRN~123456789"
-        val enrolmentKeyPPT = "HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345"
-        val taxServiceAccessGroup =
-          taxServiceGroup.copy(service = "HMRC-PPT-ORG", excludedClients = Set(Client(enrolmentKeyPPT, "bar")))
-
-        mockUserClientDetailsConnectorGetClients(
-          Some(
-            Seq(Client(enrolmentKeyVAT, "foo"), Client(enrolmentKeyPPT, "bar"))
-          )
-        )
-        mockAccessGroupsRepositoryGetAll(Seq.empty)
-        mockTaxGroupsServiceGetGroups(Seq(taxServiceAccessGroup))
-
-        val result = accessGroupsService.getUnassignedClients(arn).futureValue
-
-        result shouldBe Set(
-          Client(enrolmentKeyVAT, "foo"),
-          Client(enrolmentKeyPPT, "bar")
-        ) // do show the PPT enrolment as it's excluded from the tax service group
-      }
-    }
   }
 
   "Adding team member to a group" when {
