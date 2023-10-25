@@ -21,20 +21,23 @@ import uk.gov.hmrc.agents.accessgroups.Client
 
 import scala.util.hashing.MurmurHash3
 
-/** copy from Selectable in agent-permissions-frontend **/
+/** copy from Selectable in agent-permissions-frontend * */
 case class DisplayClient(
   hmrcRef: String,
   name: String,
   taxService: String,
-  enrolmentKeyMiddle: String, // not used for display - hacky!!
+  enrolmentKeyExtra: String, // not used for display - very hacky!!
   alreadyInGroup: Boolean = false,
   selected: Boolean = false
 ) {
-  val enrolmentKey = s"$taxService~$enrolmentKeyMiddle~$hmrcRef"
+  // TODO problematic assumption about where the 'key' identifier (hmrcRef) is in an enrolmentKey
+  val enrolmentKey: String = if (taxService == "HMRC-CBC-ORG") {
+    s"$taxService~cbcId~$hmrcRef~$enrolmentKeyExtra"
+  } else { s"$taxService~$enrolmentKeyExtra~$hmrcRef" }
   val id: String = MurmurHash3.stringHash(enrolmentKey).toString
 }
 
-/** copy from Selectable in agent-permissions-frontend **/
+/** copy from Selectable in agent-permissions-frontend * */
 case object DisplayClient {
   implicit val format: OFormat[DisplayClient] = Json.format[DisplayClient]
 
@@ -43,16 +46,18 @@ case object DisplayClient {
     val keyElements = client.enrolmentKey.split('~')
     val taxService = keyElements.head
     // very hacky!!
-    val enrolmentKeyMiddle = if (keyElements.head.contains("HMRC-CBC-ORG")) {
-      s"${keyElements(1)}~${keyElements(2)}~${keyElements(3)}"
+    val enrolmentKeyExtra = if (keyElements.head.contains("HMRC-CBC-ORG")) {
+      s"${keyElements(3)}~${keyElements(4)}" // saves the UTR for later
     } else keyElements(1)
-    val hmrcRef = keyElements.last
+    val hmrcRef = if (keyElements.head.contains("HMRC-CBC-ORG")) {
+      keyElements(2) // cbcId not UTR
+    } else keyElements.last
 
     DisplayClient(
       hmrcRef = hmrcRef,
       name = client.friendlyName,
       taxService = taxService,
-      enrolmentKeyMiddle = enrolmentKeyMiddle,
+      enrolmentKeyExtra = enrolmentKeyExtra,
       alreadyInGroup = alreadyInGroup
     )
   }

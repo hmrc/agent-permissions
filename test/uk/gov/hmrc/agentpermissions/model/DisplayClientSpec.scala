@@ -25,13 +25,13 @@ class DisplayClientSpec extends AnyWordSpec with Matchers {
   "DisplayClient" should {
     "be converted from Client" when {
       "client is cbc uk" in {
-        val cbcUkClient = Client("HMRC-CBC-ORG~UTR~1234567890~cbcId~XACBC123456789012", "Jelly Incorporated")
+        val cbcUkClient = Client("HMRC-CBC-ORG~cbcId~XACBC123456789012~UTR~1234567890", "Jelly Incorporated")
 
         // when
         val dc = DisplayClient.fromClient(cbcUkClient)
 
         val expectedDc =
-          DisplayClient("XACBC123456789012", "Jelly Incorporated", "HMRC-CBC-ORG", "UTR~1234567890~cbcId")
+          DisplayClient("XACBC123456789012", "Jelly Incorporated", "HMRC-CBC-ORG", "UTR~1234567890")
 
         // then
         dc shouldBe expectedDc
