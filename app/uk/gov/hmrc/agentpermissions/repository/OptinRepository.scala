@@ -37,6 +37,8 @@ trait OptinRepository {
   def get(arn: Arn): Future[Option[OptinRecord]]
   def upsert(optinRecord: OptinRecord): Future[Option[UpsertType]]
   def getAll(): Future[Seq[OptinRecord]]
+
+  def delete(arn: String): Future[Long]
 }
 
 /** Note: This implementation stores some fields encrypted in mongo. (APB-6461)
@@ -70,6 +72,9 @@ class OptinRepositoryImpl @Inject() (
           }
         )
       )
+
+  def delete(arn: String): Future[Long] =
+    collection.deleteOne(equal("arn", arn)).toFuture().map(_.getDeletedCount)
 
   override def getAll(): Future[Seq[OptinRecord]] = collection.find().toFuture().map(_.map(_.decryptedValue))
 
