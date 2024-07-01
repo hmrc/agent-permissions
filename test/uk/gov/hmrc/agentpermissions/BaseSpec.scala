@@ -17,13 +17,14 @@
 package uk.gov.hmrc.agentpermissions
 
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter, SymmetricCryptoFactory}
 
-abstract class BaseSpec extends AnyWordSpecLike with Matchers with ScalaFutures with MockFactory {
+abstract class BaseSpec
+    extends AnyWordSpecLike with Matchers with ScalaFutures with MockFactory with IntegrationPatience {
   val arn: Arn = Arn("KARN1234567")
 
   val serviceVat = "HMRC-MTD-VAT"

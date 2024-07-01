@@ -55,7 +55,7 @@ class ArnAllowListControllerSpec extends BaseSpec {
   }
 
   "hideBetaInviteCheck" when {
-    val req = FakeRequest("GET", routes.ArnAllowListController.hideBetaInviteCheck.url)
+    val req = FakeRequest()
     "allowlist enabled" should {
       s"return $OK if agent is on allowlist" in new TestScope {
         mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
@@ -109,7 +109,7 @@ class ArnAllowListControllerSpec extends BaseSpec {
   }
 
   "hideBetaInvite" should {
-    val postReq = FakeRequest("POST", routes.ArnAllowListController.hideBetaInvite.url)
+    val postReq = FakeRequest("POST", "/")
     s"return $CREATED for BetaInviteRecord" in new TestScope {
       mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
       mockHideBetaInviteCreated(user.id)
@@ -185,6 +185,6 @@ class ArnAllowListControllerSpec extends BaseSpec {
   }
 
   def buildRequest: FakeRequest[AnyContentAsEmpty.type] =
-    FakeRequest("GET", routes.ArnAllowListController.isArnAllowed.url)
+    FakeRequest()
 
 }

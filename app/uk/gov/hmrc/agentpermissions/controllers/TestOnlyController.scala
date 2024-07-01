@@ -35,7 +35,10 @@ class TestOnlyController @Inject() (
     for {
       a <- customGroupsRepositoryV2.delete(arn)
       b <- optinRepository.delete(arn)
-      _ = logger.info(s"deleted $a perf test users from custom groups and $b users from opt-in to access groups")
+      _ =
+        logger.info(
+          s"deleted ${a.toString} perf test users from custom groups and ${b.toString} users from opt-in to access groups"
+        )
     } yield Ok
   }
 
