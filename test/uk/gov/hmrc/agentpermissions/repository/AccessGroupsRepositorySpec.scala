@@ -258,11 +258,13 @@ class AccessGroupsRepositorySpec
 
         }
 
-        "test only deletion" should {
+        "test only deletion by arn" should {
           "delete the record matching the arn" in new TestScope {
             val arnToDelete: Arn = accessGroup.arn
-            accessGroupsRepository.delete(arnToDelete.value).futureValue
-            accessGroupsRepository.get(arnToDelete).futureValue shouldBe None
+            accessGroupsRepository.insert(accessGroup).futureValue
+            val deletion: Long = accessGroupsRepository.delete(arnToDelete.value).futureValue
+            accessGroupsRepository.get(arnToDelete, accessGroup.groupName).futureValue shouldBe None
+            deletion shouldBe 1L
           }
         }
       }
