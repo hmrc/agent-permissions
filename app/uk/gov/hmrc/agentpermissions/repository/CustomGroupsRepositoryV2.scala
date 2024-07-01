@@ -65,6 +65,8 @@ trait CustomGroupsRepositoryV2 {
    * */
   def addTeamMember(id: GroupId, toAdd: AgentUser): Future[UpdateResult]
   def removeClient(groupId: GroupId, clientId: String): Future[UpdateResult]
+
+  def delete(arn: String): Future[Long]
 }
 
 @Singleton
@@ -173,6 +175,10 @@ class CustomGroupsRepositoryV2Impl @Inject() (
         )
       )
       .head()
+
+  // test only
+  override def delete(arn: String): Future[Long] =
+    collection.deleteMany(equal("arn", arn)).toFuture().map(_.getDeletedCount)
 }
 
 object CustomGroupsRepositoryV2Impl {

@@ -21,6 +21,7 @@ import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.result.UpdateResult
 import play.api.test.Helpers.{await, defaultAwaitTimeout}
+import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.storagemodel.SensitiveCustomGroup
@@ -255,6 +256,16 @@ class AccessGroupsRepositorySpec
           // then
           updateResult.getModifiedCount shouldBe 0
 
+        }
+
+        "test only deletion by arn" should {
+          "delete the record matching the arn" in new TestScope {
+            val arnToDelete: Arn = accessGroup.arn
+            accessGroupsRepository.insert(accessGroup).futureValue
+            val deletion: Long = accessGroupsRepository.delete(arnToDelete.value).futureValue
+            accessGroupsRepository.get(arnToDelete, accessGroup.groupName).futureValue shouldBe None
+            deletion shouldBe 1L
+          }
         }
       }
 

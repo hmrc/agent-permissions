@@ -106,6 +106,16 @@ class OptinRepositorySpec
       }
     }
 
+    "test only deletion" should {
+      "delete the record matching the arn" in new TestScope {
+        val arnToDelete: Arn = optinRecord.arn
+        optinRepository.upsert(optinRecord).futureValue
+        val deletion: Long = optinRepository.delete(arnToDelete.value).futureValue
+        optinRepository.get(arnToDelete).futureValue shouldBe None
+        deletion shouldBe 1L
+      }
+    }
+
   }
 
   override protected lazy val repository: PlayMongoRepository[SensitiveOptinRecord] =
