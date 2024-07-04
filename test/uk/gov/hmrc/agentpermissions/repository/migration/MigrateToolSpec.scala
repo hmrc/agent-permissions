@@ -48,6 +48,7 @@ class MigrateToolSpec extends BaseSpec with CleanMongoCollectionSupport with Moc
       override def writes(o: JsObject): JsValue = o
       override def reads(json: JsValue): JsResult[JsObject] = json match {
         case obj: JsObject => JsSuccess(obj)
+        case other => throw new RuntimeException(s"reads fails because the json is not a JsObject: ${other.toString}")
       }
     }
 
@@ -69,15 +70,15 @@ class MigrateToolSpec extends BaseSpec with CleanMongoCollectionSupport with Moc
       )
 
     "correctly delete legacy data" in {
-      (appConfigStub.eacdSyncNotBeforeSeconds _).when().returns(300)
+      (() => appConfigStub.eacdSyncNotBeforeSeconds).when().returns(300)
 
       val optinRecord = OptinRecord(
         Arn("AARN0123456"),
         List(OptinEvent(OptedIn, AgentUser("userid", "name"), LocalDateTime.now()))
       )
 
-      oldCustomCollection.insertOne(Json.obj("foo" -> JsString("baz"))).toFuture.futureValue
-      oldTaxCollection.insertOne(Json.obj("foo" -> JsString("baz"))).toFuture.futureValue
+      oldCustomCollection.insertOne(Json.obj("foo" -> JsString("baz"))).toFuture().futureValue
+      oldTaxCollection.insertOne(Json.obj("foo" -> JsString("baz"))).toFuture().futureValue
       optInRepo.collection
         .insertMany(
           Seq(
@@ -85,22 +86,22 @@ class MigrateToolSpec extends BaseSpec with CleanMongoCollectionSupport with Moc
             SensitiveOptinRecord(optinRecord.copy(arn = Arn("BACKUPAARN0123456")))
           )
         )
-        .toFuture
+        .toFuture()
         .futureValue
-      oldCustomCollection.countDocuments(Filters.empty).toFuture.futureValue shouldBe 1L
-      oldTaxCollection.countDocuments(Filters.empty).toFuture.futureValue shouldBe 1L
-      optInRepo.collection.countDocuments(Filters.empty).toFuture.futureValue shouldBe 2L
+      oldCustomCollection.countDocuments(Filters.empty()).toFuture().futureValue shouldBe 1L
+      oldTaxCollection.countDocuments(Filters.empty()).toFuture().futureValue shouldBe 1L
+      optInRepo.collection.countDocuments(Filters.empty()).toFuture().futureValue shouldBe 2L
 
       migrateFunctionality.doTheMigration().futureValue
 
-      oldCustomCollection.countDocuments(Filters.empty).toFuture.futureValue shouldBe 0L
-      oldTaxCollection.countDocuments(Filters.empty).toFuture.futureValue shouldBe 0L
-      optInRepo.collection.countDocuments(Filters.equal("arn", "AARN0123456")).toFuture.futureValue shouldBe 1L
-      optInRepo.collection.countDocuments(Filters.equal("arn", "BACKUPAARN0123456")).toFuture.futureValue shouldBe 0L
+      oldCustomCollection.countDocuments(Filters.empty()).toFuture().futureValue shouldBe 0L
+      oldTaxCollection.countDocuments(Filters.empty()).toFuture().futureValue shouldBe 0L
+      optInRepo.collection.countDocuments(Filters.equal("arn", "AARN0123456")).toFuture().futureValue shouldBe 1L
+      optInRepo.collection.countDocuments(Filters.equal("arn", "BACKUPAARN0123456")).toFuture().futureValue shouldBe 0L
     }
 
     "fail if lock cannot be acquired" in {
-      (appConfigStub.eacdSyncNotBeforeSeconds _).when().returns(300)
+      (() => appConfigStub.eacdSyncNotBeforeSeconds).when().returns(300)
 
       syncRepo
         .acquire(Arn("MIGRATELOCK"))

@@ -26,7 +26,6 @@ import uk.gov.hmrc.auth.core._
 import uk.gov.hmrc.auth.core.retrieve.v2.Retrievals.{allEnrolments, credentialRole, credentials, name}
 import uk.gov.hmrc.auth.core.retrieve.{Credentials, Name, ~}
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.play.bootstrap.config.AuthRedirects
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 
 import javax.inject.{Inject, Singleton}
@@ -39,7 +38,7 @@ class AuthAction @Inject() (
   val env: Environment,
   val config: Configuration
 )(implicit appConfig: AppConfig)
-    extends AuthRedirects with AuthorisedFunctions with Logging {
+    extends AuthorisedFunctions with Logging {
 
   private val agentEnrolment = "HMRC-AS-AGENT"
   private val agentReferenceNumberIdentifier = "AgentReferenceNumber"
@@ -56,9 +55,7 @@ class AuthAction @Inject() (
         case enrols ~ credRole ~ name ~ credentials =>
           getArnAndAgentUser(enrols, name, credentials) match {
             case Some(authorisedAgent) =>
-              if (
-                credRole.contains(User) | credRole.contains(Admin) | (credRole.contains(Assistant) & allowStandardUser)
-              ) {
+              if (credRole.contains(User) | (credRole.contains(Assistant) & allowStandardUser)) {
                 if (appConfig.checkArnAllowList & allowlistEnabled) {
                   if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
                     Future successful Option(authorisedAgent)

@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import org.scalamock.handlers._
 import play.api.libs.json._
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
@@ -832,7 +832,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
       s"return $FORBIDDEN" in new TestScope {
         mockAuthActionGetAuthorisedAgent(None)
 
-        val result = controller.getGroup(dbId)(baseRequest)
+        val result = controller.getCustomGroupSummary(dbId)(baseRequest)
         status(result) shouldBe FORBIDDEN
       }
     }
@@ -846,7 +846,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(nonMatchingArn, user)))
           mockAccessGroupsServiceGetGroupById(Some(accessGroup))
 
-          val result = controller.getGroup(dbId)(baseRequest)
+          val result = controller.getCustomGroupSummary(dbId)(baseRequest)
 
           status(result) shouldBe FORBIDDEN
         }
@@ -857,7 +857,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
           mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
           mockAccessGroupsServiceGetGroupById(None)
 
-          val result = controller.getGroup(dbId)(baseRequest)
+          val result = controller.getCustomGroupSummary(dbId)(baseRequest)
 
           status(result) shouldBe NOT_FOUND
         }

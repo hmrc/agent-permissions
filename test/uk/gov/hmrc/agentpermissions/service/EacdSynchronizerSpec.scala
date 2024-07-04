@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import akka.actor.ActorSystem
-import akka.stream.Materializer
-import org.scalamock.handlers.{CallHandler0, CallHandler3, CallHandler4}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
+import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler3, CallHandler4}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
@@ -26,7 +26,7 @@ import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, EacdSyncRecord, EacdSyncRepository, TaxGroupsRepositoryV2}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
-import uk.gov.hmrc.agents.accessgroups.{AccessGroup, AgentUser, Client, CustomGroup, TaxGroup, UserDetails}
+import uk.gov.hmrc.agents.accessgroups._
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.{Instant, LocalDateTime}
@@ -363,15 +363,15 @@ class EacdSynchronizerSpec extends BaseSpec {
         (stubUserClientDetailsConnector
           .syncTeamMember(_: Arn, _: String, _: Seq[String])(_: HeaderCarrier, _: ExecutionContext))
           .verify(arn, agentUser1.id, Seq(clientVat.enrolmentKey), *, *)
-          .once
+          .once()
         (stubUserClientDetailsConnector
           .syncTeamMember(_: Arn, _: String, _: Seq[String])(_: HeaderCarrier, _: ExecutionContext))
           .verify(arn, agentUser2.id, Seq(clientVat.enrolmentKey, clientCgt.enrolmentKey), *, *)
-          .once
+          .once()
         (stubUserClientDetailsConnector
           .syncTeamMember(_: Arn, _: String, _: Seq[String])(_: HeaderCarrier, _: ExecutionContext))
           .verify(arn, "aThirdUserNotInAnyGroup", Seq.empty, *, *)
-          .once
+          .once()
       }
     }
   }
@@ -453,7 +453,7 @@ class EacdSynchronizerSpec extends BaseSpec {
       (mockAccessGroupsRepository
         .update(_: Arn, _: String, _: CustomGroup))
         .expects(arn, groupName, *)
-        .never
+        .never()
 
     def expectTaxGroupsRepositoryUpdate(
       maybeModifiedCount: Option[Long]
@@ -494,12 +494,16 @@ class EacdSynchronizerSpec extends BaseSpec {
         .when(arn, *, *)
         .returns(Future.successful(itemsExist))
 
-    def syncRepoCanBeAcquired(): Unit = (stubEacdSyncRepository
+    def syncRepoCanBeAcquired(): CallHandler1[Arn, Future[Option[EacdSyncRecord]]]#Derived = (stubEacdSyncRepository
       .acquire(_: Arn))
       .when(arn)
       .returns(Future.successful(Some(EacdSyncRecord(arn, Instant.now()))))
-    def syncRepoCannotBeAcquired(): Unit =
-      (stubEacdSyncRepository.acquire(_: Arn)).when(arn).returns(Future.successful(None))
+
+    def syncRepoCannotBeAcquired(): CallHandler1[Arn, Future[Option[EacdSyncRecord]]]#Derived =
+      (stubEacdSyncRepository
+        .acquire(_: Arn))
+        .when(arn)
+        .returns(Future.successful(None))
   }
 
 }

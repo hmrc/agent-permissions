@@ -16,16 +16,15 @@
 
 package uk.gov.hmrc.agentpermissions.connectors
 
-import com.codahale.metrics.MetricRegistry
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import com.google.inject.ImplementedBy
-import com.kenshoo.play.metrics.Metrics
 import play.api.Logging
 import play.api.http.Status._
 import play.api.libs.json.{Json, OFormat}
-import uk.gov.hmrc.agent.kenshoo.monitoring.HttpAPIMonitor
 import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, PaginatedList}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
+import uk.gov.hmrc.agentpermissions.util.HttpMonitor
 import uk.gov.hmrc.agents.accessgroups.{Client, UserDetails}
 import uk.gov.hmrc.http.HttpReads.is5xx
 import uk.gov.hmrc.http.client.HttpClientV2
@@ -88,26 +87,25 @@ object AgentClientSize {
 }
 
 @Singleton
-class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: Metrics)(implicit
-  appConfig: AppConfig
-) extends UserClientDetailsConnector with HttpAPIMonitor with Logging {
+class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: ExecutionContext, val metrics: Metrics)(
+  implicit appConfig: AppConfig
+) extends UserClientDetailsConnector with HttpMonitor with Logging {
 
   import uk.gov.hmrc.http.HttpReads.Implicits._
-
-  override val kenshooRegistry: MetricRegistry = metrics.defaultRegistry
 
   val aucdBaseUrl = appConfig.agentUserClientDetailsBaseUrl
   private val aucdUrl = s"$aucdBaseUrl/agent-user-client-details"
 
   override def agentSize(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]] = {
     val url = s"$aucdUrl/arn/${arn.value}/agent-size"
-
     monitor(s"ConsumedAPI-AgentUserClientDetails-AgentSize-GET") {
       httpV2
         .get(url"$url")
         .transform(ws => ws.withRequestTimeout(3.minutes))
         .execute[AgentClientSize]
-        .map(response => response.`client-count`)
+        .map { response =>
+          response.`client-count`
+        }
         .map(Option(_))
         .recover { case UpstreamErrorResponse(message, upstreamResponseCode, _, _) =>
           logger.warn(s"Received $upstreamResponseCode status: $message")
@@ -121,7 +119,7 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Map[String, Int]]] = {
     val url = s"$aucdUrl/arn/${arn.value}/tax-service-client-count"
 
-    monitor(s"ConsumedAPI-AgentUserClientDetails-ClientCount-GET") {
+    monitor("ConsumedAPI-AgentUserClientDetails-ClientCount-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
         response.status match {
           case OK => Option(response.json.as[Map[String, Int]])
@@ -138,7 +136,7 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
     val url = s"$aucdUrl/arn/${arn.value}/user-check"
 
-    monitor(s"ConsumedAPI-AgentUserClientDetails-UserCheck-GET") {
+    monitor("ConsumedAPI-AgentUserClientDetails-UserCheck-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
         response.status match {
           case NO_CONTENT =>
@@ -151,14 +149,14 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
         }
       }
     }
+
   }
 
   override def outstandingWorkItemsExist(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
     val url = s"$aucdUrl/arn/${arn.value}/work-items-exist"
-
-    monitor(s"ConsumedAPI-AgentUserClientDetails-WorkItemsExist-GET") {
+    monitor("ConsumedAPI-AgentUserClientDetails-WorkItemsExist-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
         response.status match {
           case OK =>
@@ -177,8 +175,7 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
     val url = s"$aucdUrl/arn/${arn.value}/assignments-work-items-exist"
-
-    monitor(s"ConsumedAPI-AgentUserClientDetails-AssignmentsWorkItemsExist-GET") {
+    monitor("ConsumedAPI-AgentUserClientDetails-AssignmentsWorkItemsExist-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
         response.status match {
           case OK =>
@@ -200,7 +197,6 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
 
     val params = if (sendEmail) "?sendEmail=true" + lang.fold("")("&lang=" + _) else ""
     val url = s"$aucdUrl/arn/${arn.value}/client-list$params"
-
     monitor("ConsumedAPI-AgentUserClientDetails-ClientList-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
         response.status match {
@@ -243,7 +239,6 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]] = {
 
     val url = s"$aucdUrl/arn/${arn.value}/client-list-status"
-
     monitor("ConsumedAPI-AgentUserClientDetails-ClientListStatus-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
         response.status match {
@@ -265,7 +260,6 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] = {
 
     val url = s"$aucdUrl/user-enrolment-assignments"
-
     monitor("ConsumedAPI-AgentUserClientDetails-PushAssignments-POST") {
       httpV2
         .post(url"$url")
@@ -288,7 +282,6 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
   }
 
   def getTeamMembers(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[UserDetails]] = {
-
     val url = s"$aucdUrl/arn/${arn.value}/team-members"
     monitor("ConsumedAPI-team-members-GET") {
       httpV2.get(url"$url").execute[HttpResponse].map { response =>
@@ -305,7 +298,6 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, metrics: M
     ec: ExecutionContext
   ): Future[Boolean] = {
     val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/user/$userId/ensure-assignments"
-
     monitor("ConsumedAPI-AgentUserClientDetails-syncTeamMember-POST") {
       httpV2
         .post(url"$url")

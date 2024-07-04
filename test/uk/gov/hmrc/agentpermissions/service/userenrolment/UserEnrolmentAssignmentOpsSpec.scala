@@ -29,7 +29,7 @@ class UserEnrolmentAssignmentOpsSpec extends BaseSpec {
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
-    def groupName: String = Iterator.continually(Random.nextPrintableChar).filter(_.isLetter).take(10).mkString
+    def groupName: String = Iterator.continually(Random.nextPrintableChar()).filter(_.isLetter).take(10).mkString
     val userA: AgentUser = AgentUser("A", "A")
     val userB: AgentUser = AgentUser("B", "B")
     val userC: AgentUser = AgentUser("C", "C")

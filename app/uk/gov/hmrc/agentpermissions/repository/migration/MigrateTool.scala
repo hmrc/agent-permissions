@@ -55,17 +55,17 @@ class MigrateTool @Inject() (
       oldCustomGroupsCollection = mongo.database.getCollection[JsObject]("access-groups")
       oldTaxGroupsCollection = mongo.database.getCollection[JsObject]("tax-service-groups")
       _ = logger.warn("========== Cleaning up legacy data ==========")
-      _ <- oldCustomGroupsCollection.drop().toFuture
+      _ <- oldCustomGroupsCollection.drop().toFuture()
       _ = logger.warn("Dropped old custom groups collection.")
-      _ <- oldTaxGroupsCollection.drop().toFuture
+      _ <- oldTaxGroupsCollection.drop().toFuture()
       _ = logger.warn("Dropped old tax groups collection.")
-      nrBackupOirs <- optInRepo.collection.countDocuments(Filters.regex("arn", "^BACKUP")).toFuture
-      nrActualOirs <- optInRepo.collection.countDocuments(Filters.regex("arn", "^.ARN")).toFuture
+      nrBackupOirs <- optInRepo.collection.countDocuments(Filters.regex("arn", "^BACKUP")).toFuture()
+      nrActualOirs <- optInRepo.collection.countDocuments(Filters.regex("arn", "^.ARN")).toFuture()
       _ = logger.warn(s"Opt-in records: $nrBackupOirs backups to delete, $nrActualOirs active.")
       _ = logger.warn("Deleting backup opt-in records...")
-      _            <- optInRepo.collection.deleteMany(Filters.regex("arn", "^BACKUP")).toFuture
-      nrBackupOirs <- optInRepo.collection.countDocuments(Filters.regex("arn", "^BACKUP")).toFuture
-      nrActualOirs <- optInRepo.collection.countDocuments(Filters.regex("arn", "^.ARN")).toFuture
+      _            <- optInRepo.collection.deleteMany(Filters.regex("arn", "^BACKUP")).toFuture()
+      nrBackupOirs <- optInRepo.collection.countDocuments(Filters.regex("arn", "^BACKUP")).toFuture()
+      nrActualOirs <- optInRepo.collection.countDocuments(Filters.regex("arn", "^.ARN")).toFuture()
       _ = logger.warn(s"Opt-in records after deletion: $nrBackupOirs backups to delete, $nrActualOirs active.")
       _ = logger.warn("========== Legacy data cleanup finished ==========")
     } yield ()

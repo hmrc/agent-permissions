@@ -16,11 +16,10 @@
 
 package uk.gov.hmrc.agentpermissions.connectors
 
-import akka.actor.ActorSystem
-import akka.stream.Materializer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
 import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
-import com.kenshoo.play.metrics.Metrics
-import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2}
+import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2, CallHandler4}
 import play.api.http.Status._
 import play.api.libs.json.{JsArray, Json}
 import play.api.libs.ws.{BodyWritable, DefaultBodyWritables, WSRequest}
@@ -31,9 +30,11 @@ import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
 import uk.gov.hmrc.agents.accessgroups.Client
 import uk.gov.hmrc.http.client.{HttpClientV2, RequestBuilder, StreamHttpReads}
 import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpReads, HttpResponse, UpstreamErrorResponse}
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 
 import java.net.URL
 import scala.concurrent.{ExecutionContext, Future}
+import scala.reflect.runtime.universe
 
 class UserClientDetailsConnectorSpec extends BaseSpec {
 
@@ -606,18 +607,18 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
 
   trait TestScope extends DefaultBodyWritables {
     lazy val userClientDetailsConnector: UserClientDetailsConnector =
-      new UserClientDetailsConnectorImpl(mockHttpClientV2, mockMetrics)
+      new UserClientDetailsConnectorImpl(mockHttpClientV2, executionContext, mockMetrics)
 
     implicit val materializer: Materializer = Materializer(ActorSystem())
 
     def mockAppConfigAgentUserClientDetailsBaseUrl: CallHandler0[String] =
-      (mockAppConfig.agentUserClientDetailsBaseUrl _)
+      (() => mockAppConfig.agentUserClientDetailsBaseUrl)
         .expects()
         .returning("http://someBaseUrl")
-        .noMoreThanTwice
+        .noMoreThanTwice()
 
     def mockMetricsDefaultRegistry: CallHandler0[MetricRegistry] =
-      (mockMetrics.defaultRegistry _)
+      (() => mockMetrics.defaultRegistry)
         .expects()
         .returning(noopMetricRegistry)
 
@@ -634,19 +635,25 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         .returning(mockRequestBuilder)
 
     import scala.reflect.runtime.universe._
-    def mockRequestBuilderWithBody[JsValue](body: JsValue) =
+    def mockRequestBuilderWithBody[JsValue](
+      body: JsValue
+    ): CallHandler4[JsValue, BodyWritable[JsValue], universe.TypeTag[JsValue], ExecutionContext, RequestBuilder] =
       (mockRequestBuilder
         .withBody(_: JsValue)(_: BodyWritable[JsValue], _: TypeTag[JsValue], _: ExecutionContext))
         .expects(body, *, *, *)
         .returning(mockRequestBuilder)
 
-    def mockRequestBuilderStream[A: StreamHttpReads](stream: A) =
+    def mockRequestBuilderStream[A: StreamHttpReads](
+      stream: A
+    ): CallHandler2[StreamHttpReads[A], ExecutionContext, Future[A]] =
       (mockRequestBuilder
         .stream(_: StreamHttpReads[A], _: ExecutionContext))
         .expects(*, *)
         .returning(Future successful stream)
 
-    def mockRequestBuilderStreamFailed[A](ex: Exception) =
+    def mockRequestBuilderStreamFailed[A](
+      ex: Exception
+    ): CallHandler2[StreamHttpReads[A], ExecutionContext, Future[A]] =
       (mockRequestBuilder
         .stream(_: StreamHttpReads[A], _: ExecutionContext))
         .expects(*, *)
@@ -668,7 +675,7 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         .expects(*, *)
         .returning(Future failed ex)
 
-    def mockHttpPostV2[A](url: URL): Unit =
+    def mockHttpPostV2[A](url: URL): CallHandler2[URL, HeaderCarrier, RequestBuilder] =
       (mockHttpClientV2
         .post(_: URL)(_: HeaderCarrier))
         .expects(url, *)
