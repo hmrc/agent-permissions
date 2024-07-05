@@ -17,6 +17,7 @@ val scalaCOptions = Seq(
   "-Wconf:cat=deprecation:s",
   "-Wconf:cat=unused-privates:s",
   "-Wconf:msg=match may not be exhaustive:is", // summarize warnings about non-exhaustive pattern matching
+  "-Ywarn-value-discard"
 )
 
 lazy val root = (project in file("."))

@@ -622,7 +622,7 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         .expects()
         .returning(noopMetricRegistry)
 
-    def mockHttpGetV2[A](url: URL): Unit =
+    def mockHttpGetV2[A](url: URL): CallHandler2[URL, HeaderCarrier, RequestBuilder] =
       (mockHttpClientV2
         .get(_: URL)(_: HeaderCarrier))
         .expects(url, *)

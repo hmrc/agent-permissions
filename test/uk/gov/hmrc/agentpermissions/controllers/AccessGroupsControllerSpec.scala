@@ -259,7 +259,9 @@ class AccessGroupsControllerSpec extends BaseSpec {
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
-    def mockEacdSynchronizerSyncWithEacdNoException(results: Map[SyncResult, Int] = Map.empty): Unit =
+    def mockEacdSynchronizerSyncWithEacdNoException(
+      results: Map[SyncResult, Int] = Map.empty
+    ): CallHandler4[Arn, Boolean, HeaderCarrier, ExecutionContext, Future[Option[Map[SyncResult, Int]]]] =
       (mockEacdSynchronizer
         .syncWithEacd(_: Arn, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
@@ -267,7 +269,7 @@ class AccessGroupsControllerSpec extends BaseSpec {
 
     def mockEacdSynchronizerSyncWithEacdHasException(
       ex: Exception
-    ): Unit =
+    ): CallHandler4[Arn, Boolean, HeaderCarrier, ExecutionContext, Future[Option[Map[SyncResult, Int]]]] =
       (mockEacdSynchronizer
         .syncWithEacd(_: Arn, _: Boolean)(_: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *)
