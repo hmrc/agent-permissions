@@ -465,6 +465,22 @@ class AccessGroupsControllerSpec extends BaseSpec {
       }
 
     }
+
+    "request contains no team members or clients in json payload" when {
+      implicit val request = baseRequest.withBody(jsonPayloadForCreateGroupWithNoTeamMembers(groupName))
+      "provided arn is valid" when {
+        s"access groups service returns $AccessGroupCreated" should {
+          s"return $CREATED" in new TestScope {
+            mockAuthActionGetAuthorisedAgent(Some(AuthorisedAgent(arn, user)))
+            mockAccessGroupsServiceCreate(AccessGroupCreated(createdId))
+
+            val result = controller.createGroup(arn)(request)
+
+            status(result) shouldBe CREATED
+          }
+        }
+      }
+    }
   }
 
   "Call to fetch ALL group summaries" when {
@@ -1697,6 +1713,11 @@ class AccessGroupsControllerSpec extends BaseSpec {
                   |    "groupName": "$groupName",
                   |    "clients": ${Json.toJson(Seq(clientVat, clientPpt))},
                   |    "teamMembers": ${Json.toJson(Seq(user1, user2))}
+                  |}""".stripMargin)
+
+  def jsonPayloadForCreateGroupWithNoTeamMembers(groupName: String): JsValue =
+    Json.parse(s"""{
+                  |    "groupName": "$groupName"
                   |}""".stripMargin)
 
   def jsonPayloadForUpdatingGroup(groupName: String): JsValue =
