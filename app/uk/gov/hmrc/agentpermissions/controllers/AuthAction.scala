@@ -55,7 +55,9 @@ class AuthAction @Inject() (
         case enrols ~ credRole ~ name ~ credentials =>
           getArnAndAgentUser(enrols, name, credentials) match {
             case Some(authorisedAgent) =>
-              if (credRole.contains(User) | (credRole.contains(Assistant) & allowStandardUser)) {
+              if (
+                credRole.contains(User) | credRole.contains(Admin) | (credRole.contains(Assistant) & allowStandardUser)
+              ) {
                 if (appConfig.checkArnAllowList & allowlistEnabled) {
                   if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
                     Future successful Option(authorisedAgent)
