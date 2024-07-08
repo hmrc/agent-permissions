@@ -41,17 +41,14 @@ trait EacdSyncRepository {
 @Singleton
 class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent, appConfig: AppConfig)(implicit
   ec: ExecutionContext
-) extends {
-      private val ARN = "arn"
-      private val UPDATED_AT = "updatedAt"
-    } with PlayMongoRepository[EacdSyncRecord](
+) extends PlayMongoRepository[EacdSyncRecord](
       collectionName = "eacd-sync-records",
       domainFormat = EacdSyncRecord.format,
       mongoComponent = mongoComponent,
       indexes = Seq(
-        IndexModel(ascending(ARN), new IndexOptions().name("arnIdx").unique(true)),
+        IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true)),
         IndexModel(
-          ascending(UPDATED_AT),
+          ascending("updatedAt"),
           IndexOptions()
             .background(false)
             .name("idxUpdatedAt")
@@ -67,16 +64,16 @@ class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent, appConfi
       _ <- collection
              .deleteMany(
                Filters.and(
-                 Filters.equal(ARN, arn.value),
-                 Filters.lt(UPDATED_AT, Instant.now().minusSeconds(appConfig.eacdSyncNotBeforeSeconds))
+                 Filters.equal("arn", arn.value),
+                 Filters.lt("updatedAt", Instant.now().minusSeconds(appConfig.eacdSyncNotBeforeSeconds))
                )
              )
-             .toFuture
-      syncRecords <- collection.find(equal(ARN, arn.value)).toFuture
+             .toFuture()
+      syncRecords <- collection.find(equal("arn", arn.value)).toFuture()
       maybeNewRecord <- syncRecords.toList match {
                           case Nil =>
                             collection
-                              .replaceOne(equal(ARN, arn.value), newRecord, ReplaceOptions().upsert(true))
+                              .replaceOne(equal("arn", arn.value), newRecord, ReplaceOptions().upsert(true))
                               .headOption()
                               .map(_.map(_ => newRecord))
                           case _ =>

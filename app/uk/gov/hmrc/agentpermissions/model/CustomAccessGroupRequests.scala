@@ -25,8 +25,8 @@ import java.time.LocalDateTime
 
 case class CreateAccessGroupRequest(
   groupName: String,
-  teamMembers: Option[Set[AgentUser]],
-  clients: Option[Set[Client]]
+  teamMembers: Option[Set[AgentUser]] = Some(Set.empty),
+  clients: Option[Set[Client]] = Some(Set.empty)
 ) {
   def buildAccessGroup(
     arn: Arn,
@@ -42,8 +42,8 @@ case class CreateAccessGroupRequest(
       now,
       agentUser,
       agentUser,
-      teamMembers.getOrElse(Set.empty),
-      clients.getOrElse(Set.empty)
+      teamMembers.get,
+      clients.get
     )
   }
 }

@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import org.scalamock.handlers.{CallHandler3, CallHandler4, CallHandler5, CallHandler6}
 import play.api.libs.json.{JsArray, JsBoolean, JsString, JsValue, Json}
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}

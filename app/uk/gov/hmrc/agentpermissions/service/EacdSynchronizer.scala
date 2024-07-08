@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
@@ -84,10 +84,18 @@ class EacdSynchronizerImpl @Inject() (
       clientsInAccessGroups = accessGroups.flatMap {
                                 case cg: CustomGroup => cg.clients
                                 case tg: TaxGroup    => tg.excludedClients
+                                case other =>
+                                  throw new RuntimeException(
+                                    s"Access group is not a CustomGroup or TaxGroup: ${other.toString}"
+                                  )
                               }.toSet
       membersInAccessGroups = accessGroups.flatMap {
                                 case cg: CustomGroup => cg.teamMembers
                                 case tg: TaxGroup    => tg.teamMembers
+                                case other =>
+                                  throw new RuntimeException(
+                                    s"Access group is not a CustomGroup or TaxGroup: ${other.toString}"
+                                  )
                               }.toSet
       enrolmentKeysToRemove = clientsInAccessGroups.map(_.enrolmentKey).diff(clientsInEacd.map(_.enrolmentKey))
       userIdsToRemove = membersInAccessGroups.map(_.id).diff(membersInEacd.flatMap(_.userId))
@@ -179,6 +187,7 @@ class EacdSynchronizerImpl @Inject() (
   ): Future[AccessGroup] = accessGroup match {
     case customGroup: CustomGroup => applyRemovalSetToCustomGroup(customGroup, removalSet, whoIsUpdating)
     case taxGroup: TaxGroup       => applyRemovalSetToTaxGroup(taxGroup, removalSet, whoIsUpdating)
+    case other => throw new RuntimeException(s"Access group is not a CustomGroup or TaxGroup: ${other.toString}")
   }
 
   /** Force the assigned enrolments in EACD to match those stored here.
@@ -229,6 +238,7 @@ class EacdSynchronizerImpl @Inject() (
         accessGroupsRepository.update(customGroup.arn, customGroup.groupName, customGroup)
       case taxGroup: TaxGroup =>
         taxGroupsRepository.update(taxGroup.arn, taxGroup.groupName, taxGroup)
+      case other => throw new RuntimeException(s"Access group is not a CustomGroup or TaxGroup: ${other.toString}")
     }).map {
       case Some(updatedCount) if updatedCount == 1L => SyncResult.AccessGroupUpdateSuccess
       case _                                        => SyncResult.AccessGroupUpdateFailure
@@ -304,9 +314,9 @@ class EacdSynchronizerImpl @Inject() (
       // Optionally ensure that in EACD the enrolment assignments match those kept by agent-permissions.
       // This is scheduled asynchronously as it could take some time.
       _ = if (fullSync) actorSystem.scheduler.scheduleOnce(FiniteDuration(0, "s")) {
-            doFullSync(arn, updatedAccessGroups.collect { case cg: CustomGroup => cg })
+            val _ = doFullSync(arn, updatedAccessGroups.collect { case cg: CustomGroup => cg })
           }
-          else ()
+
     } yield Map[SyncResult, Int](
       SyncResult.AccessGroupUpdateSuccess -> updateStatuses.count(_ == SyncResult.AccessGroupUpdateSuccess),
       SyncResult.AccessGroupUpdateFailure -> updateStatuses.count(_ == SyncResult.AccessGroupUpdateFailure),

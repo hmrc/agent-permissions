@@ -17,7 +17,6 @@
 package uk.gov.hmrc.agentpermissions
 
 import com.google.inject.AbstractModule
-import com.kenshoo.play.metrics.PlayModule
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,7 +36,6 @@ abstract class BaseIntegrationSpec
 
   override def fakeApplication(): Application =
     GuiceApplicationBuilder()
-      .disable[PlayModule]
       .configure("metrics.enabled" -> false)
       .configure("auditing.enabled" -> false)
       .overrides(moduleOverrides)

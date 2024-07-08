@@ -102,7 +102,7 @@ class OptinRepositorySpec
       "return all" in new TestScope {
         optinRepository.upsert(optinRecord).futureValue
 
-        optinRepository.getAll.futureValue shouldBe Seq(optinRecord)
+        optinRepository.getAll().futureValue shouldBe Seq(optinRecord)
       }
     }
 

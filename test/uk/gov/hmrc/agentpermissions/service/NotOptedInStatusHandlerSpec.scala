@@ -46,7 +46,7 @@ class NotOptedInStatusHandlerSpec extends BaseSpec {
         .returning(Future.successful(maybeSize))
 
     def mockAppConfigAgentSizeMaxClientCountAllowed(max: Int) =
-      (mockAppConfig.agentSizeMaxClientCountAllowed _: () => Int)
+      (() => mockAppConfig.agentSizeMaxClientCountAllowed)
         .expects()
         .returning(max)
 
