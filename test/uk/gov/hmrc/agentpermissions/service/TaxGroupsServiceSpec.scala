@@ -65,6 +65,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
       "HMRC-CGT-PD"        -> 3,
       "HMRC-PPT-ORG"       -> 4,
       "HMRC-MTD-IT"        -> 5,
+      "HMRC-MTD-IT-SUPP"   -> 4,
       "HMRC-TERS-ORG"      -> 6,
       "HMRC-TERSNT-ORG"    -> 1,
       "HMRC-CBC-ORG"       -> 6,
@@ -405,6 +406,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
 
   private val VAT = "HMRC-MTD-VAT"
   private val IT = "HMRC-MTD-IT"
+  private val ITSUPP = "HMRC-MTD-IT-SUPP"
   private val CGT = "HMRC-CGT-PD"
   private val PPT = "HMRC-PPT-ORG"
   private val TERS = "HMRC-TERS-ORG"
@@ -426,12 +428,13 @@ class TaxGroupsServiceSpec extends BaseSpec {
         // CBC will always expect the same
         mockTaxGroupsRepositoryGroupExistsForService(CBC, result = false)
         mockTaxGroupsRepositoryGroupExistsForService(CBCNONUK, result = false)
+        mockTaxGroupsRepositoryGroupExistsForService(ITSUPP, result = false)
 
         val expectedCount = Map(
           "HMRC-MTD-VAT" -> 2,
           "HMRC-CGT-PD"  -> 3,
           "HMRC-PPT-ORG" -> 4,
-          "HMRC-MTD-IT"  -> 5,
+          "HMRC-MTD-IT"  -> 9, // combined ITSA
           "HMRC-TERS"    -> 7, // Combined trusts
           "HMRC-CBC"     -> 8 // Combined country by country
         )
@@ -453,10 +456,11 @@ class TaxGroupsServiceSpec extends BaseSpec {
         // CBC will always expect the same
         mockTaxGroupsRepositoryGroupExistsForService(CBC, result = true)
         mockTaxGroupsRepositoryGroupExistsForService(CBCNONUK, result = true)
+        mockTaxGroupsRepositoryGroupExistsForService(ITSUPP, result = false)
 
         val expectedCount = Map(
           "HMRC-CGT-PD" -> 3,
-          "HMRC-MTD-IT" -> 5,
+          "HMRC-MTD-IT" -> 9, // combined ITSA
           "HMRC-TERS"   -> 7 // Combined trusts
         )
 
@@ -476,6 +480,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
         mockTaxGroupsRepositoryGroupExistsForService(TERSNT, result = true)
         mockTaxGroupsRepositoryGroupExistsForService(CBC, result = true)
         mockTaxGroupsRepositoryGroupExistsForService(CBCNONUK, result = true)
+        mockTaxGroupsRepositoryGroupExistsForService(ITSUPP, result = true)
 
         val expectedCount = Map.empty[String, Int]
 
@@ -583,7 +588,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
           "HMRC-MTD-VAT" -> 2,
           "HMRC-CGT-PD"  -> 3,
           "HMRC-PPT-ORG" -> 4,
-          "HMRC-MTD-IT"  -> 5,
+          "HMRC-MTD-IT"  -> 9, // combine ITSA
           "HMRC-TERS"    -> 7 // combined trusts
         )
 
