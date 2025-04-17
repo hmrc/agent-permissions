@@ -123,27 +123,24 @@ class TaxGroupsServiceImpl @Inject() (
     } yield groupCount
 
   /** Groups together client counts for services which act as 1 entity in the frontend but exist as 2 enrolment keys */
-  private def combineServicesClientCount(count: Map[String, Int]): Map[String, Int] = {
+  private def combineServicesClientCount(clientCountByTaxService: Map[String, Int]): Map[String, Int] = {
     val TRUSTS = "HMRC-TERS" // taxable "HMRC-TERS-ORG" and non taxable "HMRC-TERSNT-ORG"
     val CBC = "HMRC-CBC" // uk "HMRC-CBC-ORG" and non uk "HMRC-CBC-NONUK-ORG"
+    val ITSA = "HMRC-MTD-IT" // "HMRC-MTD-IT" and "HMRC-MTD-IT-SUPP"
 
-    val combinedTrustCountsValue = count.filter(m => m._1.contains(TRUSTS)).values.sum
-    val combinedCbcCountsValue = count.filter(m => m._1.contains(CBC)).values.sum
-
-    val combinedTrustCountMap = Map(TRUSTS -> combinedTrustCountsValue)
-    val combinedCbcCountMap = Map(CBC -> combinedCbcCountsValue)
-    val singleServicesMap = count.filterNot(m => m._1.contains(TRUSTS) || m._1.contains(CBC))
-
-    // combines count or removes services if agent has no clients of that type
-    if (combinedTrustCountsValue > 0 && combinedCbcCountsValue > 0) {
-      singleServicesMap ++ combinedTrustCountMap ++ combinedCbcCountMap
-    } else if (combinedTrustCountsValue > 0) {
-      singleServicesMap ++ combinedTrustCountMap
-    } else if (combinedCbcCountsValue > 0) {
-      singleServicesMap ++ combinedCbcCountMap
-    } else {
-      singleServicesMap
-    }
+    clientCountByTaxService
+      .filter(mapping => mapping._2 > 0)
+      .toList
+      .collect {
+        case (k, v) if k.contains(TRUSTS) => (TRUSTS, v)
+        case (k, v) if k.contains(CBC)    => (CBC, v)
+        case (k, v) if k.contains(ITSA)   => (ITSA, v)
+        case (k, v)                       => (k, v)
+      }
+      .groupBy(_._1)
+      .map { case (k, v) =>
+        (k, v.map(_._2).sum)
+      }
   }
 
   override def getById(
