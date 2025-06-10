@@ -149,7 +149,6 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: Ex
         }
       }
     }
-
   }
 
   override def outstandingWorkItemsExist(
