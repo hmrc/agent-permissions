@@ -2,7 +2,7 @@ import sbt._
 
 object AppDependencies {
 
-  private val mongoVer: String = "1.9.0"
+  private val mongoVer: String = "2.6.0"
   private val bootstrapVer: String = "8.6.0"
   private val bootstrapBackend = "bootstrap-backend-play-30"
 
