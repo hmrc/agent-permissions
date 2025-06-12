@@ -1,10 +1,10 @@
-import uk.gov.hmrc.{DefaultBuildSettings, SbtAutoBuildPlugin}
 import CodeCoverageSettings.scoverageSettings
+import uk.gov.hmrc.DefaultBuildSettings
 
 val appName = "agent-permissions"
 
 ThisBuild / majorVersion := 1
-ThisBuild / scalaVersion := "2.13.12"
+ThisBuild / scalaVersion := "2.13.16"
 
 val scalaCOptions = Seq(
   "-Werror",
