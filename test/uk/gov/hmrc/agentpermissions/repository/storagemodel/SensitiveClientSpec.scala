@@ -29,8 +29,7 @@ class SensitiveClientSpec extends BaseSpec {
   val sensitiveClient: SensitiveClient = SensitiveClient(client)
   val sensitiveJson: JsObject = Json.obj(
     "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
-    "friendlyName" -> "RRhGxwmDG4jML/ChHcNOYA==",
-    "encrypted"    -> true
+    "friendlyName" -> "RRhGxwmDG4jML/ChHcNOYA=="
   )
 
   "SensitiveClient" should {
@@ -41,15 +40,6 @@ class SensitiveClientSpec extends BaseSpec {
 
     "read from JSON" in {
       sensitiveJson.as[SensitiveClient] shouldBe sensitiveClient
-    }
-
-    "read from partially encrypted JSON" in {
-      val partiallyEncryptedJson: JsObject = Json.obj(
-        "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
-        "friendlyName" -> "Smith Roberts"
-      )
-
-      partiallyEncryptedJson.as[SensitiveClient].decryptedValue shouldBe client
     }
   }
 }

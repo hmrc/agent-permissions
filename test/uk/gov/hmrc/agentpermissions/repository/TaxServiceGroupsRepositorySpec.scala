@@ -19,10 +19,8 @@ package uk.gov.hmrc.agentpermissions.repository
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.mongodb.scala.bson.collection.immutable.Document
-import org.mongodb.scala.model.{Filters, IndexModel, Updates}
+import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.result.UpdateResult
-import org.scalatest.concurrent.Eventually.eventually
-import org.scalatest.time.{Millis, Seconds, Span}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.models.GroupId
@@ -243,47 +241,6 @@ class TaxServiceGroupsRepositorySpec
           groupsRepository.insert(accessGroup.copy(service = "HMRC-CBC")).futureValue
 
           groupsRepository.groupExistsForTaxService(arn, "HMRC-CBC-NONUK-ORG").futureValue shouldBe true
-        }
-      }
-    }
-
-    "counting unencrypted records" should {
-
-      "provide a total count of records that do not have the encrypted flag" in new TestScope {
-        val id: String = groupsRepository.insert(accessGroup).futureValue.get
-        groupsRepository.countUnencrypted().futureValue shouldBe 0
-
-        groupsRepository.collection
-          .updateOne(
-            Filters.equal("_id", id),
-            Updates.unset("encrypted")
-          )
-          .toFuture()
-          .futureValue
-
-        groupsRepository.countUnencrypted().futureValue shouldBe 1
-      }
-    }
-
-    "encrypting old records" should {
-
-      "find records that do not have the encrypted flag and encrypt them" in new TestScope {
-
-        val id1: String = groupsRepository.insert(accessGroup).futureValue.get
-
-        groupsRepository.collection
-          .updateOne(
-            Filters.equal("_id", id1),
-            Updates.unset("encrypted")
-          )
-          .toFuture()
-          .futureValue
-
-        val throttleRate = 2
-        groupsRepository.encryptOldRecords(throttleRate)
-
-        eventually(timeout(Span(5, Seconds)), interval(Span(100, Millis))) {
-          groupsRepository.countUnencrypted().futureValue shouldBe 0
         }
       }
     }
