@@ -19,8 +19,11 @@ package uk.gov.hmrc.agentpermissions.repository
 import com.google.inject.ImplementedBy
 import com.mongodb.client.model.{Collation, IndexOptions}
 import com.mongodb.MongoWriteException
+import org.apache.pekko.Done
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 import org.mongodb.scala.model.CollationStrength.SECONDARY
-import org.mongodb.scala.model.Filters.{and, equal}
+import org.mongodb.scala.model.Filters.{and, equal, exists}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
 import org.mongodb.scala.model._
 import org.mongodb.scala.result.UpdateResult
@@ -34,6 +37,7 @@ import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 
 import javax.inject.{Inject, Named, Singleton}
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[TaxGroupsRepositoryV2Impl])
@@ -55,10 +59,10 @@ import TaxGroupsRepositoryV2Impl._
 class TaxGroupsRepositoryV2Impl @Inject() (
   mongoComponent: MongoComponent,
   @Named("aes") crypto: Encrypter with Decrypter
-)(implicit ec: ExecutionContext)
+)(implicit ec: ExecutionContext, mat: Materializer)
     extends PlayMongoRepository[SensitiveTaxGroup](
       collectionName = "access-groups-tax",
-      domainFormat = SensitiveTaxGroup.format(crypto),
+      domainFormat = SensitiveTaxGroup.databaseFormat(crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending(FIELD_ARN), new IndexOptions().name("arnIdx").unique(false)),
@@ -164,6 +168,41 @@ class TaxGroupsRepositoryV2Impl @Inject() (
         update = Updates.addToSet("teamMembers", Codecs.toBson(SensitiveAgentUser(agentUser)))
       )
       .head()
+
+  def countUnencrypted(): Future[Long] = collection.countDocuments(exists("encrypted", exists = false)).toFuture()
+
+  def encryptOldRecords(rate: Int = 10): Unit = {
+    val observable = collection.find(exists("encrypted", exists = false))
+    countUnencrypted().map { count =>
+      logger.warn(s"[TaxGroupsRepositoryV2] automatic encryption has started, $count applications left to encrypt")
+    }
+    Source
+      .fromPublisher(observable)
+      .throttle(rate, 1.second)
+      .runForeach { record =>
+        collection
+          .replaceOne(equal("_id", record._id), record)
+          .toFuture()
+          .map { _ =>
+            logger.warn("[TaxGroupsRepositoryV2] successfully encrypted record")
+          }
+          .recover { case ex: Throwable =>
+            logger.warn("[TaxGroupsRepositoryV2] failed to encrypt record", ex)
+          }
+        ()
+      }
+      .recover { case _: Throwable =>
+        logger.warn("[TaxGroupsRepositoryV2] failed to read application before encrypting, aborting process")
+        Done
+      }
+      .onComplete { _ =>
+        countUnencrypted().map { count =>
+          logger.warn(s"[TaxGroupsRepositoryV2] encryption completed, $count applications left unencrypted")
+        }
+      }
+  }
+
+  encryptOldRecords()
 }
 
 object TaxGroupsRepositoryV2Impl {
