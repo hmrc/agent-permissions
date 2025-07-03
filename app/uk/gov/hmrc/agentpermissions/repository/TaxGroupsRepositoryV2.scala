@@ -17,9 +17,8 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
-import com.mongodb.client.model.{Collation, IndexOptions}
 import com.mongodb.MongoWriteException
-import org.apache.pekko.Done
+import com.mongodb.client.model.{Collation, IndexOptions}
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.mongodb.scala.model.CollationStrength.SECONDARY
@@ -53,7 +52,7 @@ trait TaxGroupsRepositoryV2 {
   def addTeamMember(id: GroupId, toAdd: AgentUser): Future[UpdateResult]
 }
 
-import TaxGroupsRepositoryV2Impl._
+import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2Impl._
 
 @Singleton
 class TaxGroupsRepositoryV2Impl @Inject() (
@@ -190,10 +189,6 @@ class TaxGroupsRepositoryV2Impl @Inject() (
             logger.warn("[TaxGroupsRepositoryV2] failed to encrypt record", ex)
           }
         ()
-      }
-      .recover { case _: Throwable =>
-        logger.warn("[TaxGroupsRepositoryV2] failed to read application before encrypting, aborting process")
-        Done
       }
       .onComplete { _ =>
         countUnencrypted().map { count =>

@@ -30,7 +30,7 @@ class SensitiveClientSpec extends BaseSpec {
   val sensitiveJson: JsObject = Json.obj(
     "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
     "friendlyName" -> "RRhGxwmDG4jML/ChHcNOYA==",
-    "encrypted" -> true
+    "encrypted"    -> true
   )
 
   "SensitiveClient" should {

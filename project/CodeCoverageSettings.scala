@@ -21,7 +21,7 @@ object CodeCoverageSettings {
     ".*TaxServiceGroupRequests.*"
   )
 
-  val scoverageSettings: Seq[Setting[_]] = Seq(
+  val scoverageSettings: Seq[Setting[?]] = Seq(
     ScoverageKeys.coverageExcludedPackages := excludedPackages.mkString(";"),
     ScoverageKeys.coverageExcludedFiles := excludedFiles.mkString(";"),
     ScoverageKeys.coverageMinimumStmtTotal := 90.00,

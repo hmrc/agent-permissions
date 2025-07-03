@@ -28,8 +28,8 @@ class SensitiveAgentUserSpec extends BaseSpec {
   val agentUser: AgentUser = AgentUser("agentUser1", "Robert Smith")
   val sensitiveAgentUser: SensitiveAgentUser = SensitiveAgentUser(agentUser)
   val sensitiveJson: JsObject = Json.obj(
-    "id" -> "b1R0M181YgUTX4YUs596jg==",
-    "name" -> "HXjWfzUOh3X5mPEI/Dbo2g==",
+    "id"        -> "b1R0M181YgUTX4YUs596jg==",
+    "name"      -> "HXjWfzUOh3X5mPEI/Dbo2g==",
     "encrypted" -> true
   )
 
@@ -45,7 +45,7 @@ class SensitiveAgentUserSpec extends BaseSpec {
 
     "read from partially encrypted JSON" in {
       val partiallyEncryptedJson: JsObject = Json.obj(
-        "id" -> "b1R0M181YgUTX4YUs596jg==",
+        "id"   -> "b1R0M181YgUTX4YUs596jg==",
         "name" -> "Robert Smith"
       )
 

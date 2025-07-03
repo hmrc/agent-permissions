@@ -16,25 +16,21 @@
 
 package uk.gov.hmrc.agentpermissions.util
 
-import play.api.libs.json.{JsString, JsSuccess, JsValue}
-import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
+import play.api.libs.json.{JsString, JsValue}
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption.sensitiveDecrypter
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 object EncryptionUtil {
 
-  def decryptToSensitive(fieldName: String,
-                         isEncrypted: Option[Boolean],
-                         json: JsValue)
-                        (implicit crypto: Encrypter with Decrypter): SensitiveString = {
+  def decryptToSensitive(fieldName: String, isEncrypted: Option[Boolean], json: JsValue)(implicit
+    crypto: Encrypter with Decrypter
+  ): SensitiveString = {
     val stringValue = (json \ fieldName).as[String]
     isEncrypted match {
       case Some(true) =>
         val decrypter = sensitiveDecrypter(SensitiveString.apply)
-        decrypter.reads(JsString(stringValue)) match {
-          case JsSuccess(value, _) => value
-          case _ => throw new RuntimeException(s"Failed to decrypt field $fieldName")
-        }
+        decrypter.reads(JsString(stringValue)).get
       case _ => SensitiveString(stringValue)
     }
   }

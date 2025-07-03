@@ -19,7 +19,6 @@ package uk.gov.hmrc.agentpermissions.repository
 import com.google.inject.ImplementedBy
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.{Collation, IndexOptions}
-import org.apache.pekko.Done
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.mongodb.scala.bson.Document
@@ -205,10 +204,6 @@ class CustomGroupsRepositoryV2Impl @Inject() (
             logger.warn("[CustomGroupsRepositoryV2] failed to encrypt record", ex)
           }
         ()
-      }
-      .recover { case _: Throwable =>
-        logger.warn("[CustomGroupsRepositoryV2] failed to read application before encrypting, aborting process")
-        Done
       }
       .onComplete { _ =>
         countUnencrypted().map { count =>
