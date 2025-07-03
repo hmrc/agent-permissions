@@ -18,6 +18,7 @@ package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
 import com.mongodb.MongoWriteException
+import com.mongodb.client.model.{Collation, IndexOptions}
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Source
 import org.mongodb.scala.model.CollationStrength.SECONDARY
