@@ -23,9 +23,10 @@ import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 object EncryptionUtil {
 
-  def decryptToSensitive(fieldName: String, isEncrypted: Option[Boolean], json: JsValue)(implicit
-    crypto: Encrypter with Decrypter
-  ): SensitiveString = {
+  def decryptToSensitive(fieldName: String,
+                         isEncrypted: Option[Boolean],
+                         json: JsValue)
+                        (implicit crypto: Encrypter with Decrypter): SensitiveString = {
     val stringValue = (json \ fieldName).as[String]
     isEncrypted match {
       case Some(true) =>
