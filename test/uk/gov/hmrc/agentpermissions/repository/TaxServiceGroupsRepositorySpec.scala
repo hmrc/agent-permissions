@@ -16,6 +16,8 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.result.UpdateResult
@@ -35,6 +37,8 @@ class TaxServiceGroupsRepositorySpec
     extends BaseSpec with PlayMongoRepositorySupport[SensitiveTaxGroup] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  val actorSystem: ActorSystem = ActorSystem()
+  implicit val materializer: Materializer = Materializer(actorSystem)
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -64,17 +68,15 @@ class TaxServiceGroupsRepositorySpec
 
     def now: LocalDateTime = LocalDateTime.now()
 
-    val groupsRepositoryImpl: TaxGroupsRepositoryV2Impl = repository.asInstanceOf[TaxGroupsRepositoryV2Impl]
-    // trying to use trait interface as much as possible
-    val groupsRepository: TaxGroupsRepositoryV2 = groupsRepositoryImpl
+    val groupsRepository: TaxGroupsRepositoryV2Impl = repository.asInstanceOf[TaxGroupsRepositoryV2Impl]
   }
 
   "TaxServiceGroupsRepository" when {
 
     "set up" should {
       "have correct indexes" in new TestScope {
-        groupsRepositoryImpl.indexes.size shouldBe 2
-        val collectionIndexes: Seq[IndexModel] = groupsRepositoryImpl.indexes
+        groupsRepository.indexes.size shouldBe 2
+        val collectionIndexes: Seq[IndexModel] = groupsRepository.indexes
 
         val arnIndexModel: IndexModel = collectionIndexes.head
         assert(arnIndexModel.getKeys.toBsonDocument.containsKey("arn"))
@@ -136,7 +138,7 @@ class TaxServiceGroupsRepositorySpec
           groupsRepository.insert(accessGroup).futureValue
           // checking at the raw Document level that the relevant fields have been encrypted
           val document: Seq[Document] =
-            groupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
+            groupsRepository.collection.find[Document]().collect().toFuture().futureValue
           document.toString should include(accessGroup.groupName) // the group name should be in plaintext
           // But the agent user ids should be encrypted
           (accessGroup.teamMembers ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>

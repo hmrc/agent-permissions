@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
-import play.api.libs.json.{Json, OFormat}
+import play.api.libs.json._
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agents.accessgroups.CustomGroup
@@ -62,6 +62,7 @@ object SensitiveCustomGroup {
       teamMembers = customGroup.teamMembers.map(SensitiveAgentUser(_)),
       clients = customGroup.clients.map(SensitiveClient(_))
     )
-  implicit def format(implicit crypto: Encrypter with Decrypter): OFormat[SensitiveCustomGroup] =
+
+  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveCustomGroup] =
     Json.format[SensitiveCustomGroup]
 }

@@ -16,25 +16,27 @@
 
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json._
 import uk.gov.hmrc.agents.accessgroups.Client
-import uk.gov.hmrc.crypto.{Decrypter, Encrypter, Sensitive}
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter, Sensitive}
 
-case class SensitiveClient(enrolmentKey: SensitiveString, friendlyName: String) extends Sensitive[Client] {
-  def decryptedValue: Client =
-    Client(enrolmentKey = enrolmentKey.decryptedValue, friendlyName = friendlyName)
+case class SensitiveClient(enrolmentKey: SensitiveString, friendlyName: SensitiveString) extends Sensitive[Client] {
+  def decryptedValue: Client = Client(enrolmentKey.decryptedValue, friendlyName.decryptedValue)
 }
 
 object SensitiveClient {
   def apply(client: Client): SensitiveClient = SensitiveClient(
     enrolmentKey = SensitiveString(client.enrolmentKey),
-    friendlyName = client.friendlyName
+    friendlyName = SensitiveString(client.friendlyName)
   )
-  implicit def format(implicit crypto: Encrypter with Decrypter): Format[SensitiveClient] = {
+
+  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveClient] = {
+
     implicit val sensitiveStringFormat: Format[SensitiveString] =
       JsonEncryption.sensitiveEncrypterDecrypter(SensitiveString.apply)
+
     Json.format[SensitiveClient]
   }
 }

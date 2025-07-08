@@ -35,9 +35,9 @@ lazy val root = (project in file("."))
     scalacOptions ++= scalaCOptions,
     Compile / scalafmtOnCompile := true,
     Test / scalafmtOnCompile := true,
-    Compile / unmanagedResourceDirectories += baseDirectory.value / "resources"
+    Compile / unmanagedResourceDirectories += baseDirectory.value / "resources",
+    commands ++= SbtCommands.commands
   )
-  .settings(resolvers += Resolver.jcenterRepo)
   .settings(
     Test / parallelExecution := false,
     scoverageSettings

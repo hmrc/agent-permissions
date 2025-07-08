@@ -16,22 +16,25 @@
 
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
-import play.api.libs.json.{Format, Json, OFormat}
+import play.api.libs.json._
 import uk.gov.hmrc.agents.accessgroups.AgentUser
-import uk.gov.hmrc.crypto.{Decrypter, Encrypter, Sensitive}
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter, Sensitive}
 
-case class SensitiveAgentUser(id: SensitiveString, name: String) extends Sensitive[AgentUser] {
-  def decryptedValue: AgentUser = AgentUser(id = id.decryptedValue, name = name)
+case class SensitiveAgentUser(id: SensitiveString, name: SensitiveString) extends Sensitive[AgentUser] {
+  def decryptedValue: AgentUser = AgentUser(id.decryptedValue, name.decryptedValue)
 }
 
 object SensitiveAgentUser {
   def apply(agentUser: AgentUser): SensitiveAgentUser =
-    SensitiveAgentUser(id = SensitiveString(agentUser.id), name = agentUser.name)
-  implicit def formatAgentUser(implicit crypto: Encrypter with Decrypter): OFormat[SensitiveAgentUser] = {
+    SensitiveAgentUser(SensitiveString(agentUser.id), SensitiveString(agentUser.name))
+
+  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveAgentUser] = {
+
     implicit val sensitiveStringFormat: Format[SensitiveString] =
       JsonEncryption.sensitiveEncrypterDecrypter(SensitiveString.apply)
+
     Json.format[SensitiveAgentUser]
   }
 }

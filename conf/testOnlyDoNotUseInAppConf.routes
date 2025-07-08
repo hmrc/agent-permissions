@@ -12,4 +12,4 @@
 # Add all the application routes to the prod.routes file
 ->         /                                                        prod.Routes
 
-DELETE     /test-only/agent-permissions/delete-test-data/arn/:arn   uk.gov.hmrc.agentpermissions.controllers.TestOnlyController.delete(arn: String)
+DELETE     /test-only/agent-permissions/delete-test-data/arn/:arn   uk.gov.hmrc.agentpermissions.testOnly.controllers.TestOnlyController.delete(arn: String)

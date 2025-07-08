@@ -16,58 +16,76 @@
 
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, TaxGroup}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 import java.time.LocalDateTime
+import java.util.UUID
 
 class SensitiveTaxGroupSpec extends BaseSpec {
 
-  val agentUser1 = SensitiveAgentUser(SensitiveString("agentUser1"), "Robert Smith")
-  val agentUser2 = SensitiveAgentUser(SensitiveString("agentUser2"), "Sandy Jones")
-  val client1 = SensitiveClient(SensitiveString("HMRC-MTD-VAT~VRN~123456789"), "")
+  implicit val crypto: Encrypter with Decrypter = aesCrypto
 
-  val sensitiveTaxGroup = SensitiveTaxGroup(
-    _id = GroupId.random().toString,
+  val agentUser: AgentUser = AgentUser(id = "agentUser1", name = "Robert Smith")
+  val client: Client = Client(enrolmentKey = "HMRC-MTD-VAT~VRN~123456789", friendlyName = "Smith Roberts")
+
+  val taxGroup: TaxGroup = TaxGroup(
+    id = UUID.fromString("00000abc-6789-6789-6789-0000000000aa"),
     arn = Arn("KARN1234567"),
-    groupName = "My Group",
-    created = LocalDateTime.now().minusDays(1),
-    lastUpdated = LocalDateTime.now().minusHours(1),
-    createdBy = agentUser1,
-    lastUpdatedBy = agentUser2,
-    teamMembers = Set(agentUser1, agentUser2),
+    groupName = "some group",
+    created = LocalDateTime.of(2020, 1, 1, 0, 0, 0, 1000),
+    lastUpdated = LocalDateTime.of(2020, 1, 1, 0, 0, 0, 1000),
+    createdBy = agentUser,
+    lastUpdatedBy = agentUser,
+    teamMembers = Set(agentUser),
     service = "HMRC-MTD-VAT",
-    excludedClients = Set(client1),
+    excludedClients = Set(client),
     automaticUpdates = true
   )
+  val sensitiveTaxGroup: SensitiveTaxGroup = SensitiveTaxGroup(taxGroup)
 
-  "SensitiveTaxServiceGroup" should {
-    "serialise and unserialise correctly" in {
-      implicit val crypto: Encrypter with Decrypter = aesCrypto
-      val json = Json.toJson(sensitiveTaxGroup)
-      val deserialised: SensitiveTaxGroup = Json.fromJson[SensitiveTaxGroup](json).get
-      deserialised shouldBe sensitiveTaxGroup
+  val sensitiveJson: JsObject = Json.obj(
+    "_id"         -> "00000abc-6789-6789-6789-0000000000aa",
+    "arn"         -> "KARN1234567",
+    "groupName"   -> "some group",
+    "created"     -> "2020-01-01T00:00:00.000001",
+    "lastUpdated" -> "2020-01-01T00:00:00.000001",
+    "createdBy" -> Json.obj(
+      "id"   -> "b1R0M181YgUTX4YUs596jg==",
+      "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
+    ),
+    "lastUpdatedBy" -> Json.obj(
+      "id"   -> "b1R0M181YgUTX4YUs596jg==",
+      "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
+    ),
+    "teamMembers" -> Json.arr(
+      Json.obj(
+        "id"   -> "b1R0M181YgUTX4YUs596jg==",
+        "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
+      )
+    ),
+    "service"          -> "HMRC-MTD-VAT",
+    "automaticUpdates" -> true,
+    "excludedClients" -> Json.arr(
+      Json.obj(
+        "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
+        "friendlyName" -> "RRhGxwmDG4jML/ChHcNOYA=="
+      )
+    ),
+    "formatVersion" -> "2"
+  )
+
+  "SensitiveTaxGroup" should {
+
+    "write to JSON" in {
+      Json.toJson(sensitiveTaxGroup) shouldBe sensitiveJson
     }
 
-    "be serialised to JSON with certain fields encrypted" in {
-      implicit val crypto: Encrypter with Decrypter = aesCrypto
-      val json = Json.toJson(sensitiveTaxGroup)
-      (json \ "createdBy" \ "id").as[String] should not be sensitiveTaxGroup.createdBy.id
-      (json \ "createdBy" \ "name").as[String] shouldBe sensitiveTaxGroup.createdBy.name
-      (json \ "lastUpdatedBy" \ "id").as[String] should not be sensitiveTaxGroup.lastUpdatedBy.id
-      (json \ "lastUpdatedBy" \ "name").as[String] shouldBe sensitiveTaxGroup.lastUpdatedBy.name
-      val memberIds = sensitiveTaxGroup.teamMembers.toSeq.indices.map { index =>
-        (json \ "teamMembers" \ index \ "id").as[String]
-      }
-      val memberNames = sensitiveTaxGroup.teamMembers.toSeq.indices.map { index =>
-        (json \ "teamMembers" \ index \ "name").as[String]
-      }
-      memberIds should contain noElementsOf sensitiveTaxGroup.teamMembers.map(_.id)
-      memberNames should contain allElementsOf sensitiveTaxGroup.teamMembers.map(_.name)
+    "read from JSON" in {
+      sensitiveJson.as[SensitiveTaxGroup].decryptedValue shouldBe taxGroup
     }
   }
 }

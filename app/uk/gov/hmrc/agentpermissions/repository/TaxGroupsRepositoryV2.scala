@@ -17,8 +17,8 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
-import com.mongodb.client.model.{Collation, IndexOptions}
 import com.mongodb.MongoWriteException
+import com.mongodb.client.model.{Collation, IndexOptions}
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
@@ -49,7 +49,7 @@ trait TaxGroupsRepositoryV2 {
   def addTeamMember(id: GroupId, toAdd: AgentUser): Future[UpdateResult]
 }
 
-import TaxGroupsRepositoryV2Impl._
+import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2Impl._
 
 @Singleton
 class TaxGroupsRepositoryV2Impl @Inject() (
@@ -58,7 +58,7 @@ class TaxGroupsRepositoryV2Impl @Inject() (
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[SensitiveTaxGroup](
       collectionName = "access-groups-tax",
-      domainFormat = SensitiveTaxGroup.format(crypto),
+      domainFormat = SensitiveTaxGroup.databaseFormat(crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending(FIELD_ARN), new IndexOptions().name("arnIdx").unique(false)),
@@ -129,7 +129,7 @@ class TaxGroupsRepositoryV2Impl @Inject() (
       .insertOne(SensitiveTaxGroup(accessGroup))
       .headOption()
       .map(_.map(result => result.getInsertedId.asString().getValue))
-      .recoverWith { case e: MongoWriteException =>
+      .recoverWith { case _: MongoWriteException =>
         Future.successful(None)
       }
 

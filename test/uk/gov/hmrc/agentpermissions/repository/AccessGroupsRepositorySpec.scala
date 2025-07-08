@@ -17,14 +17,14 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
-import org.mongodb.scala.bson.collection.immutable.Document
-import org.mongodb.scala.model.IndexModel
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
+import org.mongodb.scala.model.{Filters, IndexModel}
 import org.mongodb.scala.result.UpdateResult
-import play.api.test.Helpers.{await, defaultAwaitTimeout}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agentpermissions.repository.storagemodel.SensitiveCustomGroup
+import uk.gov.hmrc.agentpermissions.repository.storagemodel.{SensitiveAgentUser, SensitiveClient, SensitiveCustomGroup}
 import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
@@ -37,46 +37,52 @@ class AccessGroupsRepositorySpec
     extends BaseSpec with PlayMongoRepositorySupport[SensitiveCustomGroup] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  val actorSystem: ActorSystem = ActorSystem()
+  implicit val materializer: Materializer = Materializer(actorSystem)
 
   trait TestScope {
     val groupDbId: UUID = GroupId.random()
     val groupName: String = "Some Group".toLowerCase
-    val agent: AgentUser = AgentUser("userId", "userName")
     val user1: AgentUser = AgentUser("user1", "User 1")
     val user2: AgentUser = AgentUser("user2", "User 2")
+    val user3: AgentUser = AgentUser("user3", "User 3")
+    val sensitiveUser1: SensitiveAgentUser = SensitiveAgentUser(user1)
+    val sensitiveUser2: SensitiveAgentUser = SensitiveAgentUser(user2)
+    val sensitiveUser3: SensitiveAgentUser = SensitiveAgentUser(user3)
 
     val client1: Client = Client("HMRC-MTD-VAT~VRN~101747641", "John Innes")
     val client2: Client = Client("HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345", "Frank Wright")
     val client3: Client = Client("HMRC-CGT-PD~CgtRef~XMCGTP123456789", "George Candy")
+    val sensitiveClient1: SensitiveClient = SensitiveClient(client1)
+    val sensitiveClient2: SensitiveClient = SensitiveClient(client2)
+    val sensitiveClient3: SensitiveClient = SensitiveClient(client3)
 
     val accessGroup: CustomGroup =
       CustomGroup(
-        groupDbId,
-        arn,
-        groupName,
-        now,
-        now,
-        agent,
-        agent,
-        teamMembers = Set(agent, user1, user2),
+        id = groupDbId,
+        arn = arn,
+        groupName = groupName,
+        created = now,
+        lastUpdated = now,
+        createdBy = user1,
+        lastUpdatedBy = user1,
+        teamMembers = Set(user1, user2, user3),
         clients = Set(client1, client2, client3)
       )
 
-    def now: LocalDateTime = LocalDateTime.now()
+    def now: LocalDateTime = LocalDateTime.parse("2020-01-01T00:00:00.000")
 
-    val accessGroupsRepositoryImpl: CustomGroupsRepositoryV2Impl = repository.asInstanceOf[CustomGroupsRepositoryV2Impl]
-    val accessGroupsRepository: CustomGroupsRepositoryV2 =
-      accessGroupsRepositoryImpl // trying to use trait interface as much as possible
+    val accessGroupsRepository: CustomGroupsRepositoryV2Impl = repository.asInstanceOf[CustomGroupsRepositoryV2Impl]
   }
 
   "AccessGroupsRepository" when {
 
     "set up" should {
       "have correct indexes" in new TestScope {
-        accessGroupsRepositoryImpl.collectionName shouldBe "access-groups-custom"
+        accessGroupsRepository.collectionName shouldBe "access-groups-custom"
 
-        accessGroupsRepositoryImpl.indexes.size shouldBe 2
-        val collectionIndexes: Seq[IndexModel] = accessGroupsRepositoryImpl.indexes
+        accessGroupsRepository.indexes.size shouldBe 2
+        val collectionIndexes: Seq[IndexModel] = accessGroupsRepository.indexes
 
         val arnIndexModel: IndexModel = collectionIndexes.head
         assert(arnIndexModel.getKeys.toBsonDocument.containsKey("arn"))
@@ -99,22 +105,48 @@ class AccessGroupsRepositorySpec
           accessGroupsRepository.get(arn).futureValue shouldBe empty
         }
       }
+
+      "a group exists for Arn" should {
+
+        "return the group" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue
+          accessGroupsRepository.get(arn).futureValue shouldBe Seq(accessGroup)
+        }
+      }
     }
 
     "getting one group of Id" when {
 
       "group of that name does not exist" should {
+
         "return nothing" in new TestScope {
           accessGroupsRepository.findById(groupDbId).futureValue shouldBe None
         }
       }
+
+      "a group exists for Id" should {
+
+        "return the group" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue
+          accessGroupsRepository.findById(groupDbId).futureValue shouldBe Some(accessGroup)
+        }
+      }
     }
 
-    "getting one group of Arn" when {
+    "getting one group from Arn and group name" when {
 
-      "group of that name does not exist" should {
+      "group of that name and ARN does not exist" should {
+
         "return nothing" in new TestScope {
           accessGroupsRepository.get(arn, groupName).futureValue shouldBe None
+        }
+      }
+
+      "group exists for the given ARN and name" should {
+
+        "return the group" in new TestScope {
+          accessGroupsRepository.insert(accessGroup).futureValue
+          accessGroupsRepository.get(arn, groupName).futureValue shouldBe Some(accessGroup)
         }
       }
     }
@@ -122,30 +154,39 @@ class AccessGroupsRepositorySpec
     "inserting" when {
 
       "inserting a non-existing access group" should {
-        s"return an id" in new TestScope {
+
+        "return an id" in new TestScope {
           accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
         }
-        s"store the access group with field-level-encryption" in new TestScope {
-          accessGroupsRepository.insert(accessGroup).futureValue
-          // checking at the raw Document level that the relevant fields have been encrypted
-          val document = accessGroupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
-          document.toString should include(accessGroup.groupName) // the group name should be in plaintext
-          // But the agent user ids should be encrypted
-          (accessGroup.teamMembers ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>
-            document.toString should not include agentUser.id
-          }
+
+        "store the access group with field-level encryption" in new TestScope {
+          val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
+          val sensitiveCustomGroup: SensitiveCustomGroup =
+            accessGroupsRepository.collection.find(Filters.equal("_id", id)).toFuture().futureValue.head
+
+          sensitiveCustomGroup._id shouldBe id
+          sensitiveCustomGroup.arn shouldBe arn
+          sensitiveCustomGroup.groupName shouldBe groupName
+          sensitiveCustomGroup.created shouldBe now
+          sensitiveCustomGroup.lastUpdated shouldBe now
+          sensitiveCustomGroup.createdBy shouldBe sensitiveUser1
+          sensitiveCustomGroup.lastUpdatedBy shouldBe sensitiveUser1
+          sensitiveCustomGroup.teamMembers shouldBe Set(sensitiveUser1, sensitiveUser2, sensitiveUser3)
+          sensitiveCustomGroup.clients shouldBe Set(sensitiveClient1, sensitiveClient2, sensitiveClient3)
         }
       }
 
       "inserting an existing access group" should {
-        s"return None" in new TestScope {
+
+        "return None" in new TestScope {
           accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
           accessGroupsRepository.insert(accessGroup).futureValue shouldBe None
         }
       }
 
       "inserting an access group with a group name differing only in case-sensitiveness" should {
-        s"return None" in new TestScope {
+
+        "return None" in new TestScope {
           accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
 
           val accessGroupHavingGroupNameOfDifferentCase: CustomGroup =
@@ -159,16 +200,27 @@ class AccessGroupsRepositorySpec
     "deleting group" when {
 
       "access group corresponding to group name provided does not exist in DB" should {
-        s"indicate the correct deletion count" in new TestScope {
-          accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(0L)
+
+        "indicate the correct deletion count" in new TestScope {
+          accessGroupsRepository.delete(arn, groupName).futureValue shouldBe Some(0L)
         }
       }
 
-      "group name provided is different than that existing in DB only case-sensitively" should {
-        s"indicate the correct deletion count" in new TestScope {
-          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
+      "the ARN and group name matches a record in the DB" should {
 
-          accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(1L)
+        "delete the record" when {
+
+          "the provided group name matches exactly" in new TestScope {
+            val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
+            accessGroupsRepository.delete(arn, groupName).futureValue shouldBe Some(1L)
+            accessGroupsRepository.findById(GroupId.fromString(id)).futureValue shouldBe None
+          }
+
+          "the provided group name is a different case" in new TestScope {
+            val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
+            accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(1L)
+            accessGroupsRepository.findById(GroupId.fromString(id)).futureValue shouldBe None
+          }
         }
       }
     }
@@ -176,11 +228,31 @@ class AccessGroupsRepositorySpec
     "updating group" when {
 
       "access group corresponding to group name provided does not exist in DB" should {
+
         "indicate the correct update count" in new TestScope {
           accessGroupsRepository.update(arn, groupName, accessGroup).futureValue shouldBe Some(0)
         }
       }
 
+      "the ARN and group name matches a record in the DB" should {
+
+        "update the record as expected" when {
+
+          "the provided group name matches exactly" in new TestScope {
+            val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
+            val changedGroup: CustomGroup = accessGroup.copy(clients = Set())
+            accessGroupsRepository.update(arn, groupName, changedGroup).futureValue shouldBe Some(1L)
+            accessGroupsRepository.findById(GroupId.fromString(id)).futureValue shouldBe Some(changedGroup)
+          }
+
+          "the provided group name is a different case" in new TestScope {
+            val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
+            val changedGroup: CustomGroup = accessGroup.copy(clients = Set())
+            accessGroupsRepository.update(arn, groupName.toUpperCase, changedGroup).futureValue shouldBe Some(1L)
+            accessGroupsRepository.findById(GroupId.fromString(id)).futureValue shouldBe Some(changedGroup)
+          }
+        }
+      }
     }
 
     "adding a team member" when {
@@ -237,13 +309,13 @@ class AccessGroupsRepositorySpec
 
           // when
           val updateResult: UpdateResult =
-            await(accessGroupsRepository.removeClient(groupDbId, randomAlphabetic(23)))
+            accessGroupsRepository.removeClient(groupDbId, randomAlphabetic(23)).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 0
 
           // and
-          val updatedGroup: Option[CustomGroup] = await(accessGroupsRepository.findById(groupDbId))
+          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId).futureValue
           private val clients: Set[Client] = updatedGroup.get.clients
           clients.size shouldBe 3
         }
@@ -251,7 +323,7 @@ class AccessGroupsRepositorySpec
         "return modified count of 0 when group is not found" in new TestScope {
           // when
           val updateResult: UpdateResult =
-            await(accessGroupsRepository.removeClient(GroupId.random(), randomAlphabetic(23)))
+            accessGroupsRepository.removeClient(GroupId.random(), randomAlphabetic(23)).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 0
@@ -259,6 +331,7 @@ class AccessGroupsRepositorySpec
         }
 
         "test only deletion by arn" should {
+
           "delete the record matching the arn" in new TestScope {
             val arnToDelete: Arn = accessGroup.arn
             accessGroupsRepository.insert(accessGroup).futureValue
@@ -268,7 +341,6 @@ class AccessGroupsRepositorySpec
           }
         }
       }
-
     }
   }
 

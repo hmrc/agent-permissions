@@ -17,8 +17,8 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import com.google.inject.ImplementedBy
-import com.mongodb.client.model.{Collation, IndexOptions}
 import com.mongodb.MongoWriteException
+import com.mongodb.client.model.{Collation, IndexOptions}
 import org.mongodb.scala.bson.Document
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
@@ -76,7 +76,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
 )(implicit ec: ExecutionContext)
     extends PlayMongoRepository[SensitiveCustomGroup](
       collectionName = "access-groups-custom",
-      domainFormat = SensitiveCustomGroup.format(crypto),
+      domainFormat = SensitiveCustomGroup.databaseFormat(crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending(FIELD_ARN), new IndexOptions().name("arnIdx").unique(false)),
@@ -128,7 +128,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
       .insertOne(SensitiveCustomGroup(customGroup))
       .headOption()
       .map(_.map(result => result.getInsertedId.asString().getValue))
-      .recoverWith { case e: MongoWriteException =>
+      .recoverWith { case _: MongoWriteException =>
         Future.successful(None)
       }
 
