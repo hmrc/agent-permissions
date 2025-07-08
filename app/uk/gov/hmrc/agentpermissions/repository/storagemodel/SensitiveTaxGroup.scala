@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
-import play.api.libs.json.{Json, OFormat}
+import play.api.libs.json._
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agents.accessgroups.TaxGroup
@@ -36,7 +36,8 @@ case class SensitiveTaxGroup(
   service: String, // Nice to use Service but want flexibility for Trusts
   automaticUpdates: Boolean,
   excludedClients: Set[SensitiveClient],
-  formatVersion: String = "2"
+  formatVersion: String = "2",
+  encrypted: Option[Boolean]
 ) extends Sensitive[TaxGroup] {
   def decryptedValue: TaxGroup = TaxGroup(
     id = GroupId.fromString(_id),
@@ -65,8 +66,48 @@ object SensitiveTaxGroup {
     teamMembers = taxGroup.teamMembers.map(SensitiveAgentUser(_)),
     service = taxGroup.service,
     automaticUpdates = taxGroup.automaticUpdates,
-    excludedClients = taxGroup.excludedClients.map(SensitiveClient(_))
+    excludedClients = taxGroup.excludedClients.map(SensitiveClient(_)),
+    encrypted = Some(true)
   )
-  implicit def format(implicit crypto: Encrypter with Decrypter): OFormat[SensitiveTaxGroup] =
-    Json.format[SensitiveTaxGroup]
+
+  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveTaxGroup] = {
+
+    def writes: Writes[SensitiveTaxGroup] = model =>
+      Json.obj(
+        "_id"              -> model._id,
+        "arn"              -> model.arn,
+        "groupName"        -> model.groupName,
+        "created"          -> model.created,
+        "lastUpdated"      -> model.lastUpdated,
+        "createdBy"        -> model.createdBy,
+        "lastUpdatedBy"    -> model.lastUpdatedBy,
+        "teamMembers"      -> model.teamMembers,
+        "service"          -> model.service,
+        "automaticUpdates" -> model.automaticUpdates,
+        "excludedClients"  -> model.excludedClients,
+        "formatVersion"    -> model.formatVersion,
+        "encrypted"        -> true
+      )
+
+    def reads: Reads[SensitiveTaxGroup] = (json: JsValue) =>
+      JsSuccess(
+        SensitiveTaxGroup(
+          (json \ "_id").as[String],
+          (json \ "arn").as[Arn],
+          (json \ "groupName").as[String],
+          (json \ "created").as[LocalDateTime],
+          (json \ "lastUpdated").as[LocalDateTime],
+          (json \ "createdBy").as[SensitiveAgentUser],
+          (json \ "lastUpdatedBy").as[SensitiveAgentUser],
+          (json \ "teamMembers").as[Set[SensitiveAgentUser]],
+          (json \ "service").as[String],
+          (json \ "automaticUpdates").as[Boolean],
+          (json \ "excludedClients").as[Set[SensitiveClient]],
+          (json \ "formatVersion").as[String],
+          (json \ "encrypted").asOpt[Boolean]
+        )
+      )
+
+    Format(reads, writes)
+  }
 }

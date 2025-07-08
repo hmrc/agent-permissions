@@ -16,9 +16,13 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
 import org.mongodb.scala.bson.collection.immutable.Document
-import org.mongodb.scala.model.IndexModel
+import org.mongodb.scala.model.{Filters, IndexModel, Updates}
 import org.mongodb.scala.result.UpdateResult
+import org.scalatest.concurrent.Eventually.eventually
+import org.scalatest.time.{Millis, Seconds, Span}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.models.GroupId
@@ -35,6 +39,8 @@ class TaxServiceGroupsRepositorySpec
     extends BaseSpec with PlayMongoRepositorySupport[SensitiveTaxGroup] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  val actorSystem: ActorSystem = ActorSystem()
+  implicit val materializer: Materializer = Materializer(actorSystem)
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -64,17 +70,15 @@ class TaxServiceGroupsRepositorySpec
 
     def now: LocalDateTime = LocalDateTime.now()
 
-    val groupsRepositoryImpl: TaxGroupsRepositoryV2Impl = repository.asInstanceOf[TaxGroupsRepositoryV2Impl]
-    // trying to use trait interface as much as possible
-    val groupsRepository: TaxGroupsRepositoryV2 = groupsRepositoryImpl
+    val groupsRepository: TaxGroupsRepositoryV2Impl = repository.asInstanceOf[TaxGroupsRepositoryV2Impl]
   }
 
   "TaxServiceGroupsRepository" when {
 
     "set up" should {
       "have correct indexes" in new TestScope {
-        groupsRepositoryImpl.indexes.size shouldBe 2
-        val collectionIndexes: Seq[IndexModel] = groupsRepositoryImpl.indexes
+        groupsRepository.indexes.size shouldBe 2
+        val collectionIndexes: Seq[IndexModel] = groupsRepository.indexes
 
         val arnIndexModel: IndexModel = collectionIndexes.head
         assert(arnIndexModel.getKeys.toBsonDocument.containsKey("arn"))
@@ -136,7 +140,7 @@ class TaxServiceGroupsRepositorySpec
           groupsRepository.insert(accessGroup).futureValue
           // checking at the raw Document level that the relevant fields have been encrypted
           val document: Seq[Document] =
-            groupsRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
+            groupsRepository.collection.find[Document]().collect().toFuture().futureValue
           document.toString should include(accessGroup.groupName) // the group name should be in plaintext
           // But the agent user ids should be encrypted
           (accessGroup.teamMembers ++ Seq(accessGroup.createdBy, accessGroup.lastUpdatedBy)).foreach { agentUser =>
@@ -239,6 +243,47 @@ class TaxServiceGroupsRepositorySpec
           groupsRepository.insert(accessGroup.copy(service = "HMRC-CBC")).futureValue
 
           groupsRepository.groupExistsForTaxService(arn, "HMRC-CBC-NONUK-ORG").futureValue shouldBe true
+        }
+      }
+    }
+
+    "counting unencrypted records" should {
+
+      "provide a total count of records that do not have the encrypted flag" in new TestScope {
+        val id: String = groupsRepository.insert(accessGroup).futureValue.get
+        groupsRepository.countUnencrypted().futureValue shouldBe 0
+
+        groupsRepository.collection
+          .updateOne(
+            Filters.equal("_id", id),
+            Updates.unset("encrypted")
+          )
+          .toFuture()
+          .futureValue
+
+        groupsRepository.countUnencrypted().futureValue shouldBe 1
+      }
+    }
+
+    "encrypting old records" should {
+
+      "find records that do not have the encrypted flag and encrypt them" in new TestScope {
+
+        val id1: String = groupsRepository.insert(accessGroup).futureValue.get
+
+        groupsRepository.collection
+          .updateOne(
+            Filters.equal("_id", id1),
+            Updates.unset("encrypted")
+          )
+          .toFuture()
+          .futureValue
+
+        val throttleRate = 2
+        groupsRepository.encryptOldRecords(throttleRate)
+
+        eventually(timeout(Span(5, Seconds)), interval(Span(100, Millis))) {
+          groupsRepository.countUnencrypted().futureValue shouldBe 0
         }
       }
     }

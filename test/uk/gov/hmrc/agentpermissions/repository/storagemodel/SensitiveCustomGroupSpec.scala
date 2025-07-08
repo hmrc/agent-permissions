@@ -16,58 +16,110 @@
 
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.crypto.Sensitive.SensitiveString
+import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 import java.time.LocalDateTime
+import java.util.UUID
 
 class SensitiveCustomGroupSpec extends BaseSpec {
 
-  val agentUser1 = SensitiveAgentUser(SensitiveString("agentUser1"), "Robert Smith")
-  val agentUser2 = SensitiveAgentUser(SensitiveString("agentUser2"), "Sandy Jones")
-  val client1 = SensitiveClient(SensitiveString("HMRC-MTD-VAT~VRN~123456789"), "")
-  val client2 =
-    SensitiveClient(SensitiveString("HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345"), "")
+  implicit val crypto: Encrypter with Decrypter = aesCrypto
 
-  val sensitiveCustomGroup = SensitiveCustomGroup(
-    _id = GroupId.random().toString,
-    arn = Arn("KARN1234567"),
-    groupName = "My Group",
-    created = LocalDateTime.now().minusDays(1),
-    lastUpdated = LocalDateTime.now().minusHours(1),
-    createdBy = agentUser1,
-    lastUpdatedBy = agentUser2,
-    teamMembers = Set(agentUser1, agentUser2),
-    clients = Set(client1, client2)
+  val agentUser: AgentUser = AgentUser("agentUser1", "Robert Smith")
+  val client: Client = Client("HMRC-MTD-VAT~VRN~123456789", "Smith Roberts")
+
+  val customGroup: CustomGroup = CustomGroup(
+    UUID.fromString("00000abc-6789-6789-6789-0000000000aa"),
+    Arn("KARN1234567"),
+    "some group",
+    LocalDateTime.of(2020, 1, 1, 0, 0, 0, 1000),
+    LocalDateTime.of(2020, 1, 1, 0, 0, 0, 1000),
+    agentUser,
+    agentUser,
+    Set(agentUser),
+    Set(client)
+  )
+  val sensitiveCustomGroup: SensitiveCustomGroup = SensitiveCustomGroup(customGroup)
+
+  val sensitiveJson: JsObject = Json.obj(
+    "_id"         -> "00000abc-6789-6789-6789-0000000000aa",
+    "arn"         -> "KARN1234567",
+    "groupName"   -> "some group",
+    "created"     -> "2020-01-01T00:00:00.000001",
+    "lastUpdated" -> "2020-01-01T00:00:00.000001",
+    "createdBy" -> Json.obj(
+      "id"        -> "b1R0M181YgUTX4YUs596jg==",
+      "name"      -> "HXjWfzUOh3X5mPEI/Dbo2g==",
+      "encrypted" -> true
+    ),
+    "lastUpdatedBy" -> Json.obj(
+      "id"        -> "b1R0M181YgUTX4YUs596jg==",
+      "name"      -> "HXjWfzUOh3X5mPEI/Dbo2g==",
+      "encrypted" -> true
+    ),
+    "teamMembers" -> Json.arr(
+      Json.obj(
+        "id"        -> "b1R0M181YgUTX4YUs596jg==",
+        "name"      -> "HXjWfzUOh3X5mPEI/Dbo2g==",
+        "encrypted" -> true
+      )
+    ),
+    "clients" -> Json.arr(
+      Json.obj(
+        "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
+        "friendlyName" -> "RRhGxwmDG4jML/ChHcNOYA==",
+        "encrypted"    -> true
+      )
+    ),
+    "formatVersion" -> "2",
+    "encrypted"     -> true
   )
 
-  "SensitiveAccessGroup" should {
-    "serialise and unserialise correctly" in {
-      implicit val crypto: Encrypter with Decrypter = aesCrypto
-      val json = Json.toJson(sensitiveCustomGroup)
-      val deserialised: SensitiveCustomGroup = Json.fromJson[SensitiveCustomGroup](json).get
-      deserialised shouldBe sensitiveCustomGroup
+  "SensitiveCustomGroup" should {
+
+    "write to JSON" in {
+      Json.toJson(sensitiveCustomGroup) shouldBe sensitiveJson
     }
 
-    "be serialised to JSON with certain fields encrypted" in {
-      implicit val crypto: Encrypter with Decrypter = aesCrypto
-      val json = Json.toJson(sensitiveCustomGroup)
-      (json \ "createdBy" \ "id").as[String] should not be sensitiveCustomGroup.createdBy.id
-      (json \ "createdBy" \ "name").as[String] shouldBe sensitiveCustomGroup.createdBy.name
-      (json \ "lastUpdatedBy" \ "id").as[String] should not be sensitiveCustomGroup.lastUpdatedBy.id
-      (json \ "lastUpdatedBy" \ "name").as[String] shouldBe sensitiveCustomGroup.lastUpdatedBy.name
-      val memberIds = sensitiveCustomGroup.teamMembers.toSeq.indices.map { index =>
-        (json \ "teamMembers" \ index \ "id").as[String]
-      }
-      val memberNames = sensitiveCustomGroup.teamMembers.toSeq.indices.map { index =>
-        (json \ "teamMembers" \ index \ "name").as[String]
-      }
-      memberIds should contain noElementsOf sensitiveCustomGroup.teamMembers.map(_.id)
-      memberNames should contain allElementsOf sensitiveCustomGroup.teamMembers.map(_.name)
+    "read from JSON" in {
+      sensitiveJson.as[SensitiveCustomGroup].decryptedValue shouldBe customGroup
+    }
+
+    "read from partially encrypted JSON" in {
+      val partiallyEncryptedJson: JsObject = Json.obj(
+        "_id"         -> "00000abc-6789-6789-6789-0000000000aa",
+        "arn"         -> "KARN1234567",
+        "groupName"   -> "some group",
+        "created"     -> "2020-01-01T00:00:00.000001",
+        "lastUpdated" -> "2020-01-01T00:00:00.000001",
+        "createdBy" -> Json.obj(
+          "id"   -> "b1R0M181YgUTX4YUs596jg==",
+          "name" -> "Robert Smith"
+        ),
+        "lastUpdatedBy" -> Json.obj(
+          "id"   -> "b1R0M181YgUTX4YUs596jg==",
+          "name" -> "Robert Smith"
+        ),
+        "teamMembers" -> Json.arr(
+          Json.obj(
+            "id"   -> "b1R0M181YgUTX4YUs596jg==",
+            "name" -> "Robert Smith"
+          )
+        ),
+        "clients" -> Json.arr(
+          Json.obj(
+            "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
+            "friendlyName" -> "Smith Roberts"
+          )
+        ),
+        "formatVersion" -> "2"
+      )
+
+      partiallyEncryptedJson.as[SensitiveCustomGroup].decryptedValue shouldBe customGroup
     }
   }
 }

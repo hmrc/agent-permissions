@@ -26,7 +26,7 @@ import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
 import uk.gov.hmrc.agentpermissions.util.HttpMonitor
 import uk.gov.hmrc.agents.accessgroups.{Client, UserDetails}
-import uk.gov.hmrc.http.HttpReads.is5xx
+import uk.gov.hmrc.http.HttpErrorFunctions.is5xx
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, UpstreamErrorResponse}
 import uk.gov.hmrc.http.StringContextOps

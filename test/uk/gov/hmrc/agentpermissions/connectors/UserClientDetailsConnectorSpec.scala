@@ -16,9 +16,10 @@
 
 package uk.gov.hmrc.agentpermissions.connectors
 
+import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
+import izumi.reflect.Tag
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
-import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
 import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2, CallHandler4}
 import play.api.http.Status._
 import play.api.libs.json.{JsArray, Json}
@@ -34,7 +35,6 @@ import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 
 import java.net.URL
 import scala.concurrent.{ExecutionContext, Future}
-import scala.reflect.runtime.universe
 
 class UserClientDetailsConnectorSpec extends BaseSpec {
 
@@ -633,13 +633,11 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         .transform(_: WSRequest => WSRequest))
         .expects(*)
         .returning(mockRequestBuilder)
-
-    import scala.reflect.runtime.universe._
     def mockRequestBuilderWithBody[JsValue](
       body: JsValue
-    ): CallHandler4[JsValue, BodyWritable[JsValue], universe.TypeTag[JsValue], ExecutionContext, RequestBuilder] =
+    ): CallHandler4[JsValue, BodyWritable[JsValue], Tag[JsValue], ExecutionContext, RequestBuilder] =
       (mockRequestBuilder
-        .withBody(_: JsValue)(_: BodyWritable[JsValue], _: TypeTag[JsValue], _: ExecutionContext))
+        .withBody(_: JsValue)(_: BodyWritable[JsValue], _: Tag[JsValue], _: ExecutionContext))
         .expects(body, *, *, *)
         .returning(mockRequestBuilder)
 
