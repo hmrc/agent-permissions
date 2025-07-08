@@ -164,15 +164,7 @@ class AccessGroupsRepositorySpec
           val sensitiveCustomGroup: SensitiveCustomGroup =
             accessGroupsRepository.collection.find(Filters.equal("_id", id)).toFuture().futureValue.head
 
-          sensitiveCustomGroup._id shouldBe id
-          sensitiveCustomGroup.arn shouldBe arn
-          sensitiveCustomGroup.groupName shouldBe groupName
-          sensitiveCustomGroup.created shouldBe now
-          sensitiveCustomGroup.lastUpdated shouldBe now
-          sensitiveCustomGroup.createdBy shouldBe sensitiveUser1
-          sensitiveCustomGroup.lastUpdatedBy shouldBe sensitiveUser1
-          sensitiveCustomGroup.teamMembers shouldBe Set(sensitiveUser1, sensitiveUser2, sensitiveUser3)
-          sensitiveCustomGroup.clients shouldBe Set(sensitiveClient1, sensitiveClient2, sensitiveClient3)
+          sensitiveCustomGroup shouldBe SensitiveCustomGroup(accessGroup)
         }
       }
 
