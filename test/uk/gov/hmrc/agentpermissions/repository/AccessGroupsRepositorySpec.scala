@@ -19,10 +19,8 @@ package uk.gov.hmrc.agentpermissions.repository
 import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
-import org.mongodb.scala.model.{Filters, IndexModel, Updates}
+import org.mongodb.scala.model.{Filters, IndexModel}
 import org.mongodb.scala.result.UpdateResult
-import org.scalatest.concurrent.Eventually.eventually
-import org.scalatest.time.{Millis, Seconds, Span}
 import uk.gov.hmrc.agentmtdidentifiers.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.models.GroupId
@@ -61,13 +59,13 @@ class AccessGroupsRepositorySpec
 
     val accessGroup: CustomGroup =
       CustomGroup(
-        groupDbId,
-        arn,
-        groupName,
-        now,
-        now,
-        user1,
-        user1,
+        id = groupDbId,
+        arn = arn,
+        groupName = groupName,
+        created = now,
+        lastUpdated = now,
+        createdBy = user1,
+        lastUpdatedBy = user1,
         teamMembers = Set(user1, user2, user3),
         clients = Set(client1, client2, client3)
       )
@@ -163,18 +161,18 @@ class AccessGroupsRepositorySpec
 
         "store the access group with field-level encryption" in new TestScope {
           val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
-          val document: SensitiveCustomGroup =
+          val sensitiveCustomGroup: SensitiveCustomGroup =
             accessGroupsRepository.collection.find(Filters.equal("_id", id)).toFuture().futureValue.head
 
-          document._id shouldBe id
-          document.arn shouldBe arn
-          document.groupName shouldBe groupName
-          document.created shouldBe now
-          document.lastUpdated shouldBe now
-          document.createdBy shouldBe sensitiveUser1
-          document.lastUpdatedBy shouldBe sensitiveUser1
-          document.teamMembers shouldBe Set(sensitiveUser1, sensitiveUser2, sensitiveUser3)
-          document.clients shouldBe Set(sensitiveClient1, sensitiveClient2, sensitiveClient3)
+          sensitiveCustomGroup._id shouldBe id
+          sensitiveCustomGroup.arn shouldBe arn
+          sensitiveCustomGroup.groupName shouldBe groupName
+          sensitiveCustomGroup.created shouldBe now
+          sensitiveCustomGroup.lastUpdated shouldBe now
+          sensitiveCustomGroup.createdBy shouldBe sensitiveUser1
+          sensitiveCustomGroup.lastUpdatedBy shouldBe sensitiveUser1
+          sensitiveCustomGroup.teamMembers shouldBe Set(sensitiveUser1, sensitiveUser2, sensitiveUser3)
+          sensitiveCustomGroup.clients shouldBe Set(sensitiveClient1, sensitiveClient2, sensitiveClient3)
         }
       }
 
@@ -210,16 +208,18 @@ class AccessGroupsRepositorySpec
 
       "the ARN and group name matches a record in the DB" should {
 
-        "indicate the correct deletion count" when {
+        "delete the record" when {
 
           "the provided group name matches exactly" in new TestScope {
-            accessGroupsRepository.insert(accessGroup).futureValue
+            val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
             accessGroupsRepository.delete(arn, groupName).futureValue shouldBe Some(1L)
+            accessGroupsRepository.findById(GroupId.fromString(id)).futureValue shouldBe None
           }
 
           "the provided group name is a different case" in new TestScope {
-            accessGroupsRepository.insert(accessGroup).futureValue
+            val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
             accessGroupsRepository.delete(arn, groupName.toUpperCase).futureValue shouldBe Some(1L)
+            accessGroupsRepository.findById(GroupId.fromString(id)).futureValue shouldBe None
           }
         }
       }
@@ -236,18 +236,20 @@ class AccessGroupsRepositorySpec
 
       "the ARN and group name matches a record in the DB" should {
 
-        "indicate the correct update count" when {
+        "update the record as expected" when {
 
           "the provided group name matches exactly" in new TestScope {
-            accessGroupsRepository.insert(accessGroup).futureValue
+            val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
             val changedGroup: CustomGroup = accessGroup.copy(clients = Set())
             accessGroupsRepository.update(arn, groupName, changedGroup).futureValue shouldBe Some(1L)
+            accessGroupsRepository.findById(GroupId.fromString(id)).futureValue shouldBe Some(changedGroup)
           }
 
           "the provided group name is a different case" in new TestScope {
-            accessGroupsRepository.insert(accessGroup).futureValue
+            val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
             val changedGroup: CustomGroup = accessGroup.copy(clients = Set())
             accessGroupsRepository.update(arn, groupName.toUpperCase, changedGroup).futureValue shouldBe Some(1L)
+            accessGroupsRepository.findById(GroupId.fromString(id)).futureValue shouldBe Some(changedGroup)
           }
         }
       }
@@ -337,47 +339,6 @@ class AccessGroupsRepositorySpec
             accessGroupsRepository.get(arnToDelete, accessGroup.groupName).futureValue shouldBe None
             deletion shouldBe 1L
           }
-        }
-      }
-    }
-
-    "counting unencrypted records" should {
-
-      "provide a total count of records that do not have the encrypted flag" in new TestScope {
-        val id: String = accessGroupsRepository.insert(accessGroup).futureValue.get
-        accessGroupsRepository.countUnencrypted().futureValue shouldBe 0
-
-        accessGroupsRepository.collection
-          .updateOne(
-            Filters.equal("_id", id),
-            Updates.unset("encrypted")
-          )
-          .toFuture()
-          .futureValue
-
-        accessGroupsRepository.countUnencrypted().futureValue shouldBe 1
-      }
-    }
-
-    "encrypting old records" should {
-
-      "find records that do not have the encrypted flag and encrypt them" in new TestScope {
-
-        val id1: String = accessGroupsRepository.insert(accessGroup).futureValue.get
-
-        accessGroupsRepository.collection
-          .updateOne(
-            Filters.equal("_id", id1),
-            Updates.unset("encrypted")
-          )
-          .toFuture()
-          .futureValue
-
-        val throttleRate = 2
-        accessGroupsRepository.encryptOldRecords(throttleRate)
-
-        eventually(timeout(Span(5, Seconds)), interval(Span(100, Millis))) {
-          accessGroupsRepository.countUnencrypted().futureValue shouldBe 0
         }
       }
     }

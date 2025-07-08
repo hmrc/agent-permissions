@@ -19,11 +19,9 @@ package uk.gov.hmrc.agentpermissions.repository
 import com.google.inject.ImplementedBy
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.{Collation, IndexOptions}
-import org.apache.pekko.stream.Materializer
-import org.apache.pekko.stream.scaladsl.Source
 import org.mongodb.scala.bson.Document
 import org.mongodb.scala.model.CollationStrength.SECONDARY
-import org.mongodb.scala.model.Filters.{and, equal, exists}
+import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
 import org.mongodb.scala.model._
 import org.mongodb.scala.result.UpdateResult
@@ -41,7 +39,6 @@ import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 
 import javax.inject.{Inject, Named, Singleton}
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[CustomGroupsRepositoryV2Impl])
@@ -76,7 +73,7 @@ trait CustomGroupsRepositoryV2 {
 class CustomGroupsRepositoryV2Impl @Inject() (
   mongoComponent: MongoComponent,
   @Named("aes") crypto: Encrypter with Decrypter
-)(implicit ec: ExecutionContext, mat: Materializer)
+)(implicit ec: ExecutionContext)
     extends PlayMongoRepository[SensitiveCustomGroup](
       collectionName = "access-groups-custom",
       domainFormat = SensitiveCustomGroup.databaseFormat(crypto),
@@ -182,37 +179,6 @@ class CustomGroupsRepositoryV2Impl @Inject() (
   // test only
   override def delete(arn: String): Future[Long] =
     collection.deleteMany(equal("arn", arn)).toFuture().map(_.getDeletedCount)
-
-  def countUnencrypted(): Future[Long] = collection.countDocuments(exists("encrypted", exists = false)).toFuture()
-
-  def encryptOldRecords(rate: Int = 10): Unit = {
-    val observable = collection.find(exists("encrypted", exists = false))
-    countUnencrypted().map { count =>
-      logger.warn(s"[CustomGroupsRepositoryV2] automatic encryption has started, $count applications left to encrypt")
-    }
-    Source
-      .fromPublisher(observable)
-      .throttle(rate, 1.second)
-      .runForeach { record =>
-        collection
-          .replaceOne(equal("_id", record._id), record)
-          .toFuture()
-          .map { _ =>
-            logger.warn("[CustomGroupsRepositoryV2] successfully encrypted record")
-          }
-          .recover { case ex: Throwable =>
-            logger.warn("[CustomGroupsRepositoryV2] failed to encrypt record", ex)
-          }
-        ()
-      }
-      .onComplete { _ =>
-        countUnencrypted().map { count =>
-          logger.warn(s"[CustomGroupsRepositoryV2] encryption completed, $count applications left unencrypted")
-        }
-      }
-  }
-
-  encryptOldRecords()
 }
 
 object CustomGroupsRepositoryV2Impl {

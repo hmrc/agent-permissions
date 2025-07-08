@@ -29,8 +29,8 @@ class SensitiveTaxGroupSpec extends BaseSpec {
 
   implicit val crypto: Encrypter with Decrypter = aesCrypto
 
-  val agentUser: AgentUser = AgentUser("agentUser1", "Robert Smith")
-  val client: Client = Client("HMRC-MTD-VAT~VRN~123456789", "Smith Roberts")
+  val agentUser: AgentUser = AgentUser(id = "agentUser1", name = "Robert Smith")
+  val client: Client = Client(enrolmentKey = "HMRC-MTD-VAT~VRN~123456789", friendlyName = "Smith Roberts")
 
   val taxGroup: TaxGroup = TaxGroup(
     id = UUID.fromString("00000abc-6789-6789-6789-0000000000aa"),
@@ -54,20 +54,17 @@ class SensitiveTaxGroupSpec extends BaseSpec {
     "created"     -> "2020-01-01T00:00:00.000001",
     "lastUpdated" -> "2020-01-01T00:00:00.000001",
     "createdBy" -> Json.obj(
-      "id"        -> "b1R0M181YgUTX4YUs596jg==",
-      "name"      -> "HXjWfzUOh3X5mPEI/Dbo2g==",
-      "encrypted" -> true
+      "id"   -> "b1R0M181YgUTX4YUs596jg==",
+      "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
     ),
     "lastUpdatedBy" -> Json.obj(
-      "id"        -> "b1R0M181YgUTX4YUs596jg==",
-      "name"      -> "HXjWfzUOh3X5mPEI/Dbo2g==",
-      "encrypted" -> true
+      "id"   -> "b1R0M181YgUTX4YUs596jg==",
+      "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
     ),
     "teamMembers" -> Json.arr(
       Json.obj(
-        "id"        -> "b1R0M181YgUTX4YUs596jg==",
-        "name"      -> "HXjWfzUOh3X5mPEI/Dbo2g==",
-        "encrypted" -> true
+        "id"   -> "b1R0M181YgUTX4YUs596jg==",
+        "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
       )
     ),
     "service"          -> "HMRC-MTD-VAT",
@@ -75,12 +72,10 @@ class SensitiveTaxGroupSpec extends BaseSpec {
     "excludedClients" -> Json.arr(
       Json.obj(
         "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
-        "friendlyName" -> "RRhGxwmDG4jML/ChHcNOYA==",
-        "encrypted"    -> true
+        "friendlyName" -> "RRhGxwmDG4jML/ChHcNOYA=="
       )
     ),
-    "formatVersion" -> "2",
-    "encrypted"     -> true
+    "formatVersion" -> "2"
   )
 
   "SensitiveTaxGroup" should {
@@ -91,41 +86,6 @@ class SensitiveTaxGroupSpec extends BaseSpec {
 
     "read from JSON" in {
       sensitiveJson.as[SensitiveTaxGroup].decryptedValue shouldBe taxGroup
-    }
-
-    "read from partially encrypted JSON" in {
-      val partiallyEncryptedJson: JsObject = Json.obj(
-        "_id"         -> "00000abc-6789-6789-6789-0000000000aa",
-        "arn"         -> "KARN1234567",
-        "groupName"   -> "some group",
-        "created"     -> "2020-01-01T00:00:00.000001",
-        "lastUpdated" -> "2020-01-01T00:00:00.000001",
-        "createdBy" -> Json.obj(
-          "id"   -> "b1R0M181YgUTX4YUs596jg==",
-          "name" -> "Robert Smith"
-        ),
-        "lastUpdatedBy" -> Json.obj(
-          "id"   -> "b1R0M181YgUTX4YUs596jg==",
-          "name" -> "Robert Smith"
-        ),
-        "teamMembers" -> Json.arr(
-          Json.obj(
-            "id"   -> "b1R0M181YgUTX4YUs596jg==",
-            "name" -> "Robert Smith"
-          )
-        ),
-        "service"          -> "HMRC-MTD-VAT",
-        "automaticUpdates" -> true,
-        "excludedClients" -> Json.arr(
-          Json.obj(
-            "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
-            "friendlyName" -> "Smith Roberts"
-          )
-        ),
-        "formatVersion" -> "2"
-      )
-
-      partiallyEncryptedJson.as[SensitiveTaxGroup].decryptedValue shouldBe taxGroup
     }
   }
 }
