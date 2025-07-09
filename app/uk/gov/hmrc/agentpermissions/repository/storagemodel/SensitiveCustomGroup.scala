@@ -34,8 +34,7 @@ case class SensitiveCustomGroup(
   lastUpdatedBy: SensitiveAgentUser,
   teamMembers: Set[SensitiveAgentUser],
   clients: Set[SensitiveClient],
-  formatVersion: String = "2",
-  encrypted: Option[Boolean]
+  formatVersion: String = "2"
 ) extends Sensitive[CustomGroup] {
   def decryptedValue: CustomGroup = CustomGroup(
     id = GroupId.fromString(_id),
@@ -61,44 +60,9 @@ object SensitiveCustomGroup {
       createdBy = SensitiveAgentUser(customGroup.createdBy),
       lastUpdatedBy = SensitiveAgentUser(customGroup.lastUpdatedBy),
       teamMembers = customGroup.teamMembers.map(SensitiveAgentUser(_)),
-      clients = customGroup.clients.map(SensitiveClient(_)),
-      encrypted = Some(true)
+      clients = customGroup.clients.map(SensitiveClient(_))
     )
 
-  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveCustomGroup] = {
-
-    def writes: Writes[SensitiveCustomGroup] = model =>
-      Json.obj(
-        "_id"           -> model._id,
-        "arn"           -> model.arn,
-        "groupName"     -> model.groupName,
-        "created"       -> model.created,
-        "lastUpdated"   -> model.lastUpdated,
-        "createdBy"     -> model.createdBy,
-        "lastUpdatedBy" -> model.lastUpdatedBy,
-        "teamMembers"   -> model.teamMembers,
-        "clients"       -> model.clients,
-        "formatVersion" -> model.formatVersion,
-        "encrypted"     -> true
-      )
-
-    def reads: Reads[SensitiveCustomGroup] = (json: JsValue) =>
-      JsSuccess(
-        SensitiveCustomGroup(
-          (json \ "_id").as[String],
-          (json \ "arn").as[Arn],
-          (json \ "groupName").as[String],
-          (json \ "created").as[LocalDateTime],
-          (json \ "lastUpdated").as[LocalDateTime],
-          (json \ "createdBy").as[SensitiveAgentUser],
-          (json \ "lastUpdatedBy").as[SensitiveAgentUser],
-          (json \ "teamMembers").as[Set[SensitiveAgentUser]],
-          (json \ "clients").as[Set[SensitiveClient]],
-          (json \ "formatVersion").as[String],
-          (json \ "encrypted").asOpt[Boolean]
-        )
-      )
-
-    Format(reads, writes)
-  }
+  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveCustomGroup] =
+    Json.format[SensitiveCustomGroup]
 }
