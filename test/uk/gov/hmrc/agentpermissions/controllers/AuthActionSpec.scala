@@ -57,23 +57,12 @@ class AuthActionSpec extends BaseSpec with AuthorisationMockSupport {
 
       "check for Arn Allow List is false" when {
 
-        "auth response indicates empty username" should {
-          "return an authorised agent with an empty name" in new TestScope {
-            mockAuthResponseWithoutException(buildAuthorisedResponseHavingEmptyUsername)
-            mockAppConfigCheckArnAllowList(toCheckArnAllowList = false)
-
-            authAction.getAuthorisedAgent().futureValue shouldBe Some(
-              AuthorisedAgent(arn, AgentUser("user1", ""))
-            )
-          }
-        }
-
         "return a valid authorised agent" in new TestScope {
           mockAuthResponseWithoutException(buildAuthorisedResponse)
           mockAppConfigCheckArnAllowList(toCheckArnAllowList = false)
 
           authAction.getAuthorisedAgent().futureValue shouldBe Some(
-            AuthorisedAgent(arn, AgentUser("user1", "Jane Doe"))
+            AuthorisedAgent(arn, AgentUser("user1", ""))
           )
         }
 
@@ -83,7 +72,7 @@ class AuthActionSpec extends BaseSpec with AuthorisationMockSupport {
             mockAppConfigCheckArnAllowList(toCheckArnAllowList = false)
 
             authAction.getAuthorisedAgent(allowStandardUser = true).futureValue shouldBe Some(
-              AuthorisedAgent(arn, AgentUser("user1", "Jane Doe"))
+              AuthorisedAgent(arn, AgentUser("user1", ""))
             )
 
           }
@@ -114,7 +103,7 @@ class AuthActionSpec extends BaseSpec with AuthorisationMockSupport {
             mockAppConfigAllowedArns(Seq(arn.value))
 
             authAction.getAuthorisedAgent().futureValue shouldBe Some(
-              AuthorisedAgent(arn, AgentUser("user1", "Jane Doe"))
+              AuthorisedAgent(arn, AgentUser("user1", ""))
             )
           }
         }
@@ -132,14 +121,6 @@ class AuthActionSpec extends BaseSpec with AuthorisationMockSupport {
     "auth response indicates incorrect credential role" should {
       "not return an authorised agent" in new TestScope {
         mockAuthResponseWithoutException(buildUnauthorisedResponseHavingIncorrectCredentialRole)
-
-        authAction.getAuthorisedAgent().futureValue shouldBe None
-      }
-    }
-
-    "auth response indicates incorrect username" should {
-      "not return an authorised agent" in new TestScope {
-        mockAuthResponseWithoutException(buildUnauthorisedResponseHavingIncorrectUsername)
 
         authAction.getAuthorisedAgent().futureValue shouldBe None
       }

@@ -21,7 +21,7 @@ import org.scalamock.scalatest.MockFactory
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.auth.core.{Assistant, AuthConnector, CredentialRole, Enrolment, EnrolmentIdentifier, Enrolments, User}
 import uk.gov.hmrc.auth.core.authorise.Predicate
-import uk.gov.hmrc.auth.core.retrieve.{Credentials, Name, Retrieval, ~}
+import uk.gov.hmrc.auth.core.retrieve.{Credentials, Retrieval, ~}
 import uk.gov.hmrc.auth.core.syntax.retrieved.authSyntaxForRetrieved
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -35,9 +35,6 @@ trait AuthorisationMockSupport extends BaseSpec with MockFactory {
   )
   val agentEnrolment = "HMRC-AS-AGENT"
 
-  val name: Name = Name(Some("Jane"), Some("Doe"))
-  val emptyName: Name = Name(None, None)
-
   val ggCredentials: Credentials = Credentials("user1", "GovernmentGateway")
 
   val enrolments: Set[Enrolment] = Set(Enrolment(agentEnrolment, agentEnrolmentIdentifiers, "Activated"))
@@ -45,46 +42,29 @@ trait AuthorisationMockSupport extends BaseSpec with MockFactory {
   def buildAuthorisedResponse: GrantAccess =
     Enrolments(enrolments) and
       Some(User) and
-      Some(name) and
       Some(ggCredentials)
 
   def buildUnauthorisedResponseHavingEmptyEnrolments: GrantAccess =
     Enrolments(Set.empty) and
       Some(User) and
-      Some(name) and
       Some(ggCredentials)
 
   def buildUnauthorisedResponseHavingIncorrectCredentialRole: GrantAccess =
     Enrolments(enrolments) and
       None and
-      Some(name) and
-      Some(ggCredentials)
-
-  def buildUnauthorisedResponseHavingIncorrectUsername: GrantAccess =
-    Enrolments(enrolments) and
-      Some(User) and
-      None and
-      Some(ggCredentials)
-
-  def buildAuthorisedResponseHavingEmptyUsername: GrantAccess =
-    Enrolments(enrolments) and
-      Some(User) and
-      Some(emptyName) and
       Some(ggCredentials)
 
   def buildAuthorisedResponseHavingAssistantCredentialRole: GrantAccess =
     Enrolments(enrolments) and
       Some(Assistant) and
-      Some(name) and
       Some(ggCredentials)
 
   def buildUnauthorisedResponseHavingIncorrectCredentials: GrantAccess =
     Enrolments(enrolments) and
       Some(User) and
-      Some(name) and
       None
 
-  type GrantAccess = Enrolments ~ Option[CredentialRole] ~ Option[Name] ~ Option[Credentials]
+  type GrantAccess = Enrolments ~ Option[CredentialRole] ~ Option[Credentials]
 
   def mockAuthResponseWithoutException(response: GrantAccess)(implicit
     authConnector: AuthConnector
