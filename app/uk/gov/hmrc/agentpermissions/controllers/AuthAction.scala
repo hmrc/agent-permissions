@@ -51,11 +51,12 @@ class AuthAction @Inject() (
     implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
 
     authorised(AuthProviders(GovernmentGateway) and Enrolment(agentEnrolment))
-      .retrieve(allEnrolments and credentialRole and credentials) { case enrols ~ credRole ~ credentials =>
-        getArnAndAgentUser(enrols, credentials) match {
+      .retrieve(allEnrolments and credentialRole and credentials) { case allEnrolments ~ credentialRole ~ credentials =>
+        getArnAndAgentUser(allEnrolments, credentials) match {
           case Some(authorisedAgent) =>
             if (
-              credRole.contains(User) | credRole.contains(Admin) | (credRole.contains(Assistant) & allowStandardUser)
+              credentialRole.contains(User) | credentialRole
+                .contains(Admin) | (credentialRole.contains(Assistant) & allowStandardUser)
             ) {
               if (appConfig.checkArnAllowList & allowlistEnabled) {
                 if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
@@ -67,7 +68,7 @@ class AuthAction @Inject() (
                 Future successful Option(authorisedAgent)
               }
             } else {
-              logger.warn(s"Invalid credential role $credRole")
+              logger.warn(s"Invalid credential role $credentialRole")
               Future.successful(None)
             }
           case None =>
