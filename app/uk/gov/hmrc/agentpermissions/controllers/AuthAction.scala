@@ -23,8 +23,8 @@ import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agents.accessgroups.AgentUser
 import uk.gov.hmrc.auth.core.AuthProvider.GovernmentGateway
 import uk.gov.hmrc.auth.core._
-import uk.gov.hmrc.auth.core.retrieve.v2.Retrievals.{allEnrolments, credentialRole, credentials, name}
-import uk.gov.hmrc.auth.core.retrieve.{Credentials, Name, ~}
+import uk.gov.hmrc.auth.core.retrieve.v2.Retrievals.{allEnrolments, credentialRole, credentials}
+import uk.gov.hmrc.auth.core.retrieve.{Credentials, ~}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 
@@ -51,46 +51,47 @@ class AuthAction @Inject() (
     implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
 
     authorised(AuthProviders(GovernmentGateway) and Enrolment(agentEnrolment))
-      .retrieve(allEnrolments and credentialRole and name and credentials) {
-        case enrols ~ credRole ~ name ~ credentials =>
-          getArnAndAgentUser(enrols, name, credentials) match {
-            case Some(authorisedAgent) =>
-              if (
-                credRole.contains(User) | credRole.contains(Admin) | (credRole.contains(Assistant) & allowStandardUser)
-              ) {
-                if (appConfig.checkArnAllowList & allowlistEnabled) {
-                  if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
-                    Future successful Option(authorisedAgent)
-                  } else {
-                    Future successful None
-                  }
-                } else {
+      .retrieve(allEnrolments and credentialRole and credentials) { case allEnrolments ~ credentialRole ~ credentials =>
+        getArnAndAgentUser(allEnrolments, credentials) match {
+          case Some(authorisedAgent) =>
+            if (
+              credentialRole.contains(User) | credentialRole
+                .contains(Admin) | (credentialRole.contains(Assistant) & allowStandardUser)
+            ) {
+              if (appConfig.checkArnAllowList & allowlistEnabled) {
+                if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
                   Future successful Option(authorisedAgent)
+                } else {
+                  Future successful None
                 }
               } else {
-                logger.warn(s"Invalid credential role $credRole")
-                Future.successful(None)
+                Future successful Option(authorisedAgent)
               }
-            case None =>
-              logger.warn("No " + agentReferenceNumberIdentifier + " in enrolment")
+            } else {
+              logger.warn(s"Invalid credential role $credentialRole")
               Future.successful(None)
-          }
+            }
+          case None =>
+            logger.warn("No " + agentReferenceNumberIdentifier + " in enrolment")
+            Future.successful(None)
+        }
       } transformWith failureHandler
   }
 
   private def getArnAndAgentUser(
     enrolments: Enrolments,
-    maybeName: Option[Name],
     maybeCredentials: Option[Credentials]
   ): Option[AuthorisedAgent] =
     for {
       enrolment   <- enrolments.getEnrolment(agentEnrolment)
       identifier  <- enrolment.getIdentifier(agentReferenceNumberIdentifier)
       credentials <- maybeCredentials
-      name        <- maybeName
     } yield AuthorisedAgent(
       Arn(identifier.value),
-      AgentUser(credentials.providerId, (name.name.getOrElse("") + " " + name.lastName.getOrElse("")).trim)
+      AgentUser(
+        credentials.providerId,
+        ""
+      ) // TODO: Setting name field as blank until AgentUser is removed completely (See APB-8252)
     )
 
   private def failureHandler(triedResult: Try[Option[AuthorisedAgent]]): Future[Option[AuthorisedAgent]] =

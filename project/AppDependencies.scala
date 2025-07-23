@@ -3,7 +3,7 @@ import sbt.*
 object AppDependencies {
 
   private val mongoVer: String = "2.6.0"
-  private val bootstrapVer: String = "9.13.0"
+  private val bootstrapVer: String = "9.16.0"
   private val bootstrapBackend = "bootstrap-backend-play-30"
 
   val compile: Seq[ModuleID] = Seq(
@@ -16,6 +16,6 @@ object AppDependencies {
   val test: Seq[ModuleID] = Seq(
     "uk.gov.hmrc"             %% "bootstrap-test-play-30"     % bootstrapVer  % Test,
     "uk.gov.hmrc.mongo"       %% "hmrc-mongo-test-play-30"    % mongoVer      % Test,
-    "org.scalamock"           %% "scalamock"                  % "7.3.3"       % Test
+    "org.scalamock"           %% "scalamock"                  % "7.4.0"       % Test
   )
 }
