@@ -80,6 +80,12 @@ Transactions can result in potential user level assignments (add clients OR team
 
     sbt "clean;coverageOn;test;IntegrationTest/test;coverageReport"
 
+### Automated testing
+This service is tested by the following automated test repositories:
+- [agent-gran-perms-acceptance-tests](https://github.com/hmrc/agent-gran-perms-acceptance-tests/)
+- [agent-services-account-ui-tests](https://github.com/hmrc/agent-services-account-ui-tests)
+- [agent-granperms-performance-tests](https://github.com/hmrc/agent-granperms-performance-tests)
+
 ## Running the app locally
     sm2 --start AGENT_GRAN_PERMS
     sm2 --stop AGENT_PERMISSIONS
