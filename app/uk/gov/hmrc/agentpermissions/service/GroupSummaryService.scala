@@ -57,7 +57,7 @@ class GroupSummaryServiceImpl @Inject() (
       taxSummaries = taxGroups.map(group =>
                        GroupSummary
                          .of(group)
-                         .copy(clientCount = Option(taxGroupClientCount(group.service)))
+                         .copy(clientCount = taxGroupClientCount.get(group.service))
                      )
       combinedSorted = (customSummaries ++ taxSummaries).sortBy(_.groupName.toLowerCase())
     } yield combinedSorted
