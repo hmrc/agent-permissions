@@ -21,13 +21,13 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.IntegrationPatience
 import play.api.Configuration
 import play.api.libs.json._
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.agentpermissions.repository._
-import uk.gov.hmrc.agents.accessgroups.AgentUser
-import uk.gov.hmrc.agents.accessgroups.optin.{OptedIn, OptinEvent, OptinRecord}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.{OptedIn, OptinEvent, OptinRecord}
 import uk.gov.hmrc.crypto.SymmetricCryptoFactory
 import uk.gov.hmrc.mongo.play.json.CollectionFactory
 import uk.gov.hmrc.mongo.test.CleanMongoCollectionSupport

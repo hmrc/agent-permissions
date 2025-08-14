@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service.audit
 
 import play.api.libs.json.{Json, Writes}
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agents.accessgroups.Client
+import uk.gov.hmrc.agentpermissions.model.accessgroups.Client
 
 case class AccessGroupClientsRemoval(
   agentReferenceNumber: String,

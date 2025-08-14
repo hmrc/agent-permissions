@@ -19,11 +19,11 @@ package uk.gov.hmrc.agentpermissions.service.audit
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import play.api.libs.json._
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentOps
-import uk.gov.hmrc.agents.accessgroups.{AccessGroup, AgentUser, Client, CustomGroup, TaxGroup}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AccessGroup, AgentUser, Client, CustomGroup, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 

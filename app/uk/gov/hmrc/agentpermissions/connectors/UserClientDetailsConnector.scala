@@ -16,27 +16,33 @@
 
 package uk.gov.hmrc.agentpermissions.connectors
 
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import play.api.http.Status._
-import play.api.libs.json.{Json, OFormat}
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, PaginatedList}
+import play.api.libs.json.Json
+import play.api.libs.json.OFormat
 import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.model.PaginatedList
 import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
-import uk.gov.hmrc.agentpermissions.util.HttpMonitor
-import uk.gov.hmrc.agents.accessgroups.{Client, UserDetails}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.Client
+import uk.gov.hmrc.agentpermissions.model.accessgroups.UserDetails
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpErrorFunctions.is5xx
-import uk.gov.hmrc.http.client.HttpClientV2
-import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, UpstreamErrorResponse}
-import uk.gov.hmrc.http.StringContextOps
-import uk.gov.hmrc.http.NotFoundException
 import uk.gov.hmrc.http.HttpException
+import uk.gov.hmrc.http.HttpResponse
+import uk.gov.hmrc.http.NotFoundException
+import uk.gov.hmrc.http.StringContextOps
+import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.http.client.HttpClientV2
 
-import javax.inject.{Inject, Singleton}
+import javax.inject.Inject
+import javax.inject.Singleton
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.util.Failure
+import scala.util.Success
 
 @ImplementedBy(classOf[UserClientDetailsConnectorImpl])
 trait UserClientDetailsConnector {
@@ -87,40 +93,40 @@ object AgentClientSize {
 }
 
 @Singleton
-class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: ExecutionContext, val metrics: Metrics)(
-  implicit appConfig: AppConfig
-) extends UserClientDetailsConnector with HttpMonitor with Logging {
+class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: ExecutionContext)(implicit
+  appConfig: AppConfig
+) extends UserClientDetailsConnector with Logging {
 
   import uk.gov.hmrc.http.HttpReads.Implicits._
 
-  val aucdBaseUrl = appConfig.agentUserClientDetailsBaseUrl
+  private val aucdBaseUrl = appConfig.agentUserClientDetailsBaseUrl
   private val aucdUrl = s"$aucdBaseUrl/agent-user-client-details"
 
   override def agentSize(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]] = {
     val url = s"$aucdUrl/arn/${arn.value}/agent-size"
-    monitor(s"ConsumedAPI-AgentUserClientDetails-AgentSize-GET") {
-      httpV2
-        .get(url"$url")
-        .transform(ws => ws.withRequestTimeout(3.minutes))
-        .execute[AgentClientSize]
-        .map { response =>
-          response.`client-count`
-        }
-        .map(Option(_))
-        .recover { case UpstreamErrorResponse(message, upstreamResponseCode, _, _) =>
-          logger.warn(s"Received $upstreamResponseCode status: $message")
-          Option.empty[Int]
-        }
-    }
+    httpV2
+      .get(url"$url")
+      .transform(ws => ws.withRequestTimeout(3.minutes))
+      .execute[AgentClientSize]
+      .map { response =>
+        response.`client-count`
+      }
+      .map(Option(_))
+      .recover { case UpstreamErrorResponse(message, upstreamResponseCode, _, _) =>
+        logger.warn(s"Received $upstreamResponseCode status: $message")
+        Option.empty[Int]
+      }
+
   }
 
   override def clientCountByTaxService(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Map[String, Int]]] = {
     val url = s"$aucdUrl/arn/${arn.value}/tax-service-client-count"
-
-    monitor("ConsumedAPI-AgentUserClientDetails-ClientCount-GET") {
-      httpV2.get(url"$url").execute[HttpResponse].map { response =>
+    httpV2
+      .get(url"$url")
+      .execute[HttpResponse]
+      .map { response =>
         response.status match {
           case OK => Option(response.json.as[Map[String, Int]])
           case other =>
@@ -128,16 +134,16 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: Ex
             None
         }
       }
-    }
   }
 
   override def isSingleUserAgency(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
     val url = s"$aucdUrl/arn/${arn.value}/user-check"
-
-    monitor("ConsumedAPI-AgentUserClientDetails-UserCheck-GET") {
-      httpV2.get(url"$url").execute[HttpResponse].map { response =>
+    httpV2
+      .get(url"$url")
+      .execute[HttpResponse]
+      .map { response =>
         response.status match {
           case NO_CONTENT =>
             Option(false)
@@ -148,15 +154,16 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: Ex
             None
         }
       }
-    }
   }
 
   override def outstandingWorkItemsExist(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
     val url = s"$aucdUrl/arn/${arn.value}/work-items-exist"
-    monitor("ConsumedAPI-AgentUserClientDetails-WorkItemsExist-GET") {
-      httpV2.get(url"$url").execute[HttpResponse].map { response =>
+    httpV2
+      .get(url"$url")
+      .execute[HttpResponse]
+      .map { response =>
         response.status match {
           case OK =>
             Option(true)
@@ -167,15 +174,16 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: Ex
             None
         }
       }
-    }
   }
 
   override def outstandingAssignmentsWorkItemsExist(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
     val url = s"$aucdUrl/arn/${arn.value}/assignments-work-items-exist"
-    monitor("ConsumedAPI-AgentUserClientDetails-AssignmentsWorkItemsExist-GET") {
-      httpV2.get(url"$url").execute[HttpResponse].map { response =>
+    httpV2
+      .get(url"$url")
+      .execute[HttpResponse]
+      .map { response =>
         response.status match {
           case OK =>
             Option(true)
@@ -186,7 +194,6 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: Ex
             None
         }
       }
-    }
   }
 
   override def getClients(arn: Arn, sendEmail: Boolean = false, lang: Option[String] = None)(implicit
@@ -196,8 +203,10 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: Ex
 
     val params = if (sendEmail) "?sendEmail=true" + lang.fold("")("&lang=" + _) else ""
     val url = s"$aucdUrl/arn/${arn.value}/client-list$params"
-    monitor("ConsumedAPI-AgentUserClientDetails-ClientList-GET") {
-      httpV2.get(url"$url").execute[HttpResponse].map { response =>
+    httpV2
+      .get(url"$url")
+      .execute[HttpResponse]
+      .map { response =>
         response.status match {
           case ACCEPTED | OK =>
             response.json.asOpt[Seq[Client]]
@@ -209,7 +218,6 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: Ex
             None
         }
       }
-    }
   }
 
   def getPaginatedClients(
@@ -223,23 +231,25 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: Ex
     val filterParam = filter.fold("")(filterTerm => s"&filter=$filterTerm")
     val url = s"$aucdUrl/arn/${arn.value}/clients" +
       s"?page=$page&pageSize=$pageSize$searchParam$filterParam"
-    monitor("ConsumedAPI-getClientList-GET") {
-      httpV2.get(url"$url").execute[HttpResponse].map { response =>
+    httpV2
+      .get(url"$url")
+      .execute[HttpResponse]
+      .map { response =>
         response.status match {
           case OK => response.json.as[PaginatedList[Client]]
           case e  => throw UpstreamErrorResponse(s"error getClientList for ${arn.value}", e)
         }
       }
-    }
   }
 
   override def getClientListStatus(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]] = {
-
     val url = s"$aucdUrl/arn/${arn.value}/client-list-status"
-    monitor("ConsumedAPI-AgentUserClientDetails-ClientListStatus-GET") {
-      httpV2.get(url"$url").execute[HttpResponse].map { response =>
+    httpV2
+      .get(url"$url")
+      .execute[HttpResponse]
+      .map { response =>
         response.status match {
           case ACCEPTED | OK =>
             Some(response.status)
@@ -251,45 +261,43 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: Ex
             None
         }
       }
-    }
   }
 
   override def pushAssignments(
     userEnrolmentAssignments: UserEnrolmentAssignments
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] = {
-
     val url = s"$aucdUrl/user-enrolment-assignments"
-    monitor("ConsumedAPI-AgentUserClientDetails-PushAssignments-POST") {
-      httpV2
-        .post(url"$url")
-        .withBody(Json.toJson(userEnrolmentAssignments))
-        .execute[HttpResponse]
-        .transformWith {
-          case Success(response) =>
-            response.status match {
-              case ACCEPTED =>
-                Future successful AssignmentsPushed
-              case other =>
-                logger.warn(s"EACD assignments not pushed. Received $other status: ${response.body}")
-                Future successful AssignmentsNotPushed
-            }
-          case Failure(ex) =>
-            logger.error(s"EACD assignments not pushed. Error: ${ex.getMessage}")
-            Future successful AssignmentsNotPushed
-        }
-    }
+    httpV2
+      .post(url"$url")
+      .withBody(Json.toJson(userEnrolmentAssignments))
+      .execute[HttpResponse]
+      .transformWith {
+        case Success(response) =>
+          response.status match {
+            case ACCEPTED =>
+              Future successful AssignmentsPushed
+            case other =>
+              logger.warn(s"EACD assignments not pushed. Received $other status: ${response.body}")
+              Future successful AssignmentsNotPushed
+          }
+        case Failure(ex) =>
+          logger.error(s"EACD assignments not pushed. Error: ${ex.getMessage}")
+          Future successful AssignmentsNotPushed
+      }
+
   }
 
   def getTeamMembers(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[UserDetails]] = {
     val url = s"$aucdUrl/arn/${arn.value}/team-members"
-    monitor("ConsumedAPI-team-members-GET") {
-      httpV2.get(url"$url").execute[HttpResponse].map { response =>
+    httpV2
+      .get(url"$url")
+      .execute[HttpResponse]
+      .map { response =>
         response.status match {
           case OK => response.json.as[Seq[UserDetails]]
           case e  => throw UpstreamErrorResponse(s"error getTeamMemberList for ${arn.value}", e)
         }
       }
-    }
   }
 
   def syncTeamMember(arn: Arn, userId: String, expectedAssignments: Seq[String] /* enrolment keys */ )(implicit
@@ -297,24 +305,22 @@ class UserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2, val ec: Ex
     ec: ExecutionContext
   ): Future[Boolean] = {
     val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/user/$userId/ensure-assignments"
-    monitor("ConsumedAPI-AgentUserClientDetails-syncTeamMember-POST") {
-      httpV2
-        .post(url"$url")
-        .withBody(Json.toJson(expectedAssignments))
-        .execute[HttpResponse]
-        .flatMap { response =>
-          response.status match {
-            case OK       => Future.successful(false)
-            case ACCEPTED => Future.successful(true)
-            case NOT_FOUND =>
-              logger.warn(s"Team member assignment failed: Not found $arn / $userId")
-              Future.failed(new NotFoundException(response.body))
-            case other =>
-              logger.warn(s"Team member assignment sync returned unexpected status $other: ${response.body}")
-              Future.failed(new HttpException(response.body, other))
-          }
+    httpV2
+      .post(url"$url")
+      .withBody(Json.toJson(expectedAssignments))
+      .execute[HttpResponse]
+      .flatMap { response =>
+        response.status match {
+          case OK       => Future.successful(false)
+          case ACCEPTED => Future.successful(true)
+          case NOT_FOUND =>
+            logger.warn(s"Team member assignment failed: Not found $arn / $userId")
+            Future.failed(new NotFoundException(response.body))
+          case other =>
+            logger.warn(s"Team member assignment sync returned unexpected status $other: ${response.body}")
+            Future.failed(new HttpException(response.body, other))
         }
-    }
+      }
   }
 }
 

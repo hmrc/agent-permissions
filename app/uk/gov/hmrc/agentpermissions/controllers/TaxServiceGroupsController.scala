@@ -18,11 +18,11 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.libs.json._
 import play.api.mvc._
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.{AddMembersToTaxServiceGroupRequest, AddOneTeamMemberToGroupRequest, CreateTaxServiceGroupRequest, UpdateTaxServiceGroupRequest}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.service._
-import uk.gov.hmrc.agents.accessgroups.{GroupSummary, TaxGroup}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{GroupSummary, TaxGroup}
 import uk.gov.hmrc.auth.core.AuthorisationException
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController

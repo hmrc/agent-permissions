@@ -22,7 +22,7 @@ import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup, TaxGroup}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 

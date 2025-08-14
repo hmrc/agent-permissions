@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository

@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.binders
 
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 
 object Binders {
 

@@ -18,11 +18,11 @@ package uk.gov.hmrc.agentpermissions.repository
 
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
-import uk.gov.hmrc.agents.accessgroups.AgentUser
-import uk.gov.hmrc.agents.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 

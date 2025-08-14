@@ -18,13 +18,13 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.mongodb.client.result.UpdateResult
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler5}
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, GroupSummary, TaxGroup}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, GroupSummary, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime

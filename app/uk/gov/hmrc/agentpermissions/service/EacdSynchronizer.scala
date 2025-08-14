@@ -19,13 +19,13 @@ package uk.gov.hmrc.agentpermissions.service
 import org.apache.pekko.actor.ActorSystem
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, EacdSyncRepository, TaxGroupsRepositoryV2}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.util.GroupOps
-import uk.gov.hmrc.agents.accessgroups.{AccessGroup, AgentUser, CustomGroup, TaxGroup, UserDetails}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AccessGroup, AgentUser, CustomGroup, TaxGroup, UserDetails}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime

@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
 import play.api.libs.json.{JsObject, Json}
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agents.accessgroups.AgentUser
+import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 class SensitiveAgentUserSpec extends BaseSpec {

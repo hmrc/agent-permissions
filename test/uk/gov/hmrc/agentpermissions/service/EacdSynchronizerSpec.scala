@@ -19,14 +19,14 @@ package uk.gov.hmrc.agentpermissions.service
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler3, CallHandler4}
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, EacdSyncRecord, EacdSyncRepository, TaxGroupsRepositoryV2}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
-import uk.gov.hmrc.agents.accessgroups._
+import uk.gov.hmrc.agentpermissions.model.accessgroups._
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.{Instant, LocalDateTime}

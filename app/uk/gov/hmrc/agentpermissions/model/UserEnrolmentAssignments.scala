@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.{Format, Json}
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 
 case class UserEnrolment(userId: String, enrolmentKey: String)
 

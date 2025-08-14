@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
 import play.api.libs.json._
-import uk.gov.hmrc.agents.accessgroups.Client
+import uk.gov.hmrc.agentpermissions.model.accessgroups.Client
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter, Sensitive}

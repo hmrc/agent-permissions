@@ -22,7 +22,7 @@ import play.api.test.FakeRequest
 import play.api.{Configuration, Environment}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.agents.accessgroups.AgentUser
+import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.auth.core._
 
 import scala.concurrent.ExecutionContext
