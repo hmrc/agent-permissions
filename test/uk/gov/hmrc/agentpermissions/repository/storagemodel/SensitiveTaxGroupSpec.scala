@@ -17,9 +17,9 @@
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
 import play.api.libs.json.{JsObject, Json}
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, TaxGroup}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, TaxGroup}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 import java.time.LocalDateTime

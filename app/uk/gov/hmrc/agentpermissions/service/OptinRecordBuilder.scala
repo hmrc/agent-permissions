@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
-import uk.gov.hmrc.agents.accessgroups.AgentUser
-import uk.gov.hmrc.agents.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
 
 import java.time.LocalDateTime
 import javax.inject.Singleton

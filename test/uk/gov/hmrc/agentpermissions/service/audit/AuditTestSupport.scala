@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.service.audit
 
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client}
 
 import scala.util.Random
 

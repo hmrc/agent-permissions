@@ -17,13 +17,13 @@
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, CustomGroup}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, CustomGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime

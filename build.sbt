@@ -27,7 +27,7 @@ lazy val root = (project in file("."))
     PlayKeys.playDefaultPort         := 9447,
     routesImport                     ++= Seq(
       "uk.gov.hmrc.agentpermissions.binders.Binders._",
-      "uk.gov.hmrc.agentmtdidentifiers.model.Arn",
+      "uk.gov.hmrc.agentpermissions.model.Arn",
       "uk.gov.hmrc.agentpermissions.models.GroupId"
     ),
     libraryDependencies ++= AppDependencies.compile ++ AppDependencies.test,

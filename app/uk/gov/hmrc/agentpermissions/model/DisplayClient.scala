@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.{Json, OFormat}
-import uk.gov.hmrc.agents.accessgroups.Client
+import uk.gov.hmrc.agentpermissions.model.accessgroups.Client
 
 import scala.util.hashing.MurmurHash3
 

@@ -16,8 +16,8 @@
 
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
+import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.models.GroupId

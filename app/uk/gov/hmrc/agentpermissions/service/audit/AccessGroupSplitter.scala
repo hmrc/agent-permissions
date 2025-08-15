@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.service.audit
 
-import uk.gov.hmrc.agents.accessgroups.{CustomGroup, TaxGroup}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{CustomGroup, TaxGroup}
 
 object AccessGroupSplitter {
 

@@ -18,9 +18,9 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
-import uk.gov.hmrc.agents.accessgroups.GroupSummary
+import uk.gov.hmrc.agentpermissions.model.accessgroups.GroupSummary
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}

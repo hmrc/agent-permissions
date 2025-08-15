@@ -22,12 +22,12 @@ import play.api.libs.json._
 import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
-import uk.gov.hmrc.agentmtdidentifiers.model.{Arn, PaginatedList, PaginationMetaData}
+import uk.gov.hmrc.agentpermissions.model.{Arn, PaginatedList, PaginationMetaData}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.model.{AddOneTeamMemberToGroupRequest, DisplayClient}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.service._
-import uk.gov.hmrc.agents.accessgroups._
+import uk.gov.hmrc.agentpermissions.model.accessgroups._
 import uk.gov.hmrc.auth.core.InvalidBearerToken
 import uk.gov.hmrc.http.HeaderCarrier
 

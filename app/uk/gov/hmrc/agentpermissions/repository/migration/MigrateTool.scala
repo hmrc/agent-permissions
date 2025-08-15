@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.repository.migration
 import org.mongodb.scala.model.Filters
 import play.api.libs.json.JsObject
 import play.api.{Configuration, Logging}
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.repository.{EacdSyncRepository, OptinRepositoryImpl}
 import uk.gov.hmrc.mongo.MongoComponent
 

@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.agentpermissions.connectors
 
-import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
 import izumi.reflect.Tag
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
@@ -24,14 +23,13 @@ import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2, CallHan
 import play.api.http.Status._
 import play.api.libs.json.{JsArray, Json}
 import play.api.libs.ws.{BodyWritable, DefaultBodyWritables, WSRequest}
-import uk.gov.hmrc.agentmtdidentifiers.model.{PaginatedList, PaginationMetaData}
+import uk.gov.hmrc.agentpermissions.model.{PaginatedList, PaginationMetaData}
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
-import uk.gov.hmrc.agents.accessgroups.Client
+import uk.gov.hmrc.agentpermissions.model.accessgroups.Client
 import uk.gov.hmrc.http.client.{HttpClientV2, RequestBuilder, StreamHttpReads}
 import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpReads, HttpResponse, UpstreamErrorResponse}
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 
 import java.net.URL
 import scala.concurrent.{ExecutionContext, Future}
@@ -40,8 +38,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
 
   val mockHttpClientV2: HttpClientV2 = mock[HttpClientV2]
   val mockRequestBuilder: RequestBuilder = mock[RequestBuilder]
-  val mockMetrics: Metrics = mock[Metrics]
-  val noopMetricRegistry = new NoopMetricRegistry
 
   implicit val mockAppConfig: AppConfig = mock[AppConfig]
 
@@ -54,7 +50,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       "return the client count" in new TestScope {
         val clientCount = 10
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
 
         mockHttpGetV2(
           new URL(
@@ -72,7 +67,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpGetV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/agent-size"
@@ -93,7 +87,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       "return the client count by tax service" in new TestScope {
         val clientCount: Map[String, Int] = Map("HMRC-MTD-VAT" -> 7)
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/tax-service-client-count"
@@ -108,7 +101,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpGetV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/tax-service-client-count"
@@ -126,7 +118,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $NO_CONTENT status code" should {
       "return false" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user-check"
@@ -140,7 +131,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $FORBIDDEN status code" should {
       "return true" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user-check"
@@ -155,7 +145,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpGetV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user-check"
@@ -173,7 +162,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $OK status code" should {
       "return true" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/work-items-exist"
@@ -187,7 +175,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $NO_CONTENT status code" should {
       "return false" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/work-items-exist"
@@ -202,7 +189,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpGetV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/work-items-exist"
@@ -220,7 +206,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $OK status code" should {
       "return true" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/assignments-work-items-exist"
@@ -234,7 +219,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $NO_CONTENT status code" should {
       "return false" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/assignments-work-items-exist"
@@ -249,7 +233,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpGetV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/assignments-work-items-exist"
@@ -267,7 +250,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $ACCEPTED status code and to send email" should {
       "return some value" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list?sendEmail=true"
@@ -282,7 +264,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       "return some value" in new TestScope {
         val lang = "cy"
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list?sendEmail=true&lang=$lang"
@@ -298,7 +279,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $ACCEPTED status code" should {
       "return some value" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list"
@@ -312,7 +292,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $OK status code" should {
       "return some value" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list"
@@ -327,7 +306,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       Seq(NOT_FOUND, UNAUTHORIZED).foreach { statusCode =>
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpGetV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list"
@@ -343,7 +321,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       Seq(INTERNAL_SERVER_ERROR, BAD_GATEWAY).foreach { statusCode =>
         s"throw upstream exception nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpGetV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list"
@@ -380,7 +357,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       )
       val paginatedList = PaginatedList[Client](pageContent = clients, paginationMetaData = meta)
       mockAppConfigAgentUserClientDetailsBaseUrl
-      mockMetricsDefaultRegistry
       private val PAGE_SIZE = 5
       mockHttpGetV2(
         new URL(
@@ -404,7 +380,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $ACCEPTED status code" should {
       s"return $ACCEPTED" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list-status"
@@ -418,7 +393,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $OK status code" should {
       s"return $OK" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpGetV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list-status"
@@ -433,7 +407,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       Seq(NOT_FOUND, UNAUTHORIZED).foreach { statusCode =>
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpGetV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list-status"
@@ -449,7 +422,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       Seq(INTERNAL_SERVER_ERROR, BAD_GATEWAY).foreach { statusCode =>
         s"throw upstream exception nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpGetV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/client-list-status"
@@ -470,7 +442,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
     s"http response has $ACCEPTED status code" should {
       s"return $AssignmentsPushed" in new TestScope {
         mockAppConfigAgentUserClientDetailsBaseUrl
-        mockMetricsDefaultRegistry
         mockHttpPostV2(
           new URL(
             s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/user-enrolment-assignments"
@@ -491,7 +462,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
         s"return nothing for $statusCode" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpPostV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/user-enrolment-assignments"
@@ -519,7 +489,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       s"http response has $OK status code" should {
         "return some value" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpGetV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/team-members"
@@ -534,7 +503,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
           s"fail for $statusCode" in new TestScope {
             mockAppConfigAgentUserClientDetailsBaseUrl
-            mockMetricsDefaultRegistry
             mockHttpGetV2(
               new URL(
                 s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/team-members"
@@ -554,7 +522,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       s"http response has $OK status code" should {
         "return false" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpPostV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user/$userId/ensure-assignments"
@@ -569,7 +536,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
       s"http response has $ACCEPTED status code" should {
         "return true" in new TestScope {
           mockAppConfigAgentUserClientDetailsBaseUrl
-          mockMetricsDefaultRegistry
           mockHttpPostV2(
             new URL(
               s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user/$userId/ensure-assignments"
@@ -585,7 +551,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         Seq(NOT_FOUND, UNAUTHORIZED, INTERNAL_SERVER_ERROR).foreach { statusCode =>
           s"fail for $statusCode" in new TestScope {
             mockAppConfigAgentUserClientDetailsBaseUrl
-            mockMetricsDefaultRegistry
             mockHttpPostV2(
               new URL(
                 s"${mockAppConfig.agentUserClientDetailsBaseUrl}/agent-user-client-details/arn/${arn.value}/user/$userId/ensure-assignments"
@@ -607,7 +572,7 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
 
   trait TestScope extends DefaultBodyWritables {
     lazy val userClientDetailsConnector: UserClientDetailsConnector =
-      new UserClientDetailsConnectorImpl(mockHttpClientV2, executionContext, mockMetrics)
+      new UserClientDetailsConnectorImpl(mockHttpClientV2, executionContext)
 
     implicit val materializer: Materializer = Materializer(ActorSystem())
 
@@ -616,11 +581,6 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
         .expects()
         .returning("http://someBaseUrl")
         .noMoreThanTwice()
-
-    def mockMetricsDefaultRegistry: CallHandler0[MetricRegistry] =
-      (() => mockMetrics.defaultRegistry)
-        .expects()
-        .returning(noopMetricRegistry)
 
     def mockHttpGetV2[A](url: URL): CallHandler2[URL, HeaderCarrier, RequestBuilder] =
       (mockHttpClientV2

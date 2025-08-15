@@ -17,12 +17,12 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.{CallHandler1, CallHandler3}
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
 import uk.gov.hmrc.agentpermissions.repository.{BetaInviteRepository, RecordInserted, UpsertType}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
-import uk.gov.hmrc.agents.accessgroups.AgentUser
+import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.{ExecutionContext, Future}

@@ -16,10 +16,10 @@
 
 package uk.gov.hmrc.agentpermissions.service.audit
 
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.BaseSpec
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agents.accessgroups.{CustomGroup, TaxGroup}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{CustomGroup, TaxGroup}
 
 import java.time.LocalDateTime
 

@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service.audit
 
 import play.api.libs.json.{Json, OFormat}
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client}
 
 import java.time.LocalDateTime
 

@@ -18,11 +18,11 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentmtdidentifiers.model.Arn
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
 import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
-import uk.gov.hmrc.agents.accessgroups.{AgentUser, Client, CustomGroup}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
