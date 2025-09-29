@@ -24,4 +24,5 @@ private object ArnCheck extends Modulus23Check {
     val suffix: String = arn.substring(1)
     calculateCheckCharacter(suffix) == arn.charAt(0)
   }
+
 }

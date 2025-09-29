@@ -19,21 +19,21 @@ package uk.gov.hmrc.agentpermissions.service
 import com.mongodb.client.result.UpdateResult
 import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.scalamock.handlers._
-import uk.gov.hmrc.agentpermissions.model.{Arn, AssignedClient, PaginatedList, PaginationMetaData}
-import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
-import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.TestConstants
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.model.EacdAssignmentsPushStatus.{AssignmentsNotPushed, AssignmentsPushed}
+import uk.gov.hmrc.agentpermissions.model.accessgroups._
+import uk.gov.hmrc.agentpermissions.model._
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
-import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup, GroupSummary, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
-class CustomGroupsServiceSpec extends BaseSpec {
+class CustomGroupsServiceSpec extends TestConstants {
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -88,7 +88,7 @@ class CustomGroupsServiceSpec extends BaseSpec {
     val mockAccessGroupsRepository: CustomGroupsRepositoryV2 = mock[CustomGroupsRepositoryV2]
     val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
     val mockTaxGroupsService: TaxGroupsService = mock[TaxGroupsService]
-    val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
+    val mockUserClientDetailsConnector: AgentUserClientDetailsConnector = mock[AgentUserClientDetailsConnector]
     val mockAuditService: AuditService = mock[AuditService]
 
     val accessGroupsService: CustomGroupsService =

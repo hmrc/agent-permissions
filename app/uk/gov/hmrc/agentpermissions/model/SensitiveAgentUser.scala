@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.repository.storagemodel
+package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json._
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser

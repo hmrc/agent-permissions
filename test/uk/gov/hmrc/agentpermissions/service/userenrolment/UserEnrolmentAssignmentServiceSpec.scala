@@ -17,19 +17,18 @@
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
-import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
-import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
+import uk.gov.hmrc.agentpermissions.TestConstants
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.model.EacdAssignmentsPushStatus.{AssignmentsNotPushed, AssignmentsPushed}
+import uk.gov.hmrc.agentpermissions.model.{Arn, EacdAssignmentsPushStatus, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, CustomGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
-import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, CustomGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
-import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
-class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
+class UserEnrolmentAssignmentServiceSpec extends TestConstants {
   val user: AgentUser = AgentUser("userId", "userName")
   val groupName = "some group"
   val userEnrolmentAssignments: UserEnrolmentAssignments = UserEnrolmentAssignments(Set.empty, Set.empty, arn)
@@ -38,11 +37,9 @@ class UserEnrolmentAssignmentServiceSpec extends BaseSpec {
   val accessGroup: CustomGroup =
     CustomGroup(GroupId.random(), arn, groupName, now, now, user, user, Set.empty, Set.empty)
 
-  lazy val now: LocalDateTime = LocalDateTime.now()
-
   trait TestScope {
     val mockAccessGroupsRepository: CustomGroupsRepositoryV2 = mock[CustomGroupsRepositoryV2]
-    val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
+    val mockUserClientDetailsConnector: AgentUserClientDetailsConnector = mock[AgentUserClientDetailsConnector]
 
     val userEnrolmentAssignmentService =
       new UserEnrolmentAssignmentServiceImpl(

@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.controllers
-import uk.gov.hmrc.agentpermissions.BaseSpec
+package it.controllers
+
+import support.ComponentBaseISpec
 import uk.gov.hmrc.agentpermissions.model.UpdateAccessGroupRequest
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
 
-import java.time.LocalDateTime
-
-class UpdateAccessGroupRequestSpec extends BaseSpec {
+class UpdateAccessGroupRequestISpec extends ComponentBaseISpec {
   val user: AgentUser = AgentUser("userId", "userName")
   val groupName = "some existing group name"
-  lazy val now: LocalDateTime = LocalDateTime.now()
   val user1: AgentUser = AgentUser("user1", "User 1")
   val user2: AgentUser = AgentUser("user2", "User 2")
   val client1: Client = Client("HMRC-MTD-VAT~VRN~101747641", "John Innes")

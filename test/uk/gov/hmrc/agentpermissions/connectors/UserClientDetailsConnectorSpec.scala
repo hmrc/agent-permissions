@@ -23,10 +23,10 @@ import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler2, CallHan
 import play.api.http.Status._
 import play.api.libs.json.{JsArray, Json}
 import play.api.libs.ws.{BodyWritable, DefaultBodyWritables, WSRequest}
-import uk.gov.hmrc.agentpermissions.model.{PaginatedList, PaginationMetaData}
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.model.{AgentClientSize, PaginatedList, PaginationMetaData, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
+import uk.gov.hmrc.agentpermissions.model.EacdAssignmentsPushStatus.{AssignmentsNotPushed, AssignmentsPushed}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.Client
 import uk.gov.hmrc.http.client.{HttpClientV2, RequestBuilder, StreamHttpReads}
 import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpReads, HttpResponse, UpstreamErrorResponse}
@@ -34,7 +34,7 @@ import uk.gov.hmrc.http.{Authorization, HeaderCarrier, HttpReads, HttpResponse, 
 import java.net.URL
 import scala.concurrent.{ExecutionContext, Future}
 
-class UserClientDetailsConnectorSpec extends BaseSpec {
+class UserClientDetailsConnectorSpec extends TestConstants {
 
   val mockHttpClientV2: HttpClientV2 = mock[HttpClientV2]
   val mockRequestBuilder: RequestBuilder = mock[RequestBuilder]
@@ -571,8 +571,8 @@ class UserClientDetailsConnectorSpec extends BaseSpec {
   }
 
   trait TestScope extends DefaultBodyWritables {
-    lazy val userClientDetailsConnector: UserClientDetailsConnector =
-      new UserClientDetailsConnectorImpl(mockHttpClientV2, executionContext)
+    lazy val userClientDetailsConnector: AgentUserClientDetailsConnector =
+      new AgentUserClientDetailsConnectorImpl(mockHttpClientV2, executionContext)
 
     implicit val materializer: Materializer = Materializer(ActorSystem())
 

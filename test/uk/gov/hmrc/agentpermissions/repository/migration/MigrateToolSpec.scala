@@ -22,7 +22,7 @@ import org.scalatest.concurrent.IntegrationPatience
 import play.api.Configuration
 import play.api.libs.json._
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.agentpermissions.repository._
@@ -35,7 +35,7 @@ import uk.gov.hmrc.mongo.test.CleanMongoCollectionSupport
 import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class MigrateToolSpec extends BaseSpec with CleanMongoCollectionSupport with MockFactory with IntegrationPatience {
+class MigrateToolSpec extends TestConstants with CleanMongoCollectionSupport with MockFactory with IntegrationPatience {
 
   "migration functionality" should {
 

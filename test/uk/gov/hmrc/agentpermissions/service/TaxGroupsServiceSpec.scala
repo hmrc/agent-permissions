@@ -19,8 +19,8 @@ package uk.gov.hmrc.agentpermissions.service
 import com.mongodb.client.result.UpdateResult
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3, CallHandler5}
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.TestConstants
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
@@ -30,7 +30,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
-class TaxGroupsServiceSpec extends BaseSpec {
+class TaxGroupsServiceSpec extends TestConstants {
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -75,7 +75,7 @@ class TaxGroupsServiceSpec extends BaseSpec {
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    val mockAUCDConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
+    val mockAUCDConnector: AgentUserClientDetailsConnector = mock[AgentUserClientDetailsConnector]
     val mockTaxServiceGroupsRepository: TaxGroupsRepositoryV2 = mock[TaxGroupsRepositoryV2]
     val mockAuditService: AuditService = mock[AuditService]
 

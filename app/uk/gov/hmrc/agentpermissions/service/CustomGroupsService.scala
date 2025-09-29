@@ -18,9 +18,9 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentpermissions.model.{Arn, EnrolmentKey, PaginatedList}
-import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
-import uk.gov.hmrc.agentpermissions.model.{DisplayClient, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.model.EacdAssignmentsPushStatus.{AssignmentsNotPushed, AssignmentsPushed}
+import uk.gov.hmrc.agentpermissions.model.{Arn, DisplayClient, EacdAssignmentsPushStatus, EnrolmentKey, PaginatedList, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
@@ -99,7 +99,7 @@ class CustomGroupsServiceImpl @Inject() (
   customGroupsRepository: CustomGroupsRepositoryV2,
   userEnrolmentAssignmentService: UserEnrolmentAssignmentService,
   taxGroupsService: TaxGroupsService,
-  userClientDetailsConnector: UserClientDetailsConnector,
+  agentUserClientDetailsConnector: AgentUserClientDetailsConnector,
   auditService: AuditService
 ) extends CustomGroupsService with Logging {
 
@@ -122,7 +122,7 @@ class CustomGroupsServiceImpl @Inject() (
         case None => Future successful None
         case Some(grp) =>
           val enrolmentKeys = grp.clients.map(_.enrolmentKey)
-          userClientDetailsConnector
+          agentUserClientDetailsConnector
             .getPaginatedClients(grp.arn)(page, pageSize, search, filter)
             .map { paginatedClients =>
               val paginatedList = PaginatedList[DisplayClient](
@@ -361,7 +361,7 @@ class CustomGroupsServiceImpl @Inject() (
   // TODO move below to groups summary service
   override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
     for {
-      clients      <- userClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
+      clients      <- agentUserClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
       accessGroups <- if (clients.nonEmpty) customGroupsRepository.get(arn) else Future.successful(Seq.empty)
       enrolmentKeysInCustomGroups = accessGroups.toSet[CustomGroup].flatMap(_.clients).map(_.enrolmentKey)
       taxServiceGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
@@ -420,7 +420,7 @@ class CustomGroupsServiceImpl @Inject() (
     maybeAccessGroup: Option[CustomGroup]
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]] =
     maybeAccessGroup.fold(Future successful Option.empty[CustomGroup])(accessGroup =>
-      userClientDetailsConnector
+      agentUserClientDetailsConnector
         .getClients(accessGroup.arn)
         .map(
           _.map(backendClients =>
@@ -450,7 +450,7 @@ class CustomGroupsServiceImpl @Inject() (
     accessGroups match {
       case Nil => Future successful accessGroups
       case accessGroups =>
-        userClientDetailsConnector.getClients(accessGroups.head.arn).map {
+        agentUserClientDetailsConnector.getClients(accessGroups.head.arn).map {
           case None => accessGroups
           case Some(backendClients) =>
             accessGroups.map(accessGroup =>

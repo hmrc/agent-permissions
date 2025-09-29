@@ -41,8 +41,6 @@ trait OptinRepository {
   def delete(arn: String): Future[Long]
 }
 
-/** Note: This implementation stores some fields encrypted in mongo. (APB-6461)
-  */
 @Singleton
 class OptinRepositoryImpl @Inject() (
   mongoComponent: MongoComponent,

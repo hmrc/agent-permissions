@@ -17,21 +17,21 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.CallHandler3
+import uk.gov.hmrc.agentpermissions.TestConstants
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class OptedInStatusHandlerSpec extends BaseSpec {
+class OptedInStatusHandlerSpec extends TestConstants {
 
   trait TestScope {
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
     implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
 
-    val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
+    val mockUserClientDetailsConnector: AgentUserClientDetailsConnector = mock[AgentUserClientDetailsConnector]
     val optedInStatusHandler = new OptedInStatusHandlerImpl(mockUserClientDetailsConnector)
 
     def mockUserClientDetailsConnectorCheckGroupAssignments(

@@ -291,7 +291,7 @@ class AccessGroupsController @Inject() (
             ) map {
               case AccessGroupNotUpdated =>
                 logger.info("Custom group was not updated")
-                NotFound
+                NotFound // todo : remove this case...if the group is not found you get a 400...we might want to change that.
               case AccessGroupUpdated =>
                 Ok
               case AccessGroupUpdatedWithoutAssignmentsPushed =>

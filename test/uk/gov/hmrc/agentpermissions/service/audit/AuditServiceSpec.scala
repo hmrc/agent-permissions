@@ -18,18 +18,19 @@ package uk.gov.hmrc.agentpermissions.service.audit
 
 import org.scalamock.handlers.{CallHandler, CallHandler0}
 import play.api.libs.json.JsObject
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import support.UnitSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup, TaxGroup}
 import uk.gov.hmrc.agentpermissions.model.{UserEnrolment, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 
 import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext
 
-class AuditServiceSpec extends BaseSpec with AuditTestSupport {
+class AuditServiceSpec extends UnitSpec with AuditTestSupport with TestConstants {
 
   "Access group creation" should {
     "audit event correctly" when {

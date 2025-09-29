@@ -17,22 +17,22 @@
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
 import play.api.libs.json.{JsObject, Json}
-import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveTaxGroup}
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, TaxGroup}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 import java.time.LocalDateTime
 import java.util.UUID
 
-class SensitiveTaxGroupSpec extends BaseSpec {
+class SensitiveTaxGroupSpec extends TestConstants {
 
   implicit val crypto: Encrypter with Decrypter = aesCrypto
 
   val agentUser: AgentUser = AgentUser(id = "agentUser1", name = "Robert Smith")
   val client: Client = Client(enrolmentKey = "HMRC-MTD-VAT~VRN~123456789", friendlyName = "Smith Roberts")
 
-  val taxGroup: TaxGroup = TaxGroup(
+  override val taxGroup: TaxGroup = TaxGroup(
     id = UUID.fromString("00000abc-6789-6789-6789-0000000000aa"),
     arn = Arn("KARN1234567"),
     groupName = "some group",

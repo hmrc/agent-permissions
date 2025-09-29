@@ -21,11 +21,14 @@ import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup, TaxGroup}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter, SymmetricCryptoFactory}
 
-abstract class BaseSpec
-    extends AnyWordSpecLike with Matchers with ScalaFutures with MockFactory with IntegrationPatience {
-  val arn: Arn = Arn("KARN1234567")
+import java.time.LocalDateTime
+import java.util.UUID
+
+trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with MockFactory with IntegrationPatience {
+  val arn: Arn = Arn("XARN8686099")
 
   val serviceVat = "HMRC-MTD-VAT"
   val servicePpt = "HMRC-PPT-ORG"
@@ -44,6 +47,45 @@ abstract class BaseSpec
   val serviceIdentifierKeyTrust = "SAUTR"
   val serviceIdentifierKeyNTTrust = "URN"
   val serviceIdentifierKeyCbc = "cbcId"
+
+  val c1: Client = Client("HMRC-MTD-VAT~VRN~123456789", "vat1")
+  val c2: Client = Client("HMRC-MTD-IT~MTDITID~WOHV90190595538", "itsa1")
+
+  val tm1: AgentUser = AgentUser("id1", "tm1")
+  val tm2: AgentUser = AgentUser("id2", "tm2")
+
+  val now: LocalDateTime = LocalDateTime.now
+
+  val clients: Set[Client] = Set(c1, c2)
+  val teamMembers: Set[AgentUser] = Set(tm1, tm2)
+
+  val customGroup: CustomGroup = CustomGroup(
+    id = UUID.randomUUID(),
+    arn = arn,
+    groupName = "Group 1",
+    created = now,
+    lastUpdated = now,
+    createdBy = tm1,
+    lastUpdatedBy = tm1,
+    teamMembers = teamMembers,
+    clients = clients
+  )
+
+  val taxGroup: TaxGroup = TaxGroup(
+    id = UUID.randomUUID(),
+    arn = arn,
+    groupName = "Group 1",
+    created = now,
+    lastUpdated = now,
+    createdBy = tm1,
+    lastUpdatedBy = tm1,
+    teamMembers = teamMembers,
+    service = "HMRC-MTD-VAT",
+    automaticUpdates = true,
+    excludedClients = Set.empty
+  )
+
+  val expectedCount: Map[String, Int] = Map("HMRC-MTD-IT" -> 4, "HMRC-MTD-VAT" -> 3)
 
   // Note: This is simply a randomly-chosen secret key to run tests
   val aesCrypto: Encrypter with Decrypter =

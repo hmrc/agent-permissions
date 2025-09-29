@@ -21,7 +21,7 @@ import play.api.mvc.{AnyContentAsEmpty, ControllerComponents, Request}
 import play.api.test.Helpers._
 import play.api.test.{FakeRequest, Helpers}
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.service._
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
@@ -30,7 +30,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class OptinControllerSpec extends BaseSpec {
+class OptinControllerSpec extends TestConstants {
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")

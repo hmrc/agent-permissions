@@ -112,7 +112,6 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
                 tg.excludedClients
               )
             )
-        case other => throw new RuntimeException(s"Access group is not a CustomGroup or TaxGroup: ${other.toString}")
       }
     )
 
@@ -158,7 +157,6 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
                 tg.excludedClients
               )
             )
-        case other => throw new RuntimeException(s"Access group is not a CustomGroup or TaxGroup: ${other.toString}")
       }
     )
 

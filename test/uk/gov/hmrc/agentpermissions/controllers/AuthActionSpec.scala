@@ -20,14 +20,14 @@ import org.scalamock.handlers.CallHandler0
 import play.api.mvc.AnyContentAsEmpty
 import play.api.test.FakeRequest
 import play.api.{Configuration, Environment}
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.auth.core._
 
 import scala.concurrent.ExecutionContext
 
-class AuthActionSpec extends BaseSpec with AuthorisationMockSupport {
+class AuthActionSpec extends TestConstants with AuthorisationMockSupport {
 
   trait TestScope {
     implicit val mockAuthConnector: AuthConnector = mock[AuthConnector]

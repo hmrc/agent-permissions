@@ -18,20 +18,20 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import org.scalamock.handlers.CallHandler4
 import org.scalamock.scalatest.MockFactory
-import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.auth.core.{Assistant, AuthConnector, CredentialRole, Enrolment, EnrolmentIdentifier, Enrolments, User}
+import support.UnitSpec
 import uk.gov.hmrc.auth.core.authorise.Predicate
 import uk.gov.hmrc.auth.core.retrieve.{Credentials, Retrieval, ~}
 import uk.gov.hmrc.auth.core.syntax.retrieved.authSyntaxForRetrieved
+import uk.gov.hmrc.auth.core._
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait AuthorisationMockSupport extends BaseSpec with MockFactory {
+trait AuthorisationMockSupport extends UnitSpec with MockFactory {
 
   val agentReferenceNumberIdentifier = "AgentReferenceNumber"
   val agentEnrolmentIdentifiers: Seq[EnrolmentIdentifier] = Seq(
-    EnrolmentIdentifier(agentReferenceNumberIdentifier, "KARN1234567")
+    EnrolmentIdentifier(agentReferenceNumberIdentifier, "XARN8686099")
   )
   val agentEnrolment = "HMRC-AS-AGENT"
 

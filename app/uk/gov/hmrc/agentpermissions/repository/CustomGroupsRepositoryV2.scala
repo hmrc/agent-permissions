@@ -27,10 +27,9 @@ import org.mongodb.scala.model._
 import org.mongodb.scala.result.UpdateResult
 import play.api.Logging
 import play.api.libs.json.Format
-import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveAgentUser, SensitiveCustomGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2Impl._
-import uk.gov.hmrc.agentpermissions.repository.storagemodel.{SensitiveAgentUser, SensitiveCustomGroup}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, CustomGroup}
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption

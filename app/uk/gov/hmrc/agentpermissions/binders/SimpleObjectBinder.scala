@@ -21,7 +21,7 @@ import play.api.mvc.PathBindable
 import scala.util.control.NonFatal
 
 class SimpleObjectBinder[T](bind: String => T, unbind: T => String)(implicit m: Manifest[T]) extends PathBindable[T] {
-  override def bind(key: String, value: String): Either[String, T] =
+  def bind(key: String, value: String): Either[String, T] =
     try
       Right(bind(value))
     catch {

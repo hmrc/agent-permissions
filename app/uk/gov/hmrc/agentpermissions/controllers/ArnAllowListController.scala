@@ -70,14 +70,10 @@ class ArnAllowListController @Inject() (implicit
     withAuthorisedAgent(allowStandardUser = true, allowlistEnabled = false) { authorisedAgent =>
       betaInviteService
         .hideBetaInvite(authorisedAgent.arn, authorisedAgent.agentUser)
-        .map(x =>
-          if (x.isDefined) {
-            Created
-          } else {
-            Conflict
-          }
-        )
+        .map {
+          case Some(_) => Created
+          case None    => Conflict
+        }
     }
   }
-
 }

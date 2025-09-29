@@ -21,11 +21,10 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.mongodb.scala.model.{Filters, IndexModel}
 import org.mongodb.scala.result.UpdateResult
-import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agentpermissions.repository.storagemodel.{SensitiveAgentUser, SensitiveClient, SensitiveCustomGroup}
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
+import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveAgentUser, SensitiveClient, SensitiveCustomGroup}
+import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
@@ -34,7 +33,7 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext
 
 class AccessGroupsRepositorySpec
-    extends BaseSpec with PlayMongoRepositorySupport[SensitiveCustomGroup] with CleanMongoCollectionSupport {
+    extends TestConstants with PlayMongoRepositorySupport[SensitiveCustomGroup] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
   val actorSystem: ActorSystem = ActorSystem()

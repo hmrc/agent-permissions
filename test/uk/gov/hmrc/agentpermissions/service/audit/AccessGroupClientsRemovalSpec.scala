@@ -16,10 +16,10 @@
 
 package uk.gov.hmrc.agentpermissions.service.audit
 
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import support.UnitSpec
 import uk.gov.hmrc.agentpermissions.models.GroupId
 
-class AccessGroupClientsRemovalSpec extends BaseSpec with AuditTestSupport {
+class AccessGroupClientsRemovalSpec extends UnitSpec with AuditTestSupport {
 
   "Split" should {
     "create chunks correctly" in {

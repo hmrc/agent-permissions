@@ -32,7 +32,7 @@ class CryptoProviderModule extends Module {
   else
     NoCrypto
 
-  override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
+  def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
     Seq(
       bind[Encrypter with Decrypter].qualifiedWith("aes").toInstance(aesCryptoInstance(configuration))
     )
