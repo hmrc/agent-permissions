@@ -73,6 +73,25 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
 
       result.status shouldBe CONFLICT
     }
+
+    s"return $BAD_REQUEST when Arn is not the same as found by Auth" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+
+      val result = get(s"$baseUrl/arn/QARN6822748/access-group-name-check?name=Group+1")
+
+      result.status shouldBe BAD_REQUEST
+    }
+
+    s"return $BAD_REQUEST when Arn is invalid" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+
+      val result = get(s"$baseUrl/arn/HARN1234567/access-group-name-check?name=Group+1")
+
+      result.status shouldBe BAD_REQUEST
+      result.body should include("""{"message":"Invalid arn value: 'HARN1234567' provided"""")
+    }
   }
 
   s"GET $getAllGroupSummariesUrl" should {
@@ -719,6 +738,17 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       await(customGroupRepo.insert(customGroup))
 
       val result = get(unassignedClientsUrl)
+
+      result.status shouldBe OK
+    }
+
+    s"return $OK with search" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+      await(customGroupRepo.insert(customGroup))
+
+      val result = get(s"$unassignedClientsUrl?search=bob&filter=HMRC-TERS-ORG")
 
       result.status shouldBe OK
     }

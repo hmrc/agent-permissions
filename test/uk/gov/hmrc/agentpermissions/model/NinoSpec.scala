@@ -16,14 +16,20 @@
 
 package uk.gov.hmrc.agentpermissions.model
 
-import play.api.libs.json.{Format, Json}
-import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-import java.time.Instant
+class NinoSpec extends AnyFlatSpec with Matchers {
 
-case class EacdSyncRecord(arn: Arn, updatedAt: Instant)
+  it should "be true for a valid NINO" in {
+    NinoType.isValid("PW640851D") shouldBe true
+  }
 
-object EacdSyncRecord {
-  implicit val dtf: Format[Instant] = MongoJavatimeFormats.instantFormat
-  implicit val format: Format[EacdSyncRecord] = Json.format[EacdSyncRecord]
+  it should "be false when it has the wrong prefix" in {
+    UrnType.isValid("DW640851D") shouldBe false
+  }
+
+  it should "be false when it is empty" in {
+    UrnType.isValid("") shouldBe false
+  }
 }

@@ -417,7 +417,7 @@ class AccessGroupsController @Inject() (
         }
     }
 
-  private def withValidAndMatchingArn(providedArn: Arn, authorisedAgent: AuthorisedAgent)(
+  def withValidAndMatchingArn(providedArn: Arn, authorisedAgent: AuthorisedAgent)(
     body: Arn => Future[Result]
   ): Future[Result] =
     if (!Arn.isValid(providedArn.value)) {
