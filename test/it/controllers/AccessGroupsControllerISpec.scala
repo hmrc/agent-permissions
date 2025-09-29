@@ -737,17 +737,6 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       givenGetClientsSuccess(arn)
       await(customGroupRepo.insert(customGroup))
 
-      val result = get(unassignedClientsUrl)
-
-      result.status shouldBe OK
-    }
-
-    s"return $OK with search" in {
-
-      givenAuthorisedAsAgentWith(arn.value)
-      givenGetClientsSuccess(arn)
-      await(customGroupRepo.insert(customGroup))
-
       val result = get(s"$unassignedClientsUrl?search=bob&filter=HMRC-TERS-ORG")
 
       result.status shouldBe OK
