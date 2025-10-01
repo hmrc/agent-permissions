@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 HM Revenue & Customs
+ * Copyright 2025 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,22 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.binders
+package uk.gov.hmrc.agentpermissions.model
 
-import play.api.mvc.PathBindable
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-import scala.util.control.NonFatal
+class NinoSpec extends AnyFlatSpec with Matchers {
 
-class SimpleObjectBinder[T](bind: String => T, unbind: T => String)(implicit m: Manifest[T]) extends PathBindable[T] {
-  def bind(key: String, value: String): Either[String, T] =
-    try
-      Right(bind(value))
-    catch {
-      case NonFatal(_) =>
-        Left(s"Cannot parse parameter '$key' with value '$value' as '${m.runtimeClass.getSimpleName}'")
-    }
+  it should "be true for a valid NINO" in {
+    NinoType.isValid("PW640851D") shouldBe true
+  }
 
-  def unbind(key: String, value: T): String = unbind(value)
+  it should "be false when it has the wrong prefix" in {
+    UrnType.isValid("DW640851D") shouldBe false
+  }
+
+  it should "be false when it is empty" in {
+    UrnType.isValid("") shouldBe false
+  }
 }

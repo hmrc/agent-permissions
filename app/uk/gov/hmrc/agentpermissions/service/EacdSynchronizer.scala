@@ -21,7 +21,7 @@ import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, EacdSyncRepository, TaxGroupsRepositoryV2}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.util.GroupOps
@@ -55,7 +55,7 @@ trait EacdSynchronizer {
 
 @Singleton
 class EacdSynchronizerImpl @Inject() (
-  userClientDetailsConnector: UserClientDetailsConnector,
+  agentUserClientDetailsConnector: AgentUserClientDetailsConnector,
   accessGroupsRepository: CustomGroupsRepositoryV2, // TODO consider importing service instead of repository
   taxGroupsRepository: TaxGroupsRepositoryV2, // TODO consider importing service instead of repository
   eacdSyncRepository: EacdSyncRepository, // TODO consider importing service instead of repository
@@ -77,10 +77,10 @@ class EacdSynchronizerImpl @Inject() (
     Future.successful(RemovalSet(Set.empty, Set.empty))
   else
     for {
-      clientsInEacd <- userClientDetailsConnector
+      clientsInEacd <- agentUserClientDetailsConnector
                          .getClients(arn)
                          .map(_.getOrElse(throw new RuntimeException("Could not retrieve client list from ES3")).toSet)
-      membersInEacd: Set[UserDetails] <- userClientDetailsConnector.getTeamMembers(arn).map(_.toSet)
+      membersInEacd: Set[UserDetails] <- agentUserClientDetailsConnector.getTeamMembers(arn).map(_.toSet)
       clientsInAccessGroups = accessGroups.flatMap {
                                 case cg: CustomGroup => cg.clients
                                 case tg: TaxGroup    => tg.excludedClients
@@ -198,16 +198,17 @@ class EacdSynchronizerImpl @Inject() (
   ): Future[Unit] = {
     logger.info(s"Starting full sync for $arn.")
     for {
-      usersInAgency <- userClientDetailsConnector.getTeamMembers(arn)
+      usersInAgency <- agentUserClientDetailsConnector.getTeamMembers(arn)
       userIds = usersInAgency.map(_.userId).collect { case Some(id) => id }.toSet
       fullSyncResults <- Future.traverse(userIds) { userId =>
                            val expectedAssignments = customGroups
                              .filter(_.teamMembers.map(_.id).contains(userId))
                              .flatMap(_.clients.map(_.enrolmentKey))
-                           userClientDetailsConnector.syncTeamMember(arn, userId, expectedAssignments).transformWith {
-                             res =>
+                           agentUserClientDetailsConnector
+                             .syncTeamMember(arn, userId, expectedAssignments)
+                             .transformWith { res =>
                                Future.successful((userId, res))
-                           }
+                             }
                          // return value is Future of (userId, Success(bool: updated or not)) or (userId, Failure(exception))
                          }
     } yield {
@@ -252,7 +253,8 @@ class EacdSynchronizerImpl @Inject() (
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Option[A]] = for {
-    maybeOutstandingAssignmentsWorkItemsExist <- userClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn)
+    maybeOutstandingAssignmentsWorkItemsExist <-
+      agentUserClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn)
 
     maybeEacdSyncRecord <- maybeOutstandingAssignmentsWorkItemsExist match {
                              case None | Some(true) =>

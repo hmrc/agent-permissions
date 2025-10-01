@@ -20,9 +20,9 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.scalamock.handlers.{CallHandler0, CallHandler1, CallHandler3, CallHandler4}
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, EacdSyncRecord, EacdSyncRepository, TaxGroupsRepositoryV2}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
@@ -32,7 +32,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import java.time.{Instant, LocalDateTime}
 import scala.concurrent.{ExecutionContext, Future}
 
-class EacdSynchronizerSpec extends BaseSpec {
+class EacdSynchronizerSpec extends TestConstants {
 
   "Sync control" should {
     val user: AgentUser = AgentUser("userId", "userName")
@@ -392,7 +392,7 @@ class EacdSynchronizerSpec extends BaseSpec {
 
     implicit val materializer: Materializer = Materializer(ActorSystem())
     val mockAccessGroupsRepository: CustomGroupsRepositoryV2 = mock[CustomGroupsRepositoryV2]
-    val stubUserClientDetailsConnector: UserClientDetailsConnector = stub[UserClientDetailsConnector]
+    val stubUserClientDetailsConnector: AgentUserClientDetailsConnector = stub[AgentUserClientDetailsConnector]
     val mockAuditService: AuditService = mock[AuditService]
     val stubEacdSyncRepository: EacdSyncRepository = stub[EacdSyncRepository]
     val stubTaxServiceGroupsRepository: TaxGroupsRepositoryV2 = stub[TaxGroupsRepositoryV2]

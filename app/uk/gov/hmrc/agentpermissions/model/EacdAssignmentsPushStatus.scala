@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 HM Revenue & Customs
+ * Copyright 2025 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions
+package uk.gov.hmrc.agentpermissions.model
 
-import com.google.inject.AbstractModule
-import uk.gov.hmrc.agentpermissions.repository.migration.MigrateTool
+sealed trait EacdAssignmentsPushStatus
 
-class MigrateToV2Module extends AbstractModule {
-  override def configure(): Unit =
-    bind(classOf[MigrateTool]).asEagerSingleton()
+object EacdAssignmentsPushStatus {
+  case object AssignmentsPushed extends EacdAssignmentsPushStatus
+  case object AssignmentsNotPushed extends EacdAssignmentsPushStatus
 }

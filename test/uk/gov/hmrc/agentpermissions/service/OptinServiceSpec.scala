@@ -18,8 +18,8 @@ package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.{CallHandler1, CallHandler3, CallHandler4, CallHandler5}
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.TestConstants
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, RecordInserted, RecordUpdated, UpsertType}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client}
@@ -30,7 +30,7 @@ import java.time.LocalDateTime
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
-class OptinServiceSpec extends BaseSpec {
+class OptinServiceSpec extends TestConstants {
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -41,7 +41,7 @@ class OptinServiceSpec extends BaseSpec {
     val mockOptinRecordBuilder: OptinRecordBuilder = mock[OptinRecordBuilder]
     val mockOptedInStatusHandler: OptedInStatusHandler = mock[OptedInStatusHandler]
     val mockNotOptedInStatusHandler: NotOptedInStatusHandler = mock[NotOptedInStatusHandler]
-    val mockUserClientDetailsConnector: UserClientDetailsConnector = mock[UserClientDetailsConnector]
+    val mockUserClientDetailsConnector: AgentUserClientDetailsConnector = mock[AgentUserClientDetailsConnector]
     val mockAuditService: AuditService = mock[AuditService]
 
     implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global

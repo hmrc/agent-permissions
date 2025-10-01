@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.service
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
@@ -85,14 +85,14 @@ trait TaxGroupsService {
 @Singleton
 class TaxGroupsServiceImpl @Inject() (
   taxServiceGroupsRepository: TaxGroupsRepositoryV2,
-  userClientDetailsConnector: UserClientDetailsConnector,
+  agentUserClientDetailsConnector: AgentUserClientDetailsConnector,
   auditService: AuditService
 ) extends TaxGroupsService with Logging {
 
   override def clientCountForAvailableTaxServices(
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]] =
-    userClientDetailsConnector.clientCountByTaxService(arn).flatMap {
+    agentUserClientDetailsConnector.clientCountByTaxService(arn).flatMap {
       case Some(fullMap) =>
         Future
           .sequence(
@@ -113,7 +113,7 @@ class TaxGroupsServiceImpl @Inject() (
     arn: Arn
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]] =
     for {
-      fullCount         <- userClientDetailsConnector.clientCountByTaxService(arn)
+      fullCount         <- agentUserClientDetailsConnector.clientCountByTaxService(arn)
       existingTaxGroups <- getAllTaxServiceGroups(arn)
 
       taxServiceIds = existingTaxGroups.map(groups => groups.service)

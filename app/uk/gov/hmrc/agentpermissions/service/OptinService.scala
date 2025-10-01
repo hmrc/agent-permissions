@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.service
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, RecordInserted, RecordUpdated, UpsertType}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
@@ -55,7 +55,7 @@ class OptinServiceImpl @Inject() (
   optinRecordBuilder: OptinRecordBuilder,
   optedInStatusHandler: OptedInStatusHandler,
   notOptedInStatusHandler: NotOptedInStatusHandler,
-  userClientDetailsConnector: UserClientDetailsConnector,
+  agentUserClientDetailsConnector: AgentUserClientDetailsConnector,
   auditService: AuditService
 ) extends OptinService with Logging {
 
@@ -116,7 +116,7 @@ class OptinServiceImpl @Inject() (
                              case Some(optinRecordToUpdate) =>
                                optinRepository.upsert(optinRecordToUpdate)
                            }
-      _ <- userClientDetailsConnector.getClients(arn, sendEmail = optinEventType == OptedIn, lang = lang)
+      _ <- agentUserClientDetailsConnector.getClients(arn, sendEmail = optinEventType == OptedIn, lang = lang)
     } yield maybeUpsertResult
 
 }

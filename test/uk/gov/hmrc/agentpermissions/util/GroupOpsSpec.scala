@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.util
 
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.http.HeaderCarrier
@@ -25,7 +25,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext
 
-class GroupOpsSpec extends BaseSpec {
+class GroupOpsSpec extends TestConstants {
 
   "Removing clients from access group" when {
 

@@ -20,7 +20,7 @@ import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -33,13 +33,13 @@ trait NotOptedInStatusHandler {
 }
 
 @Singleton
-class NotOptedInStatusHandlerImpl @Inject() (userClientDetailsConnector: UserClientDetailsConnector)(implicit
+class NotOptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: AgentUserClientDetailsConnector)(implicit
   appConfig: AppConfig
 ) extends NotOptedInStatusHandler with Logging {
 
   def identifyStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
     for {
-      maybeSize <- userClientDetailsConnector.agentSize(arn)
+      maybeSize <- agentUserClientDetailsConnector.agentSize(arn)
       maybeOptinStatus: Option[OptinStatus] <-
         maybeSize match {
           case None =>
@@ -49,7 +49,7 @@ class NotOptedInStatusHandlerImpl @Inject() (userClientDetailsConnector: UserCli
               Future.successful(Option(OptedOutWrongClientCount))
             } else {
               for {
-                maybeSingleUser <- userClientDetailsConnector.isSingleUserAgency(arn)
+                maybeSingleUser <- agentUserClientDetailsConnector.isSingleUserAgency(arn)
                 maybeOptinStatus: Option[OptinStatus] <- {
                   maybeSingleUser match {
                     case None =>

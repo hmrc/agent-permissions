@@ -18,14 +18,14 @@ package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.Json
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 import java.time.LocalDateTime
 
-class SensitiveOptinRecordSpec extends BaseSpec {
+class SensitiveOptinRecordSpec extends TestConstants {
 
   val agentUser1 = AgentUser("agentUser1", "Robert Smith")
   val agentUser2 = AgentUser("agentUser2", "Sandy Jones")

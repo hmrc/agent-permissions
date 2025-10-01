@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.agentpermissions.binders
 
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import support.UnitSpec
 
-class SimpleObjectBinderSpec extends BaseSpec {
+class SimpleObjectBinderSpec extends UnitSpec {
 
   case class Example(str: String)
 

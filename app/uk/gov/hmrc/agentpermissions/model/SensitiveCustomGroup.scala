@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.agentpermissions.repository.storagemodel
+package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json._
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agentpermissions.model.accessgroups.TaxGroup
+import uk.gov.hmrc.agentpermissions.model.accessgroups.CustomGroup
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter, Sensitive}
 
 import java.time.LocalDateTime
 
-case class SensitiveTaxGroup(
+case class SensitiveCustomGroup(
   _id: String,
   arn: Arn,
   groupName: String,
@@ -33,12 +33,10 @@ case class SensitiveTaxGroup(
   createdBy: SensitiveAgentUser,
   lastUpdatedBy: SensitiveAgentUser,
   teamMembers: Set[SensitiveAgentUser],
-  service: String, // Nice to use Service but want flexibility for Trusts
-  automaticUpdates: Boolean,
-  excludedClients: Set[SensitiveClient],
+  clients: Set[SensitiveClient],
   formatVersion: String = "2"
-) extends Sensitive[TaxGroup] {
-  def decryptedValue: TaxGroup = TaxGroup(
+) extends Sensitive[CustomGroup] {
+  def decryptedValue: CustomGroup = CustomGroup(
     id = GroupId.fromString(_id),
     arn = arn,
     groupName = groupName,
@@ -47,27 +45,24 @@ case class SensitiveTaxGroup(
     createdBy = createdBy.decryptedValue,
     lastUpdatedBy = lastUpdatedBy.decryptedValue,
     teamMembers = teamMembers.map(_.decryptedValue),
-    service = service,
-    automaticUpdates = automaticUpdates,
-    excludedClients = excludedClients.map(_.decryptedValue)
+    clients = clients.map(_.decryptedValue)
   )
 }
 
-object SensitiveTaxGroup {
-  implicit def apply(taxGroup: TaxGroup): SensitiveTaxGroup = SensitiveTaxGroup(
-    _id = taxGroup.id.toString,
-    arn = taxGroup.arn,
-    groupName = taxGroup.groupName,
-    created = taxGroup.created,
-    lastUpdated = taxGroup.lastUpdated,
-    createdBy = SensitiveAgentUser(taxGroup.createdBy),
-    lastUpdatedBy = SensitiveAgentUser(taxGroup.lastUpdatedBy),
-    teamMembers = taxGroup.teamMembers.map(SensitiveAgentUser(_)),
-    service = taxGroup.service,
-    automaticUpdates = taxGroup.automaticUpdates,
-    excludedClients = taxGroup.excludedClients.map(SensitiveClient(_))
-  )
+object SensitiveCustomGroup {
+  def apply(customGroup: CustomGroup): SensitiveCustomGroup =
+    SensitiveCustomGroup(
+      _id = customGroup.id.toString,
+      arn = customGroup.arn,
+      groupName = customGroup.groupName,
+      created = customGroup.created,
+      lastUpdated = customGroup.lastUpdated,
+      createdBy = SensitiveAgentUser(customGroup.createdBy),
+      lastUpdatedBy = SensitiveAgentUser(customGroup.lastUpdatedBy),
+      teamMembers = customGroup.teamMembers.map(SensitiveAgentUser(_)),
+      clients = customGroup.clients.map(SensitiveClient(_))
+    )
 
-  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveTaxGroup] =
-    Json.format[SensitiveTaxGroup]
+  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveCustomGroup] =
+    Json.format[SensitiveCustomGroup]
 }

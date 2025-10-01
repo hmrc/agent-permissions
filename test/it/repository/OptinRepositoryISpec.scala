@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.repository
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
@@ -30,7 +30,7 @@ import java.time.LocalDateTime
 import scala.concurrent.ExecutionContext
 
 class OptinRepositorySpec
-    extends BaseSpec with PlayMongoRepositorySupport[SensitiveOptinRecord] with CleanMongoCollectionSupport {
+    extends TestConstants with PlayMongoRepositorySupport[SensitiveOptinRecord] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 

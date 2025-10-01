@@ -18,12 +18,13 @@ package uk.gov.hmrc.agentpermissions
 
 import com.typesafe.config.ConfigFactory
 import play.api.Configuration
+import support.UnitSpec
 import uk.gov.hmrc.crypto.{Crypted, PlainBytes, PlainText}
 
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
-class CryptoProviderModuleSpec extends BaseSpec {
+class CryptoProviderModuleSpec extends UnitSpec {
 
   def configuration(fieldLevelEncryptionEnabled: Boolean) = Configuration(
     ConfigFactory.parseString(s"""fieldLevelEncryption {

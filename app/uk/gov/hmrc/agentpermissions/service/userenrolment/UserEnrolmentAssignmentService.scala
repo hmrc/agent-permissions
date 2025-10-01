@@ -18,9 +18,9 @@ package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.connectors.{AssignmentsNotPushed, AssignmentsPushed, EacdAssignmentsPushStatus, UserClientDetailsConnector}
-import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.model.EacdAssignmentsPushStatus.{AssignmentsNotPushed, AssignmentsPushed}
+import uk.gov.hmrc.agentpermissions.model.{Arn, EacdAssignmentsPushStatus, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.http.HeaderCarrier
@@ -65,7 +65,7 @@ trait UserEnrolmentAssignmentService {
 @Singleton
 class UserEnrolmentAssignmentServiceImpl @Inject() (
   customGroupsRepository: CustomGroupsRepositoryV2,
-  userClientDetailsConnector: UserClientDetailsConnector
+  agentUserClientDetailsConnector: AgentUserClientDetailsConnector
 ) extends UserEnrolmentAssignmentService with Logging {
 
   override def calculateForGroupCreation(
@@ -165,7 +165,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
           .sequence(
             UserEnrolmentAssignmentOps
               .split(userEnrolmentAssignments, 500)
-              .map(userClientDetailsConnector.pushAssignments(_))
+              .map(agentUserClientDetailsConnector.pushAssignments(_))
           )
           .map(pushStatuses =>
             if (pushStatuses.forall(_ == AssignmentsPushed)) AssignmentsPushed else AssignmentsNotPushed

@@ -17,11 +17,11 @@
 package uk.gov.hmrc.agentpermissions.service.audit
 
 import play.api.libs.json.{Json, Writes}
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import support.UnitSpec
 
 import java.util.UUID
 
-class AuditEventBatchSpec extends BaseSpec {
+class AuditEventBatchSpec extends UnitSpec {
 
   case class TestObject(name: String)
   object TestObject {

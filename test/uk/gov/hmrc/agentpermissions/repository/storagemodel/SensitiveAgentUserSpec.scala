@@ -17,11 +17,12 @@
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
 import play.api.libs.json.{JsObject, Json}
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
+import uk.gov.hmrc.agentpermissions.model.SensitiveAgentUser
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
-class SensitiveAgentUserSpec extends BaseSpec {
+class SensitiveAgentUserSpec extends TestConstants {
 
   implicit val crypto: Encrypter with Decrypter = aesCrypto
 

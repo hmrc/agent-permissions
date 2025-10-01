@@ -17,10 +17,10 @@
 package uk.gov.hmrc.agentpermissions.config
 
 import play.api.{Configuration, Environment}
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import support.UnitSpec
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
-class AppConfigSpec extends BaseSpec {
+class AppConfigSpec extends UnitSpec {
 
   private val env = Environment.simple()
   private val configuration = Configuration.load(env)

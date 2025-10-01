@@ -17,7 +17,7 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
@@ -26,7 +26,7 @@ import java.time.Instant
 import scala.concurrent.ExecutionContext
 
 class EacdSyncRepositorySpec
-    extends BaseSpec with PlayMongoRepositorySupport[EacdSyncRecord] with CleanMongoCollectionSupport {
+    extends TestConstants with PlayMongoRepositorySupport[EacdSyncRecord] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
 

@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.repository
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
@@ -28,7 +28,7 @@ import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositoryS
 import scala.concurrent.ExecutionContext
 
 class BetaInviteRepositorySpec
-    extends BaseSpec with PlayMongoRepositorySupport[BetaInviteRecord] with CleanMongoCollectionSupport {
+    extends TestConstants with PlayMongoRepositorySupport[BetaInviteRecord] with CleanMongoCollectionSupport {
 
   implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 

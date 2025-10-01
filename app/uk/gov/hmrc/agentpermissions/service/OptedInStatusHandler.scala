@@ -19,7 +19,7 @@ package uk.gov.hmrc.agentpermissions.service
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.connectors.UserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -32,12 +32,12 @@ trait OptedInStatusHandler {
 }
 
 @Singleton
-class OptedInStatusHandlerImpl @Inject() (userClientDetailsConnector: UserClientDetailsConnector)
+class OptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: AgentUserClientDetailsConnector)
     extends OptedInStatusHandler with Logging {
 
   def identifyStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
     for {
-      maybeSingleUser <- userClientDetailsConnector.isSingleUserAgency(arn)
+      maybeSingleUser <- agentUserClientDetailsConnector.isSingleUserAgency(arn)
       maybeOptinStatus: Option[OptinStatus] <- {
         maybeSingleUser match {
           case None =>
@@ -47,7 +47,7 @@ class OptedInStatusHandlerImpl @Inject() (userClientDetailsConnector: UserClient
               Future.successful(Option(OptedInSingleUser))
             } else {
               for {
-                maybeWorkItemsExist <- userClientDetailsConnector.outstandingWorkItemsExist(arn)
+                maybeWorkItemsExist <- agentUserClientDetailsConnector.outstandingWorkItemsExist(arn)
                 maybeOptinStatus <- maybeWorkItemsExist match {
                                       case None =>
                                         Future.successful(None)

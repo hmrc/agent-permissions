@@ -39,18 +39,3 @@ object BetaInviteRecord {
   implicit val formatBetaInviteRecord: Format[BetaInviteRecord] =
     Format(readsBetaInviteRecord, writesBetaInviteRecord)
 }
-
-class BetaInvite {
-
-  sealed trait BetaInviteStatus {
-    val value: Boolean
-  }
-
-  case object HideBetaInvite extends BetaInviteStatus {
-    override val value = true
-  }
-  case object ShowBetaInvite extends BetaInviteStatus {
-    override val value = false
-  }
-
-}

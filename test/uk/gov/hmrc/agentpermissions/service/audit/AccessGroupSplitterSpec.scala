@@ -17,13 +17,13 @@
 package uk.gov.hmrc.agentpermissions.service.audit
 
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.BaseSpec
+import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{CustomGroup, TaxGroup}
 
 import java.time.LocalDateTime
 
-class AccessGroupSplitterSpec extends BaseSpec with AuditTestSupport {
+class AccessGroupSplitterSpec extends TestConstants with AuditTestSupport {
 
   "Splitter" should {
     "create chunks correctly for custom groups" in {
