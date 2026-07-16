@@ -28,14 +28,14 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[OptedInStatusHandlerImpl])
 trait OptedInStatusHandler {
-  def identifyStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]]
+  def identifyStatus(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]]
 }
 
 @Singleton
 class OptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: AgentUserClientDetailsConnector)
     extends OptedInStatusHandler with Logging {
 
-  def identifyStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
+  def identifyStatus(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
     for {
       maybeSingleUser <- agentUserClientDetailsConnector.isSingleUserAgency(arn)
       maybeOptinStatus: Option[OptinStatus] <- {

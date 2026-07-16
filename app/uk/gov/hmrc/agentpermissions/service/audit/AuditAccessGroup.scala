@@ -37,5 +37,5 @@ case class AuditAccessGroup(
 )
 
 object AuditAccessGroup {
-  implicit val formatAccessGroup: OFormat[AuditAccessGroup] = Json.format[AuditAccessGroup]
+  given OFormat[AuditAccessGroup] = Json.format[AuditAccessGroup]
 }

@@ -24,7 +24,7 @@ import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 class SensitiveAgentUserSpec extends TestConstants {
 
-  implicit val crypto: Encrypter with Decrypter = aesCrypto
+  given crypto: (Encrypter & Decrypter) = aesCrypto
 
   val agentUser: AgentUser = AgentUser("agentUser1", "Robert Smith")
   val sensitiveAgentUser: SensitiveAgentUser = SensitiveAgentUser(agentUser)

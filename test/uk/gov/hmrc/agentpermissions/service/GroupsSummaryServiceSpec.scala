@@ -96,8 +96,8 @@ class GroupsSummaryServiceSpec extends TestConstants {
       groupSummary(name = "VAT", taxService = Some(serviceVat))
     )
 
-    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    given HeaderCarrier = HeaderCarrier()
 
     val mockTaxGroupsRepository: TaxGroupsRepositoryV2 = mock[TaxGroupsRepositoryV2]
     val mockTaxGroupsService: TaxGroupsService = mock[TaxGroupsService]
@@ -127,7 +127,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       groups: Seq[TaxGroup]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxGroup]]] =
       (mockTaxGroupsService
-        .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .getAllTaxServiceGroups(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.successful(groups))
 
@@ -135,7 +135,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       clientsCounts: Map[String, Int]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Map[String, Int]]] =
       (mockTaxGroupsService
-        .clientCountForTaxGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .clientCountForTaxGroups(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.successful(clientsCounts))
 
@@ -143,7 +143,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       groups: Seq[CustomGroup]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[CustomGroup]]] =
       (mockCustomGroupsService
-        .getAllCustomGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .getAllCustomGroups(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.successful(groups))
 
@@ -151,7 +151,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       accessGroupSummaries: Seq[GroupSummary]
     ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockCustomGroupsService
-        .getCustomGroupSummariesForClient(_: Arn, _: String)(_: ExecutionContext))
+        .getCustomGroupSummariesForClient(_: Arn, _: String)(using _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful accessGroupSummaries)
 
@@ -159,7 +159,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       ex: Exception
     ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockCustomGroupsService
-        .getCustomGroupSummariesForClient(_: Arn, _: String)(_: ExecutionContext))
+        .getCustomGroupSummariesForClient(_: Arn, _: String)(using _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
@@ -167,7 +167,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       accessGroupSummaries: Seq[GroupSummary]
     ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockCustomGroupsService
-        .getCustomGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
+        .getCustomGroupSummariesForTeamMember(_: Arn, _: String)(using _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful accessGroupSummaries)
 
@@ -175,7 +175,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       ex: Exception
     ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockCustomGroupsService
-        .getCustomGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
+        .getCustomGroupSummariesForTeamMember(_: Arn, _: String)(using _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 
@@ -183,7 +183,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       accessGroupSummaries: Seq[GroupSummary]
     ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockTaxGroupsService
-        .getTaxGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
+        .getTaxGroupSummariesForTeamMember(_: Arn, _: String)(using _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful accessGroupSummaries)
 
@@ -191,7 +191,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       ex: Exception
     ): CallHandler3[Arn, String, ExecutionContext, Future[Seq[GroupSummary]]] =
       (mockTaxGroupsService
-        .getTaxGroupSummariesForTeamMember(_: Arn, _: String)(_: ExecutionContext))
+        .getTaxGroupSummariesForTeamMember(_: Arn, _: String)(using _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.failed(ex))
 

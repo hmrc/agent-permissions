@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
+import uk.gov.hmrc.mongo.logging.ObservableFutureImplicits.SingleObservableFuture
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import uk.gov.hmrc.agentpermissions.model.Arn
@@ -32,7 +33,7 @@ import scala.concurrent.ExecutionContext
 class OptinRepositorySpec
     extends TestConstants with PlayMongoRepositorySupport[SensitiveOptinRecord] with CleanMongoCollectionSupport {
 
-  implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -118,6 +119,6 @@ class OptinRepositorySpec
 
   }
 
-  override protected lazy val repository: PlayMongoRepository[SensitiveOptinRecord] =
+  override protected val repository: PlayMongoRepository[SensitiveOptinRecord] =
     new OptinRepositoryImpl(mongoComponent, aesCrypto)
 }

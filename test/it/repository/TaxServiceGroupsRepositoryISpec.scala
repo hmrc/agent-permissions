@@ -25,6 +25,7 @@ import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveTaxGroup}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, TaxGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
+import uk.gov.hmrc.mongo.logging.ObservableFutureImplicits.SingleObservableFuture
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
@@ -35,9 +36,9 @@ import scala.concurrent.ExecutionContext
 class TaxServiceGroupsRepositorySpec
     extends TestConstants with PlayMongoRepositorySupport[SensitiveTaxGroup] with CleanMongoCollectionSupport {
 
-  implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
   val actorSystem: ActorSystem = ActorSystem()
-  implicit val materializer: Materializer = Materializer(actorSystem)
+  given Materializer = Materializer(actorSystem)
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -245,6 +246,6 @@ class TaxServiceGroupsRepositorySpec
     }
   }
 
-  override protected lazy val repository: PlayMongoRepository[SensitiveTaxGroup] =
+  override protected val repository: PlayMongoRepository[SensitiveTaxGroup] =
     new TaxGroupsRepositoryV2Impl(mongoComponent, aesCrypto)
 }

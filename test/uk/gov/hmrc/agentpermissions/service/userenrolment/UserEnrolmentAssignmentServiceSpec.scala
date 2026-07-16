@@ -47,8 +47,8 @@ class UserEnrolmentAssignmentServiceSpec extends TestConstants {
         mockUserClientDetailsConnector
       )
 
-    implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given ExecutionContext = ExecutionContext.Implicits.global
+    given HeaderCarrier = HeaderCarrier()
 
     def mockAccessGroupsRepositoryGetAll(accessGroups: Seq[CustomGroup]): CallHandler1[Arn, Future[Seq[CustomGroup]]] =
       (mockAccessGroupsRepository
@@ -68,7 +68,7 @@ class UserEnrolmentAssignmentServiceSpec extends TestConstants {
       pushStatus: EacdAssignmentsPushStatus
     ): CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Future[EacdAssignmentsPushStatus]] =
       (mockUserClientDetailsConnector
-        .pushAssignments(_: UserEnrolmentAssignments)(_: HeaderCarrier, _: ExecutionContext))
+        .pushAssignments(_: UserEnrolmentAssignments)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(userEnrolmentAssignments, *, *)
         .anyNumberOfTimes()
         .returning(Future successful pushStatus)

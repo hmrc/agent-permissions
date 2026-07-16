@@ -24,7 +24,7 @@ import uk.gov.hmrc.agentpermissions.model.EnrolmentKey
 case class Client(enrolmentKey: String, friendlyName: String)
 
 object Client {
-  implicit val format: Format[Client] = Json.format[Client]
+  given Format[Client] = Json.format[Client]
 
   def fromEnrolment(enrolment: Enrolment): Client =
     Client(EnrolmentKey.fromEnrolment(enrolment), enrolment.friendlyName)

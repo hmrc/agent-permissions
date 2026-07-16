@@ -173,12 +173,12 @@ class AuditServiceSpec extends UnitSpec with AuditTestSupport with TestConstants
     val now: LocalDateTime = LocalDateTime.now()
 
     val mockAuditConnector: AuditConnector = mock[AuditConnector]
-    implicit val mockAppConfig: AppConfig = mock[AppConfig]
+    given mockAppConfig: AppConfig = mock[AppConfig]
 
     val auditService = new AuditServiceImpl(mockAuditConnector)
 
-    implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given executionContext: ExecutionContext = ExecutionContext.Implicits.global
+    given headerCarrier: HeaderCarrier = HeaderCarrier()
 
     def buildCustomGroup(teamMembers: Set[AgentUser], clients: Set[Client]): CustomGroup =
       CustomGroup(
@@ -233,7 +233,7 @@ class AuditServiceSpec extends UnitSpec with AuditTestSupport with TestConstants
       times: Int
     ): CallHandler[Unit] =
       (mockAuditConnector
-        .sendExplicitAudit(_: String, _: JsObject)(_: HeaderCarrier, _: ExecutionContext))
+        .sendExplicitAudit(_: String, _: JsObject)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(eventType, *, *, *)
         .returning(())
         .repeat(times)

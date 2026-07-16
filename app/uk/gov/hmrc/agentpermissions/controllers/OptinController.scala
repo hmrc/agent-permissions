@@ -29,14 +29,15 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 @Singleton()
-class OptinController @Inject() (optinService: OptinService)(implicit
+class OptinController @Inject() (optinService: OptinService)(using
   authAction: AuthAction,
   val appConfig: AppConfig,
   cc: ControllerComponents,
   val ec: ExecutionContext
 ) extends BackendController(cc) with AuthorisedAgentSupport {
 
-  def optin(arn: Arn, lang: Option[String] = None): Action[AnyContent] = Action.async { implicit request =>
+  def optin(arn: Arn, lang: Option[String] = None): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       withMatchedArn(arn, authorisedAgent) {
         optinService.optin(authorisedAgent.arn, authorisedAgent.agentUser, lang) flatMap {
@@ -51,7 +52,8 @@ class OptinController @Inject() (optinService: OptinService)(implicit
     } transformWith failureHandler
   }
 
-  def optout(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def optout(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       withMatchedArn(arn, authorisedAgent) {
         optinService.optout(authorisedAgent.arn, authorisedAgent.agentUser) flatMap {
@@ -66,7 +68,8 @@ class OptinController @Inject() (optinService: OptinService)(implicit
     } transformWith failureHandler
   }
 
-  def optinStatus(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def optinStatus(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { _ =>
       optinService
         .optinStatus(arn)
@@ -78,7 +81,8 @@ class OptinController @Inject() (optinService: OptinService)(implicit
     } transformWith failureHandler
   }
 
-  def optinRecordExists(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def optinRecordExists(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { _ =>
       optinService
         .optinRecordExists(arn)

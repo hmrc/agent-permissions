@@ -23,8 +23,7 @@ import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{Client, UserDetails}
 import uk.gov.hmrc.agentpermissions.model.{Arn, PaginatedList, PaginationMetaData, UserEnrolmentAssignments}
 
-trait AgentUserClientDetailsStubs {
-  _: TestConstants =>
+trait AgentUserClientDetailsStubs { this: TestConstants =>
 
   private val aucdPath: String = "/agent-user-client-details"
 
@@ -104,10 +103,12 @@ trait AgentUserClientDetailsStubs {
     )
 
   def givenGetPaginatedClientsSuccess(
-    arn: Arn
+    arn: Arn,
+    page: Int = 1,
+    pageSize: Int = 10
   )(clients: Seq[Client]): StubMapping = {
     val url = s"$aucdPath/arn/${arn.value}/clients" +
-      s"?page=1&pageSize=10"
+      s"?page=$page&pageSize=$pageSize"
     stubFor(
       get(urlEqualTo(url)).willReturn(
         aResponse()

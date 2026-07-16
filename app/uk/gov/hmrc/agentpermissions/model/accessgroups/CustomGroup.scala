@@ -35,5 +35,5 @@ case class CustomGroup(
 ) extends AccessGroup
 
 object CustomGroup {
-  implicit val format: OFormat[CustomGroup] = Json.format[CustomGroup]
+  given OFormat[CustomGroup] = Json.format[CustomGroup]
 }

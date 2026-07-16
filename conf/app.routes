@@ -23,7 +23,7 @@ PATCH   /groups/:gid                        uk.gov.hmrc.agentpermissions.control
 PUT     /groups/:gid/members/add            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addMembers(gid: GroupId)
 PATCH   /groups/:id/members/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addTeamMemberToGroup(id: GroupId)
 GET     /group/:gid/clients                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForGroup(gid: GroupId, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
-GET     /group/:gid/clients/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForAddingToGroup(gid: GroupId, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
+GET     /group/:gid/clients/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForAddingToGroup(gid: GroupId, page: Int ?= 1, pageSize: Int ?= 20, search: Option[String] ?= None, filter: Option[String] ?= None)
 DELETE  /groups/:gid/clients/:clientId      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeClient(gid: GroupId, clientId: String)
 DELETE  /groups/:gid/members/:memberId      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeTeamMember(gid: GroupId, memberId: String)
 

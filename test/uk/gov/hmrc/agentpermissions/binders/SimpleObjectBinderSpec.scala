@@ -36,8 +36,8 @@ class SimpleObjectBinderSpec extends UnitSpec {
 
     "error path" should {
       "throw exceptions" in {
-        val bind: String => Example = param => throw new RuntimeException("Bad")
-        val unbind: Example => String = example => throw new RuntimeException("Sad")
+        val bind: String => Example = _ => throw new RuntimeException("Bad")
+        val unbind: Example => String = _ => throw new RuntimeException("Sad")
         val binder = new SimpleObjectBinder[Example](bind, unbind)
         binder.bind("key", "in") shouldBe Left("Cannot parse parameter 'key' with value 'in' as 'Example'")
         assertThrows[RuntimeException](binder.unbind("key", Example("out")))

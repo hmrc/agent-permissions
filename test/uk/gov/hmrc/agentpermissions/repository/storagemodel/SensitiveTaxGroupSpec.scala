@@ -27,7 +27,7 @@ import java.util.UUID
 
 class SensitiveTaxGroupSpec extends TestConstants {
 
-  implicit val crypto: Encrypter with Decrypter = aesCrypto
+  given crypto: (Encrypter & Decrypter) = aesCrypto
 
   val agentUser: AgentUser = AgentUser(id = "agentUser1", name = "Robert Smith")
   val client: Client = Client(enrolmentKey = "HMRC-MTD-VAT~VRN~123456789", friendlyName = "Smith Roberts")

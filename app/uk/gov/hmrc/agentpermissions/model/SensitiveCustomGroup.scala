@@ -63,6 +63,6 @@ object SensitiveCustomGroup {
       clients = customGroup.clients.map(SensitiveClient(_))
     )
 
-  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveCustomGroup] =
+  given databaseFormat(using crypto: Encrypter & Decrypter): Format[SensitiveCustomGroup] =
     Json.format[SensitiveCustomGroup]
 }

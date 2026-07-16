@@ -34,12 +34,12 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[CustomGroupsServiceImpl])
 trait CustomGroupsService {
-  def addMemberToGroup(gid: GroupId, teamMember: AgentUser, whoIsUpdating: AgentUser)(implicit
+  def addMemberToGroup(gid: GroupId, teamMember: AgentUser, whoIsUpdating: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
 
-  def getById(id: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]]
+  def getById(id: GroupId)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]]
 
   def getGroupByIdWithPageOfClientsToAdd(
     id: GroupId,
@@ -47,48 +47,48 @@ trait CustomGroupsService {
     pageSize: Int = 20,
     search: Option[String] = None,
     filter: Option[String] = None
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[(GroupSummary, PaginatedList[DisplayClient])]]
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[(GroupSummary, PaginatedList[DisplayClient])]]
 
   def create(
     accessGroup: CustomGroup
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus]
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus]
 
-  def getAllCustomGroups(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[CustomGroup]]
+  def getAllCustomGroups(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[CustomGroup]]
 
-  def get(arn: Arn, groupName: String)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]]
+  def get(arn: Arn, groupName: String)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]]
 
-  def getCustomGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
+  def getCustomGroupSummariesForClient(arn: Arn, enrolmentKey: String)(using
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]]
 
-  def getCustomGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+  def getCustomGroupSummariesForTeamMember(arn: Arn, userId: String)(using
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]]
-  def delete(arn: Arn, groupName: String, agentUser: AgentUser)(implicit
+  def delete(arn: Arn, groupName: String, agentUser: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupDeletionStatus]
 
-  def update(arn: Arn, groupName: String, accessGroup: CustomGroup, whoIsUpdating: AgentUser)(implicit
+  def update(arn: Arn, groupName: String, accessGroup: CustomGroup, whoIsUpdating: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
 
-  def removeClient(groupId: GroupId, clientId: String, whoIsUpdating: AgentUser)(implicit
+  def removeClient(groupId: GroupId, clientId: String, whoIsUpdating: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
 
-  def removeTeamMember(groupId: GroupId, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
+  def removeTeamMember(groupId: GroupId, teamMemberId: String, whoIsUpdating: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus]
 
-  def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList]
+  def getAllClients(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList]
 
-  def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
+  def getAssignedClients(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
 
-  def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
+  def getUnassignedClients(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]]
 
 }
 
@@ -103,7 +103,7 @@ class CustomGroupsServiceImpl @Inject() (
   auditService: AuditService
 ) extends CustomGroupsService with Logging {
 
-  override def getById(id: GroupId)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]] =
+  override def getById(id: GroupId)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]] =
     customGroupsRepository
       .findById(id)
       .flatMap(withClientName)
@@ -111,11 +111,11 @@ class CustomGroupsServiceImpl @Inject() (
   /** Gets a page of clients for the Arn and then finds if any of them are already in the group */
   override def getGroupByIdWithPageOfClientsToAdd(
     id: GroupId,
-    page: Int = 1,
-    pageSize: Int = 20,
-    search: Option[String] = None,
-    filter: Option[String] = None
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[(GroupSummary, PaginatedList[DisplayClient])]] =
+    page: Int,
+    pageSize: Int,
+    search: Option[String],
+    filter: Option[String]
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[(GroupSummary, PaginatedList[DisplayClient])]] =
     customGroupsRepository
       .findById(id)
       .flatMap {
@@ -138,7 +138,7 @@ class CustomGroupsServiceImpl @Inject() (
 
   override def create(
     accessGroup: CustomGroup
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus] =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus] =
     customGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
       case Some(_) =>
         Future.successful(AccessGroupExistsForCreation)
@@ -165,12 +165,12 @@ class CustomGroupsServiceImpl @Inject() (
 
   override def getAllCustomGroups(
     arn: Arn
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[CustomGroup]] =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[CustomGroup]] =
     customGroupsRepository
       .get(arn)
       .flatMap(withClientNames)
 
-  override def get(arn: Arn, groupName: String)(implicit
+  override def get(arn: Arn, groupName: String)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Option[CustomGroup]] =
@@ -178,7 +178,7 @@ class CustomGroupsServiceImpl @Inject() (
       .get(arn, groupName)
       .flatMap(withClientName)
 
-  override def getCustomGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
+  override def getCustomGroupSummariesForClient(arn: Arn, enrolmentKey: String)(using
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]] =
     customGroupsRepository
@@ -189,7 +189,7 @@ class CustomGroupsServiceImpl @Inject() (
           .map(GroupSummary.of(_))
       )
 
-  override def getCustomGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+  override def getCustomGroupSummariesForTeamMember(arn: Arn, userId: String)(using
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]] =
     customGroupsRepository
@@ -200,7 +200,7 @@ class CustomGroupsServiceImpl @Inject() (
           .map(GroupSummary.of(_))
       )
 
-  override def delete(arn: Arn, groupName: String, agentUser: AgentUser)(implicit
+  override def delete(arn: Arn, groupName: String, agentUser: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupDeletionStatus] =
@@ -229,7 +229,7 @@ class CustomGroupsServiceImpl @Inject() (
                                    }
     } yield accessGroupDeletionStatus
 
-  override def update(arn: Arn, groupName: String, accessGroup: CustomGroup, whoIsUpdating: AgentUser)(implicit
+  override def update(arn: Arn, groupName: String, accessGroup: CustomGroup, whoIsUpdating: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
@@ -257,7 +257,7 @@ class CustomGroupsServiceImpl @Inject() (
     groupName: String,
     updatedGroup: CustomGroup,
     maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupUpdateStatus] =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupUpdateStatus] =
     for {
       maybeUpdatedCount <-
         customGroupsRepository
@@ -293,7 +293,7 @@ class CustomGroupsServiceImpl @Inject() (
                                  }
     } yield accessGroupUpdateStatus
 
-  def removeClient(groupId: GroupId, clientId: String, whoIsUpdating: AgentUser)(implicit
+  def removeClient(groupId: GroupId, clientId: String, whoIsUpdating: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
@@ -326,7 +326,7 @@ class CustomGroupsServiceImpl @Inject() (
         case _ => Future successful AccessGroupNotUpdated
       }
 
-  def removeTeamMember(groupId: GroupId, teamMemberId: String, whoIsUpdating: AgentUser)(implicit
+  def removeTeamMember(groupId: GroupId, teamMemberId: String, whoIsUpdating: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =
@@ -359,7 +359,7 @@ class CustomGroupsServiceImpl @Inject() (
       }
 
   // TODO move below to groups summary service
-  override def getAllClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
+  override def getAllClients(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
     for {
       clients      <- agentUserClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
       accessGroups <- if (clients.nonEmpty) customGroupsRepository.get(arn) else Future.successful(Seq.empty)
@@ -386,17 +386,17 @@ class CustomGroupsServiceImpl @Inject() (
       }
     }
 
-  override def getAssignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
+  override def getAssignedClients(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
     getAllClients(arn).map(_.assigned)
 
-  override def getUnassignedClients(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
+  override def getUnassignedClients(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
     getAllClients(arn).map(_.unassigned)
   // TODO move above to groups summary service
 
   private def mergeWhoIsUpdating(accessGroup: CustomGroup, whoIsUpdating: AgentUser): Future[CustomGroup] =
     Future.successful(accessGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
 
-  private def pushAssignments(maybeCalculatedAssignments: Option[UserEnrolmentAssignments])(implicit
+  private def pushAssignments(maybeCalculatedAssignments: Option[UserEnrolmentAssignments])(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[EacdAssignmentsPushStatus] =
@@ -418,7 +418,7 @@ class CustomGroupsServiceImpl @Inject() (
 
   private def withClientName(
     maybeAccessGroup: Option[CustomGroup]
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]] =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]] =
     maybeAccessGroup.fold(Future successful Option.empty[CustomGroup])(accessGroup =>
       agentUserClientDetailsConnector
         .getClients(accessGroup.arn)
@@ -446,7 +446,7 @@ class CustomGroupsServiceImpl @Inject() (
 
   private def withClientNames(
     accessGroups: Seq[CustomGroup]
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[CustomGroup]] =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[CustomGroup]] =
     accessGroups match {
       case Nil => Future successful accessGroups
       case accessGroups =>
@@ -459,7 +459,7 @@ class CustomGroupsServiceImpl @Inject() (
         }
     }
 
-  override def addMemberToGroup(groupId: GroupId, teamMemberToAdd: AgentUser, whoIsUpdating: AgentUser)(implicit
+  override def addMemberToGroup(groupId: GroupId, teamMemberToAdd: AgentUser, whoIsUpdating: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[AccessGroupUpdateStatus] =

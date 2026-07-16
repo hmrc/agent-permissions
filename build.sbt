@@ -4,20 +4,18 @@ import uk.gov.hmrc.DefaultBuildSettings
 val appName = "agent-permissions"
 
 ThisBuild / majorVersion := 1
-ThisBuild / scalaVersion := "2.13.18"
+ThisBuild / scalaVersion := "3.7.4"
 
 val scalaCOptions = Seq(
   "-Werror",
-  "-Wdead-code",
+  "-unchecked",
+  "-deprecation",
   "-feature",
   "-language:implicitConversions",
-  "-Xlint",
   "-Wconf:src=target/.*:s", // silence warnings from compiled files
-  "-Wconf:src=*html:w", // silence html warnings as they are wrong
   "-Wconf:cat=deprecation:s",
-  "-Wconf:cat=unused-privates:s",
-  "-Wconf:msg=match may not be exhaustive:is", // summarize warnings about non-exhaustive pattern matching
-  "-Ywarn-value-discard"
+  "-Wconf:msg=Flag.*repeatedly:s",
+  "-Wconf:msg=unused privates:s"
 )
 
 lazy val root = (project in file("."))
@@ -26,7 +24,7 @@ lazy val root = (project in file("."))
     organization := "uk.gov.hmrc",
     PlayKeys.playDefaultPort         := 9447,
     routesImport                     ++= Seq(
-      "uk.gov.hmrc.agentpermissions.binders.Binders._",
+      "uk.gov.hmrc.agentpermissions.binders.Binders.{given, *}",
       "uk.gov.hmrc.agentpermissions.model.Arn",
       "uk.gov.hmrc.agentpermissions.models.GroupId"
     ),

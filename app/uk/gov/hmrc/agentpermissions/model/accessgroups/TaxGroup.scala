@@ -37,5 +37,5 @@ case class TaxGroup(
 ) extends AccessGroup
 
 object TaxGroup {
-  implicit val format: OFormat[TaxGroup] = Json.format[TaxGroup]
+  given OFormat[TaxGroup] = Json.format[TaxGroup]
 }

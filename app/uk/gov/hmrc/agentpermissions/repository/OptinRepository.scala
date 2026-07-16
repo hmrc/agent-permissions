@@ -44,11 +44,11 @@ trait OptinRepository {
 @Singleton
 class OptinRepositoryImpl @Inject() (
   mongoComponent: MongoComponent,
-  @Named("aes") crypto: Encrypter with Decrypter
-)(implicit val ec: ExecutionContext)
+  @Named("aes") crypto: Encrypter & Decrypter
+)(using ec: ExecutionContext)
     extends PlayMongoRepository[SensitiveOptinRecord](
       collectionName = "optin",
-      domainFormat = SensitiveOptinRecord.format(crypto),
+      domainFormat = SensitiveOptinRecord.format(using crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true))

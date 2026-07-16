@@ -54,5 +54,5 @@ object GroupSummary {
         )
     }
 
-  implicit val format: OFormat[GroupSummary] = Json.format[GroupSummary]
+  given OFormat[GroupSummary] = Json.format[GroupSummary]
 }

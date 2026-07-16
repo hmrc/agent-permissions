@@ -38,8 +38,8 @@ class BetaInviteServiceSpec extends TestConstants {
     val mockBetaInviteRecordBuilder: BetaInviteRecordBuilder = mock[BetaInviteRecordBuilder]
     val mockAuditService: AuditService = mock[AuditService]
 
-    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    given HeaderCarrier = HeaderCarrier()
 
     val betaInviteService =
       new BetaInviteServiceImpl(

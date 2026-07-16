@@ -32,7 +32,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 @Singleton()
-class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(implicit
+class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(using
   authAction: AuthAction,
   cc: ControllerComponents,
   val ec: ExecutionContext
@@ -40,7 +40,8 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
 
   private val MAX_LENGTH_GROUP_NAME = 50 // 32
 
-  def createGroup(arn: Arn): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def createGroup(arn: Arn): Action[JsValue] = Action.async(parse.json) { request =>
+    given Request[JsValue] = request
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         withJsonParsed[CreateTaxServiceGroupRequest] { createGroupRequest =>
@@ -61,9 +62,6 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
               case TaxServiceGroupNotCreated =>
                 logger.warn("Unable to create access group")
                 InternalServerError
-              case unknownStatus =>
-                logger.warn(s"Unknown status during group creation: $unknownStatus")
-                InternalServerError
             }
           }
         }
@@ -72,7 +70,8 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
   }
 
   // gets access group summaries for tax service groups ONLY, without client count
-  def groups(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def groups(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         taxGroupsService
@@ -83,7 +82,8 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
   }
 
   // gets a tax service group ONLY
-  def getGroup(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
+  def getGroup(gid: GroupId): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       taxGroupsService.getById(gid) map {
         case None =>
@@ -99,7 +99,8 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  def getGroupByService(arn: Arn, service: String): Action[AnyContent] = Action.async { implicit request =>
+  def getGroupByService(arn: Arn, service: String): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       taxGroupsService.getByService(arn, service).map {
         case None =>
@@ -115,7 +116,8 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  def deleteGroup(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
+  def deleteGroup(gid: GroupId): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       withTaxGroup(gid, authorisedAgent.arn) { taxGroup =>
         for {
@@ -131,7 +133,8 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  def updateGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def updateGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { request =>
+    given Request[JsValue] = request
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[UpdateTaxServiceGroupRequest] { updateGroupRequest =>
         withTaxGroup(gid, authorisedAgent.arn) { existingAccessGroup =>
@@ -151,9 +154,6 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
                 NotFound
               case TaxServiceGroupUpdated =>
                 Ok
-              case unknown =>
-                logger.warn(s"Unknown status during group update: $unknown")
-                InternalServerError
             }
           }
         }
@@ -161,7 +161,8 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  def addMembers(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def addMembers(gid: GroupId): Action[JsValue] = Action.async(parse.json) { request =>
+    given Request[JsValue] = request
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddMembersToTaxServiceGroupRequest] { updateGroupRequest =>
         withTaxGroup(gid, authorisedAgent.arn) { group =>
@@ -182,16 +183,14 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
               NotFound
             case TaxServiceGroupUpdated =>
               Ok
-            case unknown =>
-              logger.warn(s"Unknown status during group update: $unknown")
-              InternalServerError
           }
         }
       }
     } transformWith failureHandler
   }
 
-  def addTeamMemberToGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def addTeamMemberToGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { request =>
+    given Request[JsValue] = request
     withAuthorisedAgent() { _ =>
       withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
         taxGroupsService.addMemberToGroup(gid, addRequest.teamMember) map {
@@ -204,7 +203,8 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     }
   }
 
-  def removeTeamMember(gid: GroupId, memberId: String): Action[AnyContent] = Action.async { implicit request =>
+  def removeTeamMember(gid: GroupId, memberId: String): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       taxGroupsService
         .removeTeamMember(gid, memberId, authorisedAgent.agentUser)
@@ -219,7 +219,8 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     }
   }
 
-  def clientCountForAvailableTaxServices(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def clientCountForAvailableTaxServices(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         taxGroupsService
@@ -229,7 +230,8 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
     } transformWith failureHandler
   }
 
-  def clientCountForTaxGroups(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def clientCountForTaxGroups(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         taxGroupsService
@@ -242,7 +244,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
   // TODO move to separate GroupAction
   private def withTaxGroup(gid: GroupId, authorisedArn: Arn)(
     body: TaxGroup => Future[Result]
-  )(implicit hc: HeaderCarrier): Future[Result] =
+  )(using hc: HeaderCarrier): Future[Result] =
     taxGroupsService.getById(gid) flatMap {
       case None =>
         logger.warn(s"Group not found for '$gid', cannot update")
@@ -271,7 +273,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
 
   def withJsonParsed[T](
     body: T => Future[Result]
-  )(implicit request: Request[JsValue], reads: Reads[T]): Future[Result] =
+  )(using request: Request[JsValue], reads: Reads[T]): Future[Result] =
     request.body
       .validate[T]
       .fold(

@@ -41,7 +41,7 @@ class SensitiveOptinRecordSpec extends TestConstants {
 
   "SensitiveOptinRecord" should {
     "serialise and unserialise correctly" in {
-      implicit val crypto: Encrypter with Decrypter = aesCrypto
+      given crypto: (Encrypter & Decrypter) = aesCrypto
       val sensitiveOptinRecord = SensitiveOptinRecord(optinRecord)
       val json = Json.toJson(sensitiveOptinRecord)
       val deserialised: SensitiveOptinRecord = Json.fromJson[SensitiveOptinRecord](json).get
@@ -50,7 +50,7 @@ class SensitiveOptinRecordSpec extends TestConstants {
     }
 
     "be serialised to JSON with certain fields encrypted" in {
-      implicit val crypto: Encrypter with Decrypter = aesCrypto
+      given crypto: (Encrypter & Decrypter) = aesCrypto
       val sensitiveOptinRecord = SensitiveOptinRecord(optinRecord)
       val json = Json.toJson(sensitiveOptinRecord)
       val userIds = optinRecord.history.indices.map { index =>

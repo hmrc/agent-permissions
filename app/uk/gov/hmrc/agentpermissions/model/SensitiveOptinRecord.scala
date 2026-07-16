@@ -25,7 +25,7 @@ import uk.gov.hmrc.crypto._
 case class SensitiveOptinRecord(override val decryptedValue: OptinRecord) extends Sensitive[OptinRecord]
 
 object SensitiveOptinRecord {
-  def encryptFields(optinRecord: OptinRecord)(implicit crypto: Encrypter): OptinRecord = optinRecord.copy(
+  def encryptFields(optinRecord: OptinRecord)(using crypto: Encrypter): OptinRecord = optinRecord.copy(
     history = optinRecord.history.map(event =>
       event.copy(
         user = event.user.copy(
@@ -35,7 +35,7 @@ object SensitiveOptinRecord {
       )
     )
   )
-  def decryptFields(securedOptinRecord: OptinRecord)(implicit crypto: Decrypter): OptinRecord = securedOptinRecord.copy(
+  def decryptFields(securedOptinRecord: OptinRecord)(using crypto: Decrypter): OptinRecord = securedOptinRecord.copy(
     history = securedOptinRecord.history.map(event =>
       event.copy(
         user = event.user.copy(
@@ -46,7 +46,7 @@ object SensitiveOptinRecord {
     )
   )
 
-  implicit def format(implicit crypto: Encrypter with Decrypter): Format[SensitiveOptinRecord] =
+  given format(using crypto: Encrypter & Decrypter): Format[SensitiveOptinRecord] =
     new Format[SensitiveOptinRecord] {
       def reads(json: JsValue): JsResult[SensitiveOptinRecord] =
         Json.fromJson[OptinRecord](json).map(o => SensitiveOptinRecord(decryptFields(o)))

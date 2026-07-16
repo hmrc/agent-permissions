@@ -32,10 +32,9 @@ object SensitiveClient {
     friendlyName = SensitiveString(client.friendlyName)
   )
 
-  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveClient] = {
+  given databaseFormat(using crypto: Encrypter & Decrypter): Format[SensitiveClient] = {
 
-    implicit val sensitiveStringFormat: Format[SensitiveString] =
-      JsonEncryption.sensitiveEncrypterDecrypter(SensitiveString.apply)
+    given Format[SensitiveString] = JsonEncryption.sensitiveEncrypterDecrypter(SensitiveString.apply)
 
     Json.format[SensitiveClient]
   }

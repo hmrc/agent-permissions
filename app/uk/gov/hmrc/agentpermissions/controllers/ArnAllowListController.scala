@@ -24,7 +24,7 @@ import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 
-class ArnAllowListController @Inject() (implicit
+class ArnAllowListController @Inject() ()(using
   appConfig: AppConfig,
   betaInviteService: BetaInviteService,
   authAction: AuthAction,
@@ -32,17 +32,19 @@ class ArnAllowListController @Inject() (implicit
   ec: ExecutionContext
 ) extends BackendController(cc) with AuthorisedAgentSupport {
 
-  def isArnAllowed: Action[AnyContent] = Action.async { implicit request =>
+  def isArnAllowed: Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { _ =>
-      Future successful Ok
+      Future.successful(Ok)
     }
   }
 
-  def hideBetaInviteCheck: Action[AnyContent] = Action.async { implicit request =>
+  def hideBetaInviteCheck: Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true, allowlistEnabled = false) { authorisedAgent =>
       if (appConfig.checkArnAllowList) {
         if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
-          Future successful Ok
+          Future.successful(Ok)
         } else {
           for {
             hideBetaInvite <- betaInviteService.hideBetaInviteCheck(authorisedAgent.arn, authorisedAgent.agentUser)
@@ -66,7 +68,8 @@ class ArnAllowListController @Inject() (implicit
     }
   }
 
-  def hideBetaInvite: Action[AnyContent] = Action.async { implicit request =>
+  def hideBetaInvite: Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true, allowlistEnabled = false) { authorisedAgent =>
       betaInviteService
         .hideBetaInvite(authorisedAgent.arn, authorisedAgent.agentUser)

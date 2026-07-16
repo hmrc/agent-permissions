@@ -18,6 +18,8 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.libs.json._
 import play.api.mvc._
+import play.api.mvc.AnyContent
+import play.api.mvc.Request
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.util.PaginatedListBuilder
 import uk.gov.hmrc.agentpermissions.model.{AddMembersToAccessGroupRequest, AddOneTeamMemberToGroupRequest, CreateAccessGroupRequest, UpdateAccessGroupRequest}
@@ -37,13 +39,14 @@ class AccessGroupsController @Inject() (
   customGroupsService: CustomGroupsService,
   groupsService: GroupSummaryService,
   eacdSynchronizer: EacdSynchronizer
-)(implicit authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
+)(using authAction: AuthAction, cc: ControllerComponents, val ec: ExecutionContext)
     extends BackendController(cc) with AuthorisedAgentSupport {
 
   private val MAX_LENGTH_GROUP_NAME = 50
 
   /** Checks group names for duplicates across all types * */
-  def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { implicit request =>
+  def groupNameCheck(arn: Arn, name: String): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
@@ -59,7 +62,8 @@ class AccessGroupsController @Inject() (
   }
 
   /** Sorted by group name A-Z * */
-  def getAllGroupSummaries(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def getAllGroupSummaries(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         for {
@@ -69,16 +73,17 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async {
-    implicit request =>
-      withAuthorisedAgent(allowStandardUser = true) { _ =>
-        groupsService
-          .getAllGroupSummariesForClient(arn, enrolmentKey)
-          .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
-      } transformWith failureHandler
+  def getGroupSummariesForClient(arn: Arn, enrolmentKey: String): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
+    withAuthorisedAgent(allowStandardUser = true) { _ =>
+      groupsService
+        .getAllGroupSummariesForClient(arn, enrolmentKey)
+        .map(result => if (result.isEmpty) NotFound else Ok(Json.toJson(result)))
+    } transformWith failureHandler
   }
 
-  def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async { implicit request =>
+  def getGroupSummariesForTeamMember(arn: Arn, userId: String): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { _ =>
       groupsService
         .getAllGroupSummariesForTeamMember(arn, userId)
@@ -107,7 +112,8 @@ class AccessGroupsController @Inject() (
     pageSize: Int = 20,
     search: Option[String] = None,
     filter: Option[String] = None
-  ): Action[AnyContent] = Action.async { implicit request =>
+  ): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         for {
@@ -127,7 +133,8 @@ class AccessGroupsController @Inject() (
     }
   }
 
-  def createGroup(arn: Arn): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def createGroup(arn: Arn): Action[JsValue] = Action.async(parse.json) { request =>
+    given Request[JsValue] = request
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         withJsonParsed[CreateAccessGroupRequest] { createAccessGroupRequest =>
@@ -159,7 +166,8 @@ class AccessGroupsController @Inject() (
   }
 
   // gets access group summaries for custom groups ONLY
-  def groups(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def groups(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { _ =>
         customGroupsService
@@ -174,7 +182,8 @@ class AccessGroupsController @Inject() (
     message = "group could be too big with 5000+ clients - use getCustomGroupSummary & paginated lists instead",
     since = "1.0"
   )
-  def getGroup(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
+  def getGroup(gid: GroupId): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       customGroupsService.getById(gid) map {
         case None =>
@@ -190,7 +199,8 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def getCustomGroupSummary(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
+  def getCustomGroupSummary(gid: GroupId): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       customGroupsService.getById(gid) map {
         case None =>
@@ -212,7 +222,8 @@ class AccessGroupsController @Inject() (
     pageSize: Int = 20,
     search: Option[String] = None,
     filter: Option[String] = None
-  ): Action[AnyContent] = Action.async { implicit request =>
+  ): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { authorisedAgent =>
       customGroupsService.getById(gid) map {
         case None =>
@@ -243,7 +254,8 @@ class AccessGroupsController @Inject() (
     pageSize: Int = 20,
     search: Option[String] = None,
     filter: Option[String] = None
-  ): Action[AnyContent] = Action.async { implicit request =>
+  ): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { _ =>
       customGroupsService
         .getGroupByIdWithPageOfClientsToAdd(gid, page, pageSize, search, filter)
@@ -254,7 +266,8 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def deleteGroup(gid: GroupId): Action[AnyContent] = Action.async { implicit request =>
+  def deleteGroup(gid: GroupId): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       withCustomGroup(gid, authorisedAgent.arn) { customGroup =>
         for {
@@ -274,7 +287,8 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def updateGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def updateGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { request =>
+    given Request[JsValue] = request
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[UpdateAccessGroupRequest] { updateAccessGroupRequest =>
         withCustomGroup(gid, authorisedAgent.arn) { existingAccessGroup =>
@@ -304,7 +318,8 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def removeClient(gid: GroupId, clientId: String): Action[AnyContent] = Action.async { implicit request =>
+  def removeClient(gid: GroupId, clientId: String): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       customGroupsService
         .removeClient(gid, clientId, authorisedAgent.agentUser)
@@ -320,7 +335,8 @@ class AccessGroupsController @Inject() (
     }
   }
 
-  def removeTeamMember(gid: GroupId, memberId: String): Action[AnyContent] = Action.async { implicit request =>
+  def removeTeamMember(gid: GroupId, memberId: String): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       customGroupsService
         .removeTeamMember(gid, memberId, authorisedAgent.agentUser)
@@ -336,7 +352,8 @@ class AccessGroupsController @Inject() (
     }
   }
 
-  def addMembers(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def addMembers(gid: GroupId): Action[JsValue] = Action.async(parse.json) { request =>
+    given Request[JsValue] = request
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddMembersToAccessGroupRequest] { updateAccessGroupRequest =>
         withCustomGroup(gid, authorisedAgent.arn) { group =>
@@ -366,7 +383,8 @@ class AccessGroupsController @Inject() (
     } transformWith failureHandler
   }
 
-  def addTeamMemberToGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { implicit request =>
+  def addTeamMemberToGroup(gid: GroupId): Action[JsValue] = Action.async(parse.json) { request =>
+    given Request[JsValue] = request
     withAuthorisedAgent() { authorisedAgent =>
       withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
         customGroupsService
@@ -383,7 +401,8 @@ class AccessGroupsController @Inject() (
     }
   }
 
-  def syncWithEacd(arn: Arn, fullSync: Boolean = false): Action[AnyContent] = Action.async { implicit request =>
+  def syncWithEacd(arn: Arn, fullSync: Boolean = false): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       withValidAndMatchingArn(arn, authorisedAgent) { matchedArn =>
         // Note: we are not waiting for this future to complete before returning a response
@@ -403,7 +422,7 @@ class AccessGroupsController @Inject() (
 
   private def withCustomGroup(gid: GroupId, authorisedArn: Arn)(
     body: CustomGroup => Future[Result]
-  )(implicit hc: HeaderCarrier): Future[Result] =
+  )(using hc: HeaderCarrier): Future[Result] =
     customGroupsService.getById(gid) flatMap {
       case None =>
         logger.warn(s"Group not found for '$gid', cannot update")
@@ -432,7 +451,7 @@ class AccessGroupsController @Inject() (
 
   def withJsonParsed[T](
     body: T => Future[Result]
-  )(implicit request: Request[JsValue], reads: Reads[T]): Future[Result] =
+  )(using request: Request[JsValue], reads: Reads[T]): Future[Result] =
     request.body
       .validate[T]
       .fold(

@@ -32,19 +32,19 @@ import scala.concurrent.{ExecutionContext, Future}
 @ImplementedBy(classOf[OptinServiceImpl])
 trait OptinService {
 
-  def optin(arn: Arn, user: AgentUser, lang: Option[String])(implicit
+  def optin(arn: Arn, user: AgentUser, lang: Option[String])(using
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[OptinRequestStatus]]
 
-  def optout(arn: Arn, user: AgentUser)(implicit
+  def optout(arn: Arn, user: AgentUser)(using
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[OptoutRequestStatus]]
 
-  def optinStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]]
+  def optinStatus(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]]
 
-  def optinRecordExists(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean]
+  def optinRecordExists(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean]
 
   def getAll(): Future[Seq[OptinRecord]]
 }
@@ -59,7 +59,7 @@ class OptinServiceImpl @Inject() (
   auditService: AuditService
 ) extends OptinService with Logging {
 
-  override def optin(arn: Arn, user: AgentUser, lang: Option[String])(implicit
+  override def optin(arn: Arn, user: AgentUser, lang: Option[String])(using
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[OptinRequestStatus]] =
@@ -71,7 +71,7 @@ class OptinServiceImpl @Inject() (
       case RecordUpdated     => OptinUpdated
     }
 
-  override def optout(arn: Arn, user: AgentUser)(implicit
+  override def optout(arn: Arn, user: AgentUser)(using
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[OptoutRequestStatus]] =
@@ -83,7 +83,7 @@ class OptinServiceImpl @Inject() (
       case RecordUpdated     => OptoutUpdated
     }
 
-  override def optinStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
+  override def optinStatus(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
     for {
       maybeOptinRecord <- optinRepository.get(arn)
       maybeOptinStatus <- maybeOptinRecord match {
@@ -94,7 +94,7 @@ class OptinServiceImpl @Inject() (
                           }
     } yield maybeOptinStatus
 
-  override def optinRecordExists(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean] =
+  override def optinRecordExists(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean] =
     for {
       maybeOptinRecord <- optinRepository.get(arn)
     } yield maybeOptinRecord.fold(false)(_.status == OptedIn)

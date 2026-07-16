@@ -47,7 +47,7 @@ case object OptedInNotReady extends OptinStatus {
 
 object OptinStatus {
 
-  implicit val reads: Reads[OptinStatus] = {
+  given Reads[OptinStatus] = {
     case JsString(OptedInReady.value)             => JsSuccess(OptedInReady)
     case JsString(OptedInNotReady.value)          => JsSuccess(OptedInNotReady)
     case JsString(OptedInSingleUser.value)        => JsSuccess(OptedInSingleUser)
@@ -57,7 +57,7 @@ object OptinStatus {
     case invalid                                  => JsError(s"Invalid OptedIn value found: $invalid")
   }
 
-  implicit val writes: Writes[OptinStatus] = (o: OptinStatus) => JsString(o.value)
+  given Writes[OptinStatus] = (o: OptinStatus) => JsString(o.value)
 }
 
 sealed trait OptinEventType {
@@ -68,35 +68,35 @@ case object OptedOut extends OptinEventType
 
 object OptinEventType {
 
-  implicit val reads: Reads[OptinEventType] = {
+  given Reads[OptinEventType] = {
     case JsString(OptedIn.value)  => JsSuccess(OptedIn)
     case JsString(OptedOut.value) => JsSuccess(OptedOut)
     case invalid                  => JsError(s"Invalid OptinEventType value found: $invalid")
   }
 
-  implicit val writes: Writes[OptinEventType] = (o: OptinEventType) => JsString(o.value)
+  given Writes[OptinEventType] = (o: OptinEventType) => JsString(o.value)
 }
 
 case class OptinEvent(optinEventType: OptinEventType, user: AgentUser, eventDateTime: LocalDateTime)
 
 object OptinEvent {
-  implicit val formatOptinEvent: OFormat[OptinEvent] = Json.format[OptinEvent]
+  given OFormat[OptinEvent] = Json.format[OptinEvent]
 }
 
 case class OptinRecord(arn: Arn, history: List[OptinEvent]) {
 
   lazy val status: OptinEventType = history match {
     case Nil    => OptedOut
-    case events => events.sortWith(_.eventDateTime isAfter _.eventDateTime).head.optinEventType
+    case events => events.sortWith((a, b) => a.eventDateTime.isAfter(b.eventDateTime)).head.optinEventType
   }
 }
 
 object OptinRecord {
 
-  implicit val reads: Reads[OptinRecord] = Json.reads[OptinRecord]
+  given reads: Reads[OptinRecord] = Json.reads[OptinRecord]
 
-  implicit val writes: Writes[OptinRecord] = (optinRecord: OptinRecord) =>
+  given writes: Writes[OptinRecord] = (optinRecord: OptinRecord) =>
     Json.obj(fields = "arn" -> optinRecord.arn, "status" -> optinRecord.status, "history" -> optinRecord.history)
 
-  implicit val format: Format[OptinRecord] = Format(reads, writes)
+  given format: Format[OptinRecord] = Format(reads, writes)
 }

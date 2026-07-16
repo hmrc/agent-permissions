@@ -39,7 +39,7 @@ case class DisplayClient(
 
 /** copy from Selectable in agent-permissions-frontend * */
 case object DisplayClient {
-  implicit val format: OFormat[DisplayClient] = Json.format[DisplayClient]
+  given OFormat[DisplayClient] = Json.format[DisplayClient]
 
   // TODO problematic assumption about where the 'key' identifier (hmrcRef) is in an enrolmentKey
   def fromClient(client: Client, alreadyInGroup: Boolean = false): DisplayClient = {

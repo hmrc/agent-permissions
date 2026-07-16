@@ -22,6 +22,7 @@ import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
+import uk.gov.hmrc.mongo.logging.ObservableFutureImplicits.SingleObservableFuture
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
@@ -30,7 +31,7 @@ import scala.concurrent.ExecutionContext
 class BetaInviteRepositorySpec
     extends TestConstants with PlayMongoRepositorySupport[BetaInviteRecord] with CleanMongoCollectionSupport {
 
-  implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -93,6 +94,6 @@ class BetaInviteRepositorySpec
 
   }
 
-  override protected lazy val repository: PlayMongoRepository[BetaInviteRecord] =
+  override protected val repository: PlayMongoRepository[BetaInviteRecord] =
     new BetaInviteRepositoryImpl(mongoComponent)
 }

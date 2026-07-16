@@ -41,7 +41,7 @@ trait BetaInviteRepository {
 @Singleton
 class BetaInviteRepositoryImpl @Inject() (
   mongoComponent: MongoComponent
-)(implicit ec: ExecutionContext)
+)(using ec: ExecutionContext)
     extends PlayMongoRepository[BetaInviteRecord](
       collectionName = "beta-invite",
       domainFormat = BetaInviteRecord.formatBetaInviteRecord,

@@ -37,18 +37,18 @@ class AuthAction @Inject() (
   val authConnector: AuthConnector,
   val env: Environment,
   val config: Configuration
-)(implicit appConfig: AppConfig)
+)(using appConfig: AppConfig)
     extends AuthorisedFunctions with Logging {
 
   private val agentEnrolment = "HMRC-AS-AGENT"
   private val agentReferenceNumberIdentifier = "AgentReferenceNumber"
 
-  def getAuthorisedAgent(allowStandardUser: Boolean = false, allowlistEnabled: Boolean = true)(implicit
+  def getAuthorisedAgent(allowStandardUser: Boolean = false, allowlistEnabled: Boolean = true)(using
     ec: ExecutionContext,
-    request: Request[_]
+    request: Request[?]
   ): Future[Option[AuthorisedAgent]] = {
 
-    implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+    given hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
 
     authorised(AuthProviders(GovernmentGateway) and Enrolment(agentEnrolment))
       .retrieve(allEnrolments and credentialRole and credentials) { case allEnrolments ~ credentialRole ~ credentials =>

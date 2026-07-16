@@ -82,8 +82,8 @@ class CustomGroupsServiceSpec extends TestConstants {
 
     val assignedClient: AssignedClient = AssignedClient("service~key~value", None, "user")
 
-    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    given HeaderCarrier = HeaderCarrier()
 
     val mockAccessGroupsRepository: CustomGroupsRepositoryV2 = mock[CustomGroupsRepositoryV2]
     val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
@@ -145,7 +145,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
     ): CallHandler2[CustomGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForGroupCreation(_: CustomGroup)(_: ExecutionContext))
+        .calculateForGroupCreation(_: CustomGroup)(using _: ExecutionContext))
         .expects(accessGroup, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
@@ -153,7 +153,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
     ): CallHandler3[Arn, String, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForGroupDeletion(_: Arn, _: String)(_: ExecutionContext))
+        .calculateForGroupDeletion(_: Arn, _: String)(using _: ExecutionContext))
         .expects(arn, groupName, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
@@ -161,7 +161,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
     ): CallHandler4[Arn, String, CustomGroup, ExecutionContext, Future[Option[UserEnrolmentAssignments]]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForGroupUpdate(_: Arn, _: String, _: CustomGroup)(_: ExecutionContext))
+        .calculateForGroupUpdate(_: Arn, _: String, _: CustomGroup)(using _: ExecutionContext))
         .expects(arn, groupName, accessGroup, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
@@ -171,7 +171,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       Option[UserEnrolmentAssignments]
     ]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForRemoveFromGroup(_: Arn, _: String, _: Set[Client], _: Set[AgentUser])(_: ExecutionContext))
+        .calculateForRemoveFromGroup(_: Arn, _: String, _: Set[Client], _: Set[AgentUser])(using _: ExecutionContext))
         .expects(*, *, *, *, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
@@ -181,7 +181,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       Option[UserEnrolmentAssignments]
     ]] =
       (mockUserEnrolmentAssignmentService
-        .calculateForAddToGroup(_: Arn, _: String, _: Set[Client], _: Set[AgentUser])(_: ExecutionContext))
+        .calculateForAddToGroup(_: Arn, _: String, _: Set[Client], _: Set[AgentUser])(using _: ExecutionContext))
         .expects(*, *, *, *, *)
         .returning(Future successful maybeUserEnrolmentAssignments)
 
@@ -209,14 +209,14 @@ class CustomGroupsServiceSpec extends TestConstants {
       (mockAccessGroupsRepository
         .addTeamMember(_: GroupId, _: AgentUser))
         .expects(groupId, member)
-        .returning(Future.successful(UpdateResult.acknowledged(updatedCount, updatedCount, null)))
+        .returning(Future.successful(UpdateResult.acknowledged(updatedCount, updatedCount.toLong, null)))
 
     def mockAddRemoveClientFromGroup(
       groupId: GroupId,
       client: Client,
       updatedCount: Int = 1
     ): CallHandler2[GroupId, String, Future[UpdateResult]] = {
-      val updateResult = UpdateResult.acknowledged(updatedCount, updatedCount, null)
+      val updateResult = UpdateResult.acknowledged(updatedCount, updatedCount.toLong, null)
       (mockAccessGroupsRepository
         .removeClient(_: GroupId, _: String))
         .expects(groupId, client.enrolmentKey)
@@ -227,7 +227,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       groups: Seq[TaxGroup]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxGroup]]] =
       (mockTaxGroupsService
-        .getAllTaxServiceGroups(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .getAllTaxServiceGroups(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.successful(groups))
 
@@ -235,7 +235,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       maybeClients: Option[Seq[Client]]
     ): CallHandler5[Arn, Boolean, Option[String], HeaderCarrier, ExecutionContext, Future[Option[Seq[Client]]]] =
       (mockUserClientDetailsConnector
-        .getClients(_: Arn, _: Boolean, _: Option[String])(_: HeaderCarrier, _: ExecutionContext))
+        .getClients(_: Arn, _: Boolean, _: Option[String])(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *, *, *)
         .returning(Future successful maybeClients)
 
@@ -245,7 +245,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       EacdAssignmentsPushStatus
     ]] =
       (mockUserEnrolmentAssignmentService
-        .pushCalculatedAssignments(_: Option[UserEnrolmentAssignments])(_: HeaderCarrier, _: ExecutionContext))
+        .pushCalculatedAssignments(_: Option[UserEnrolmentAssignments])(using _: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future successful eacdAssignmentsPushStatus)
 
@@ -253,7 +253,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       maybeOutstandingAssignmentsWorkItemsExist: Option[Boolean]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
       (mockUserClientDetailsConnector
-        .outstandingAssignmentsWorkItemsExist(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .outstandingAssignmentsWorkItemsExist(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future successful maybeOutstandingAssignmentsWorkItemsExist)
 
@@ -267,7 +267,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       String
     ], HeaderCarrier, ExecutionContext, Future[PaginatedList[Client]]] =
       (mockUserClientDetailsConnector
-        .getPaginatedClients(_: Arn)(_: Int, _: Int, _: Option[String], _: Option[String])(
+        .getPaginatedClients(_: Arn)(_: Int, _: Int, _: Option[String], _: Option[String])(using
           _: HeaderCarrier,
           _: ExecutionContext
         ))
@@ -277,26 +277,26 @@ class CustomGroupsServiceSpec extends TestConstants {
     def mockAuditServiceAuditEsAssignmentUnassignments()
       : CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
-        .auditEsAssignmentUnassignments(_: UserEnrolmentAssignments)(_: HeaderCarrier, _: ExecutionContext))
+        .auditEsAssignmentUnassignments(_: UserEnrolmentAssignments)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(())
 
     def mockAuditServiceAuditAccessGroupCreation(): CallHandler3[CustomGroup, HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupCreation(_: CustomGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupCreation(_: CustomGroup)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(())
 
     def mockAuditServiceAuditAccessGroupUpdate(): CallHandler3[CustomGroup, HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupUpdate(_: CustomGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupUpdate(_: CustomGroup)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(())
 
     def mockAuditServiceAuditAccessGroupDeletion()
       : CallHandler5[Arn, String, AgentUser, HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupDeletion(_: Arn, _: String, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupDeletion(_: Arn, _: String, _: AgentUser)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *, *)
         .returning(())
 
@@ -383,6 +383,17 @@ class CustomGroupsServiceSpec extends TestConstants {
 
         accessGroupsService.getAllCustomGroups(arn).futureValue shouldBe
           Seq.empty
+      }
+    }
+
+    "backend client lookup returns None" should {
+      "return groups without updating client names" in new TestScope {
+
+        mockAccessGroupsRepositoryGetAll(Seq(accessGroupInMongo))
+        mockUserClientDetailsConnectorGetClients(None)
+
+        accessGroupsService.getAllCustomGroups(arn).futureValue shouldBe
+          Seq(accessGroupInMongo)
       }
     }
   }
@@ -479,6 +490,17 @@ class CustomGroupsServiceSpec extends TestConstants {
 
         accessGroupsService.getById(dbId).futureValue shouldBe
           Some(accessGroup)
+      }
+    }
+
+    "group does not exist" should {
+      "return None" in new TestScope {
+        (mockAccessGroupsRepository
+          .findById(_: GroupId))
+          .expects(dbId)
+          .returning(Future.successful(None))
+
+        accessGroupsService.getById(dbId).futureValue shouldBe None
       }
     }
   }
@@ -969,6 +991,53 @@ class CustomGroupsServiceSpec extends TestConstants {
         response.get._1.groupName shouldBe accessGroup.groupName
         response.get._1.groupId shouldBe accessGroup.id
         response.get._2.pageContent.length shouldBe accessGroup.clients.size
+      }
+    }
+
+    "called with default pagination parameters" should {
+      "use default values" in new TestScope {
+
+        (mockAccessGroupsRepository
+          .findById(_: GroupId))
+          .expects(dbId)
+          .returning(Future.successful(Some(accessGroup)))
+
+        mockAucdGetPaginatedClientsForArn(
+          accessGroup.arn,
+          search = None,
+          filter = None
+        )(
+          PaginatedList[Client](
+            accessGroup.clients.toSeq,
+            PaginationMetaData(
+              lastPage = false,
+              firstPage = false,
+              totalSize = 3,
+              totalPages = 1,
+              pageSize = 20,
+              currentPageNumber = 1,
+              currentPageSize = 10,
+              extra = None
+            )
+          )
+        )
+
+        accessGroupsService
+          .getGroupByIdWithPageOfClientsToAdd(dbId)
+          .futureValue should not be None
+      }
+    }
+
+    "group does not exist" should {
+      "return None" in new TestScope {
+        (mockAccessGroupsRepository
+          .findById(_: GroupId))
+          .expects(dbId)
+          .returning(Future.successful(None))
+
+        accessGroupsService
+          .getGroupByIdWithPageOfClientsToAdd(dbId)
+          .futureValue shouldBe None
       }
     }
   }

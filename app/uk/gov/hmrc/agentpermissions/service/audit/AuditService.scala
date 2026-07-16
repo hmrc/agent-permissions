@@ -33,46 +33,46 @@ import scala.concurrent.ExecutionContext
 
 @ImplementedBy(classOf[AuditServiceImpl])
 trait AuditService {
-  def auditOptInEvent(arn: Arn, agentUser: AgentUser)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
+  def auditOptInEvent(arn: Arn, agentUser: AgentUser)(using hc: HeaderCarrier, ec: ExecutionContext): Unit
 
-  def auditOptOutEvent(arn: Arn, agentUser: AgentUser)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
+  def auditOptOutEvent(arn: Arn, agentUser: AgentUser)(using hc: HeaderCarrier, ec: ExecutionContext): Unit
 
-  def auditAccessGroupCreation(accessGroup: AccessGroup)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
+  def auditAccessGroupCreation(accessGroup: AccessGroup)(using hc: HeaderCarrier, ec: ExecutionContext): Unit
 
-  def auditAccessGroupUpdate(accessGroup: AccessGroup)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
+  def auditAccessGroupUpdate(accessGroup: AccessGroup)(using hc: HeaderCarrier, ec: ExecutionContext): Unit
 
-  def auditAccessGroupDeletion(arn: Arn, groupName: String, agentUser: AgentUser)(implicit
+  def auditAccessGroupDeletion(arn: Arn, groupName: String, agentUser: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit
 
   def auditEsAssignmentUnassignments(
     userEnrolmentAssignments: UserEnrolmentAssignments
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Unit
 
-  def auditAccessGroupClientsRemoval(customGroup: CustomGroup, clientsToRemove: Set[Client])(implicit
+  def auditAccessGroupClientsRemoval(customGroup: CustomGroup, clientsToRemove: Set[Client])(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit
 
-  def auditAccessGroupExcludedClientsRemoval(tax: TaxGroup, clientsToRemove: Set[Client])(implicit
+  def auditAccessGroupExcludedClientsRemoval(tax: TaxGroup, clientsToRemove: Set[Client])(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit
 
-  def auditAccessGroupTeamMembersRemoval(accessGroup: AccessGroup, teamMembersToRemove: Set[AgentUser])(implicit
+  def auditAccessGroupTeamMembersRemoval(accessGroup: AccessGroup, teamMembersToRemove: Set[AgentUser])(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit
 }
 
 @Singleton
-class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appConfig: AppConfig)
+class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(using appConfig: AppConfig)
     extends AuditService with Logging {
 
   override def auditAccessGroupCreation(
     accessGroup: AccessGroup
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Unit =
     sendChunkedAuditEvents(
       "GranularPermissionsAccessGroupCreated",
       accessGroup match {
@@ -117,7 +117,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
 
   override def auditAccessGroupUpdate(
     accessGroup: AccessGroup
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Unit =
     sendChunkedAuditEvents(
       "GranularPermissionsAccessGroupUpdated",
       accessGroup match {
@@ -160,7 +160,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       }
     )
 
-  override def auditAccessGroupDeletion(arn: Arn, groupName: String, agentUser: AgentUser)(implicit
+  override def auditAccessGroupDeletion(arn: Arn, groupName: String, agentUser: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit =
@@ -171,7 +171,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
 
   override def auditEsAssignmentUnassignments(
     userEnrolmentAssignments: UserEnrolmentAssignments
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit = {
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Unit = {
     val splitUserEnrolmentAssignments =
       UserEnrolmentAssignmentOps
         .split(userEnrolmentAssignments, appConfig.useEnrolmentAssignmentsChunkSize)
@@ -186,13 +186,13 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
     sendChunkedAuditEvents("GranularPermissionsESAssignmentsUnassignmentsPushed", splitUserEnrolmentAssignments)
   }
 
-  override def auditOptInEvent(arn: Arn, agentUser: AgentUser)(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit =
+  override def auditOptInEvent(arn: Arn, agentUser: AgentUser)(using hc: HeaderCarrier, ec: ExecutionContext): Unit =
     sendAuditEvent(
       "GranularPermissionsOptedIn",
       Json.obj("agentReferenceNumber" -> s"${arn.value}", "user" -> agentUser)
     )
 
-  override def auditOptOutEvent(arn: Arn, agentUser: AgentUser)(implicit
+  override def auditOptOutEvent(arn: Arn, agentUser: AgentUser)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit =
@@ -201,7 +201,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       Json.obj("agentReferenceNumber" -> s"${arn.value}", "user" -> agentUser)
     )
 
-  override def auditAccessGroupClientsRemoval(customGroup: CustomGroup, clientsToRemove: Set[Client])(implicit
+  override def auditAccessGroupClientsRemoval(customGroup: CustomGroup, clientsToRemove: Set[Client])(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit =
@@ -217,7 +217,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
         )
     )
 
-  override def auditAccessGroupExcludedClientsRemoval(taxGroup: TaxGroup, clientsToRemove: Set[Client])(implicit
+  override def auditAccessGroupExcludedClientsRemoval(taxGroup: TaxGroup, clientsToRemove: Set[Client])(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit =
@@ -236,7 +236,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
   override def auditAccessGroupTeamMembersRemoval(
     accessGroup: AccessGroup,
     teamMembersToRemove: Set[AgentUser]
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Unit =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Unit =
     sendChunkedAuditEvents(
       "GranularPermissionsAccessGroupTeamMembersRemoval",
       AccessGroupTeamMembersRemoval.split(
@@ -248,7 +248,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       )
     )
 
-  private def sendChunkedAuditEvents[T](eventType: String, chunks: Seq[T])(implicit
+  private def sendChunkedAuditEvents[T](eventType: String, chunks: Seq[T])(using
     writes: Writes[T],
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -257,7 +257,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
       sendAuditEvent(eventType, auditEventBatchPart.json)
     }
 
-  private def sendAuditEvent(eventType: String, detail: JsObject)(implicit
+  private def sendAuditEvent(eventType: String, detail: JsObject)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Unit =
@@ -267,7 +267,7 @@ class AuditServiceImpl @Inject() (auditConnector: AuditConnector)(implicit appCo
 
 case class AuditEventBatchPart[T](value: T, batchId: String, partNumber: Int, partOutOfTotal: Int) {
 
-  def json(implicit writes: Writes[T]): JsObject =
+  def json(using writes: Writes[T]): JsObject =
     Json.obj(
       "batchPart" -> Json
         .obj("batchId" -> batchId, "partNumber" -> partNumber, "partOutOfTotal" -> partOutOfTotal, "value" -> value)

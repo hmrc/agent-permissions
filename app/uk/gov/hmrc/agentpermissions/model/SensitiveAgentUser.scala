@@ -30,9 +30,9 @@ object SensitiveAgentUser {
   def apply(agentUser: AgentUser): SensitiveAgentUser =
     SensitiveAgentUser(SensitiveString(agentUser.id), SensitiveString(agentUser.name))
 
-  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveAgentUser] = {
+  given databaseFormat(using crypto: Encrypter & Decrypter): Format[SensitiveAgentUser] = {
 
-    implicit val sensitiveStringFormat: Format[SensitiveString] =
+    given Format[SensitiveString] =
       JsonEncryption.sensitiveEncrypterDecrypter(SensitiveString.apply)
 
     Json.format[SensitiveAgentUser]

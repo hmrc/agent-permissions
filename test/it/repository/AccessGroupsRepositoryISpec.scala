@@ -25,6 +25,7 @@ import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveAgentUser, SensitiveClient, SensitiveCustomGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
+import org.mongodb.scala.gridfs.ObservableFuture
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
@@ -35,9 +36,9 @@ import scala.concurrent.ExecutionContext
 class AccessGroupsRepositorySpec
     extends TestConstants with PlayMongoRepositorySupport[SensitiveCustomGroup] with CleanMongoCollectionSupport {
 
-  implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
   val actorSystem: ActorSystem = ActorSystem()
-  implicit val materializer: Materializer = Materializer(actorSystem)
+  given Materializer = Materializer(actorSystem)
 
   trait TestScope {
     val groupDbId: UUID = GroupId.random()
@@ -335,6 +336,6 @@ class AccessGroupsRepositorySpec
     }
   }
 
-  override protected lazy val repository: PlayMongoRepository[SensitiveCustomGroup] =
+  override protected val repository: PlayMongoRepository[SensitiveCustomGroup] =
     new CustomGroupsRepositoryV2Impl(mongoComponent, aesCrypto)
 }

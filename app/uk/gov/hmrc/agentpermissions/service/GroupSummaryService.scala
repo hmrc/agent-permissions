@@ -28,12 +28,12 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[GroupSummaryServiceImpl])
 trait GroupSummaryService {
-  def getAllGroupSummaries(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]]
-  def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
+  def getAllGroupSummaries(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]]
+  def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]]
-  def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+  def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(using
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]]
 
@@ -48,7 +48,7 @@ class GroupSummaryServiceImpl @Inject() (
 
   override def getAllGroupSummaries(
     arn: Arn
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]] =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]] =
     for {
       customGroups <- customGroupsService.getAllCustomGroups(arn)
       customSummaries = customGroups.map(GroupSummary.of(_))
@@ -62,7 +62,7 @@ class GroupSummaryServiceImpl @Inject() (
       combinedSorted = (customSummaries ++ taxSummaries).sortBy(_.groupName.toLowerCase())
     } yield combinedSorted
 
-  override def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
+  override def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]] = {
@@ -82,7 +82,7 @@ class GroupSummaryServiceImpl @Inject() (
     } yield combinedSummaries
   }
 
-  override def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+  override def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(using
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]] =
     for {

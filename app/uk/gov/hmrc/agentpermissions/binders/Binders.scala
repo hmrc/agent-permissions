@@ -20,6 +20,6 @@ import uk.gov.hmrc.agentpermissions.model.Arn
 
 object Binders {
 
-  implicit object ArnBinder extends SimpleObjectBinder[Arn](Arn.apply, _.value)
+  given ArnBinder: SimpleObjectBinder[Arn] = new SimpleObjectBinder[Arn](Arn.apply, _.value)
 
 }

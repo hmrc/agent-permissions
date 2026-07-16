@@ -53,11 +53,11 @@ import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2Impl._
 @Singleton
 class TaxGroupsRepositoryV2Impl @Inject() (
   mongoComponent: MongoComponent,
-  @Named("aes") crypto: Encrypter with Decrypter
-)(implicit ec: ExecutionContext)
+  @Named("aes") crypto: Encrypter & Decrypter
+)(using ec: ExecutionContext)
     extends PlayMongoRepository[SensitiveTaxGroup](
       collectionName = "access-groups-tax",
-      domainFormat = SensitiveTaxGroup.databaseFormat(crypto),
+      domainFormat = SensitiveTaxGroup.databaseFormat(using crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending(FIELD_ARN), new IndexOptions().name("arnIdx").unique(false)),
@@ -77,7 +77,7 @@ class TaxGroupsRepositoryV2Impl @Inject() (
     s"Crypto algorithm provided is not deterministic."
   )
 
-  implicit val theCrypto: Encrypter with Decrypter = crypto
+  given theCrypto: (Encrypter & Decrypter) = crypto
 
   override def findById(id: GroupId): Future[Option[TaxGroup]] =
     collection
