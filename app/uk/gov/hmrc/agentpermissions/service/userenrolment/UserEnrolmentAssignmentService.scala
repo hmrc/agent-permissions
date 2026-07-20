@@ -168,7 +168,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
               .map(agentUserClientDetailsConnector.pushAssignments(_))
           )
           .map(pushStatuses =>
-            if (pushStatuses.forall(_ == AssignmentsPushed)) AssignmentsPushed else AssignmentsNotPushed
+            if pushStatuses.forall(_ == AssignmentsPushed) then AssignmentsPushed else AssignmentsNotPushed
           )
     }
 

@@ -24,13 +24,14 @@ import org.mongodb.scala.model.Indexes.ascending
 import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
 import javax.inject.{Inject, Named, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
+import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, RecordUpdated}
 
 @ImplementedBy(classOf[OptinRepositoryImpl])
 trait OptinRepository {

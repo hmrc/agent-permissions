@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.connectors
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import play.api.http.Status._
+import play.api.http.Status.*
 import play.api.libs.json.Json
 import play.api.libs.ws.JsonBodyWritables.writeableOf_JsValue
 import uk.gov.hmrc.agentpermissions.config.AppConfig
@@ -81,7 +81,7 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
   appConfig: AppConfig
 ) extends AgentUserClientDetailsConnector with Logging {
 
-  import uk.gov.hmrc.http.HttpReads.Implicits._
+  import uk.gov.hmrc.http.HttpReads.Implicits.*
 
   val aucdBaseUrl = appConfig.agentUserClientDetailsBaseUrl
   private val aucdUrl = s"$aucdBaseUrl/agent-user-client-details"
@@ -174,7 +174,7 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
     ec: ExecutionContext
   ): Future[Option[Seq[Client]]] = {
 
-    val params = if (sendEmail) "?sendEmail=true" + lang.fold("")("&lang=" + _) else ""
+    val params = if sendEmail then "?sendEmail=true" + lang.fold("")("&lang=" + _) else ""
     val url = s"$aucdUrl/arn/${arn.value}/client-list$params"
     httpV2.get(url"$url").execute[HttpResponse].map { response =>
       response.status match {
@@ -243,14 +243,14 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
         case Success(response) =>
           response.status match {
             case ACCEPTED =>
-              Future successful AssignmentsPushed
+              Future.successful(AssignmentsPushed)
             case other =>
               logger.warn(s"EACD assignments not pushed. Received $other status: ${response.body}")
-              Future successful AssignmentsNotPushed
+              Future.successful(AssignmentsNotPushed)
           }
         case Failure(ex) =>
           logger.error(s"EACD assignments not pushed. Error: ${ex.getMessage}")
-          Future successful AssignmentsNotPushed
+          Future.successful(AssignmentsNotPushed)
       }
   }
 

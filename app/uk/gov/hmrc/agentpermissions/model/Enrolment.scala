@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.model
 
-import play.api.libs.json._
+import play.api.libs.json.*
 
 case class Enrolment(
   service: String,

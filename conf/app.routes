@@ -16,16 +16,16 @@ GET     /arn/:arn/all-groups                    uk.gov.hmrc.agentpermissions.con
 # Custom access groups
 POST    /arn/:arn/groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.createGroup(arn: Arn)
 GET     /arn/:arn/groups                    uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.groups(arn: Arn)
-GET     /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: GroupId)
-GET     /custom-group/:gid                  uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getCustomGroupSummary(gid: GroupId)
-DELETE  /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: GroupId)
-PATCH   /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: GroupId)
-PUT     /groups/:gid/members/add            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addMembers(gid: GroupId)
-PATCH   /groups/:id/members/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addTeamMemberToGroup(id: GroupId)
-GET     /group/:gid/clients                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForGroup(gid: GroupId, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
-GET     /group/:gid/clients/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForAddingToGroup(gid: GroupId, page: Int ?= 1, pageSize: Int ?= 20, search: Option[String] ?= None, filter: Option[String] ?= None)
-DELETE  /groups/:gid/clients/:clientId      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeClient(gid: GroupId, clientId: String)
-DELETE  /groups/:gid/members/:memberId      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeTeamMember(gid: GroupId, memberId: String)
+GET     /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getGroup(gid: java.util.UUID)
+GET     /custom-group/:gid                  uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getCustomGroupSummary(gid: java.util.UUID)
+DELETE  /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.deleteGroup(gid: java.util.UUID)
+PATCH   /groups/:gid                        uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.updateGroup(gid: java.util.UUID)
+PUT     /groups/:gid/members/add            uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addMembers(gid: java.util.UUID)
+PATCH   /groups/:id/members/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.addTeamMemberToGroup(id: java.util.UUID)
+GET     /group/:gid/clients                 uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForGroup(gid: java.util.UUID, page: Int, pageSize: Int, search: Option[String], filter: Option[String])
+GET     /group/:gid/clients/add             uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.getPaginatedClientsForAddingToGroup(gid: java.util.UUID, page: Int ?= 1, pageSize: Int ?= 20, search: Option[String] ?= None, filter: Option[String] ?= None)
+DELETE  /groups/:gid/clients/:clientId      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeClient(gid: java.util.UUID, clientId: String)
+DELETE  /groups/:gid/members/:memberId      uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.removeTeamMember(gid: java.util.UUID, memberId: String)
 
 # TODO: Remove the PATCH version of endpoint below
 PATCH   /arn/:arn/sync                   uk.gov.hmrc.agentpermissions.controllers.AccessGroupsController.syncWithEacd(arn: Arn, fullSync: Boolean ?= false)
@@ -36,12 +36,12 @@ GET     /arn/:arn/unassigned-clients     uk.gov.hmrc.agentpermissions.controller
 POST    /arn/:arn/tax-group              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.createGroup(arn: Arn)
 GET     /arn/:arn/tax-groups             uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.groups(arn: Arn)
 GET     /arn/:arn/tax-group/:service     uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.getGroupByService(arn: Arn, service: String)
-GET     /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.getGroup(groupId: GroupId)
-PATCH   /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.updateGroup(groupId: GroupId)
-DELETE  /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.deleteGroup(groupId: GroupId)
-PATCH   /tax-group/:groupId/members/add  uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.addTeamMemberToGroup(groupId: GroupId)
-PUT     /tax-group/:groupId/members/add  uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.addMembers(groupId: GroupId)
-DELETE  /tax-group/:gid/members/:memberId      uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.removeTeamMember(gid: GroupId, memberId: String)
+GET     /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.getGroup(groupId: java.util.UUID)
+PATCH   /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.updateGroup(groupId: java.util.UUID)
+DELETE  /tax-group/:groupId              uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.deleteGroup(groupId: java.util.UUID)
+PATCH   /tax-group/:groupId/members/add  uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.addTeamMemberToGroup(groupId: java.util.UUID)
+PUT     /tax-group/:groupId/members/add  uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.addMembers(groupId: java.util.UUID)
+DELETE  /tax-group/:gid/members/:memberId      uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.removeTeamMember(gid: java.util.UUID, memberId: String)
 
 GET     /arn/:arn/client-count/available-tax-services    uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.clientCountForAvailableTaxServices(arn: Arn)
 GET     /arn/:arn/client-count/tax-groups                uk.gov.hmrc.agentpermissions.controllers.TaxServiceGroupsController.clientCountForTaxGroups(arn: Arn)
@@ -50,4 +50,3 @@ GET     /arn/:arn/client-count/tax-groups                uk.gov.hmrc.agentpermis
 GET     /arn-allowed                     uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.isArnAllowed
 GET     /private-beta-invite             uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.hideBetaInviteCheck
 POST    /private-beta-invite/decline     uk.gov.hmrc.agentpermissions.controllers.ArnAllowListController.hideBetaInvite
-

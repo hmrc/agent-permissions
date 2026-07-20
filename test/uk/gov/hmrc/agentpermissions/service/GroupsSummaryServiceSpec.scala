@@ -79,7 +79,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       name: String = groupName,
       taxService: Option[String] = None
     ): GroupSummary =
-      GroupSummary(id, name, if (taxService.isEmpty) Some(3) else None, 3, taxService)
+      GroupSummary(id, name, if taxService.isEmpty then Some(3) else None, 3, taxService)
 
     val taxSummaries = Seq(
       groupSummary(name = "Capital Gains Tax", taxService = Some(serviceCgt)),
@@ -153,7 +153,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       (mockCustomGroupsService
         .getCustomGroupSummariesForClient(_: Arn, _: String)(using _: ExecutionContext))
         .expects(*, *, *)
-        .returning(Future successful accessGroupSummaries)
+        .returning(Future.successful(accessGroupSummaries))
 
     def mockCustomGroupsServiceGetGroupSummariesForClientWithException(
       ex: Exception
@@ -169,7 +169,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       (mockCustomGroupsService
         .getCustomGroupSummariesForTeamMember(_: Arn, _: String)(using _: ExecutionContext))
         .expects(*, *, *)
-        .returning(Future successful accessGroupSummaries)
+        .returning(Future.successful(accessGroupSummaries))
 
     def mockCustomServiceGetGroupSummariesForTeamMemberWithException(
       ex: Exception
@@ -185,7 +185,7 @@ class GroupsSummaryServiceSpec extends TestConstants {
       (mockTaxGroupsService
         .getTaxGroupSummariesForTeamMember(_: Arn, _: String)(using _: ExecutionContext))
         .expects(*, *, *)
-        .returning(Future successful accessGroupSummaries)
+        .returning(Future.successful(accessGroupSummaries))
 
     def mockTaxGroupsServiceGetGroupSummariesForTeamMemberWithException(
       ex: Exception

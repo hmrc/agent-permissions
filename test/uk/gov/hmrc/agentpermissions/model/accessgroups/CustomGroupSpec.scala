@@ -21,9 +21,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
+import uk.gov.hmrc.agentpermissions.models.GroupId
 
 import java.time.LocalDateTime
-import java.util.UUID
 
 class CustomGroupSpec extends AnyFlatSpec with Matchers {
 
@@ -38,7 +38,7 @@ class CustomGroupSpec extends AnyFlatSpec with Matchers {
   val client3: Client = Client("HMRC-CGT-PD~CgtRef~XMCGTP123456789", "George Candy")
 
   val now: LocalDateTime = LocalDateTime.now()
-  val id = UUID.randomUUID()
+  val id = GroupId.random()
 
   "AccessGroup" should "serialise to JSON and deserialize from string" in {
 

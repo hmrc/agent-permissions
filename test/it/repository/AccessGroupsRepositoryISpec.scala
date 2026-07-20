@@ -30,7 +30,6 @@ import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
 import java.time.LocalDateTime
-import java.util.UUID
 import scala.concurrent.ExecutionContext
 
 class AccessGroupsRepositorySpec
@@ -41,7 +40,7 @@ class AccessGroupsRepositorySpec
   given Materializer = Materializer(actorSystem)
 
   trait TestScope {
-    val groupDbId: UUID = GroupId.random()
+    val groupDbId: GroupId = GroupId.random()
     val groupName: String = "Some Group".toLowerCase
     val user1: AgentUser = AgentUser("user1", "User 1")
     val user2: AgentUser = AgentUser("user2", "User 2")

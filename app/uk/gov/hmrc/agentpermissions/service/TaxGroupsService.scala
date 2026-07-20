@@ -106,7 +106,7 @@ class TaxGroupsServiceImpl @Inject() (
           .map(_.flatten)
           .map(_.toMap)
           .map(combineServicesClientCount)
-      case None => Future successful Map[String, Int]()
+      case None => Future.successful(Map[String, Int]())
     }
 
   override def clientCountForTaxGroups(
@@ -154,17 +154,17 @@ class TaxGroupsServiceImpl @Inject() (
   )(using hc: HeaderCarrier, ec: ExecutionContext): Future[TaxServiceGroupCreationStatus] =
     taxServiceGroupsRepository.getByService(taxGroup.arn, taxGroup.service) flatMap {
       case Some(_) =>
-        Future.successful(TaxServiceGroupExistsForCreation)
+        Future.successful(TaxServiceGroupCreationStatus.TaxServiceGroupExistsForCreation)
       case _ =>
         for {
           maybeCreationId <- taxServiceGroupsRepository.insert(taxGroup)
         } yield maybeCreationId match {
           case None =>
-            TaxServiceGroupNotCreated
+            TaxServiceGroupCreationStatus.TaxServiceGroupNotCreated
           case Some(creationId) =>
             auditService.auditAccessGroupCreation(taxGroup)
             logger.info(s"Created tax service group. Service: ${taxGroup.service} DB id: '$creationId")
-            TaxServiceGroupCreated(creationId)
+            TaxServiceGroupCreationStatus.TaxServiceGroupCreated(creationId)
         }
     }
 
@@ -191,8 +191,8 @@ class TaxGroupsServiceImpl @Inject() (
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]] = for {
     taxGroups <- taxServiceGroupsRepository.get(arn)
-    usersGroups = taxGroups.filter(_.teamMembers.map(_.id).contains(userId))
-  } yield usersGroups.map(group => GroupSummary.of(group))
+    usersGroups = taxGroups.filter(_.teamMembers.exists(_.id == userId))
+  } yield usersGroups.map(GroupSummary.of)
 
   override def delete(arn: Arn, groupName: String, agentUser: AgentUser)(using
     hc: HeaderCarrier,
@@ -203,9 +203,9 @@ class TaxGroupsServiceImpl @Inject() (
       taxServiceGroupDeletionStatus <- maybeDeletedCount match {
                                          case Some(1L) =>
                                            auditService.auditAccessGroupDeletion(arn, groupName, agentUser)
-                                           Future.successful(TaxServiceGroupDeleted)
+                                           Future.successful(TaxServiceGroupDeletionStatus.TaxServiceGroupDeleted)
                                          case _ =>
-                                           Future.successful(TaxServiceGroupNotDeleted)
+                                           Future.successful(TaxServiceGroupDeletionStatus.TaxServiceGroupNotDeleted)
                                        }
     } yield taxServiceGroupDeletionStatus
 
@@ -221,12 +221,12 @@ class TaxGroupsServiceImpl @Inject() (
       accessGroupUpdateStatus <- maybeUpdatedCount match {
                                    case Some(1L) =>
                                      auditService.auditAccessGroupUpdate(accessGroupWithWhoIsUpdating)
-                                     Future.successful(TaxServiceGroupUpdated)
+                                     Future.successful(TaxServiceGroupUpdateStatus.TaxServiceGroupUpdated)
                                    case _ =>
                                      logger.info(
                                        s"Tax service group '${taxGroup.groupName}' not updated. Service: ${taxGroup.service}"
                                      )
-                                     Future.successful(TaxServiceGroupNotUpdated)
+                                     Future.successful(TaxServiceGroupUpdateStatus.TaxServiceGroupNotUpdated)
                                  }
     } yield accessGroupUpdateStatus
 
@@ -243,8 +243,8 @@ class TaxGroupsServiceImpl @Inject() (
     taxServiceGroupsRepository
       .addTeamMember(groupId, agentUser)
       .map(_.getMatchedCount match {
-        case 1 => TaxServiceGroupUpdated
-        case _ => TaxServiceGroupNotUpdated
+        case 1 => TaxServiceGroupUpdateStatus.TaxServiceGroupUpdated
+        case _ => TaxServiceGroupUpdateStatus.TaxServiceGroupNotUpdated
       })
 
   def removeTeamMember(groupId: GroupId, teamMemberId: String, whoIsUpdating: AgentUser)(using
@@ -260,22 +260,25 @@ class TaxGroupsServiceImpl @Inject() (
           taxServiceGroupsRepository
             .update(accessGroup.arn, accessGroup.groupName, updatedGroup)
             .map {
-              case Some(1) => TaxServiceGroupUpdated
-              case _       => TaxServiceGroupNotUpdated
+              case Some(1) => TaxServiceGroupUpdateStatus.TaxServiceGroupUpdated
+              case _       => TaxServiceGroupUpdateStatus.TaxServiceGroupNotUpdated
             }
-        case None => Future successful TaxServiceGroupNotUpdated
+        case None => Future.successful(TaxServiceGroupUpdateStatus.TaxServiceGroupNotUpdated)
       }
 }
 
-sealed trait TaxServiceGroupCreationStatus
-case class TaxServiceGroupCreated(creationId: String) extends TaxServiceGroupCreationStatus
-case object TaxServiceGroupExistsForCreation extends TaxServiceGroupCreationStatus
-case object TaxServiceGroupNotCreated extends TaxServiceGroupCreationStatus
+enum TaxServiceGroupCreationStatus {
+  case TaxServiceGroupCreated(creationId: String)
+  case TaxServiceGroupExistsForCreation
+  case TaxServiceGroupNotCreated
+}
 
-sealed trait TaxServiceGroupDeletionStatus
-case object TaxServiceGroupDeleted extends TaxServiceGroupDeletionStatus
-case object TaxServiceGroupNotDeleted extends TaxServiceGroupDeletionStatus
+enum TaxServiceGroupDeletionStatus {
+  case TaxServiceGroupDeleted
+  case TaxServiceGroupNotDeleted
+}
 
-sealed trait TaxServiceGroupUpdateStatus
-case object TaxServiceGroupNotUpdated extends TaxServiceGroupUpdateStatus
-case object TaxServiceGroupUpdated extends TaxServiceGroupUpdateStatus
+enum TaxServiceGroupUpdateStatus {
+  case TaxServiceGroupNotUpdated
+  case TaxServiceGroupUpdated
+}

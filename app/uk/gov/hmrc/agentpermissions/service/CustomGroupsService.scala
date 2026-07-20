@@ -119,7 +119,7 @@ class CustomGroupsServiceImpl @Inject() (
     customGroupsRepository
       .findById(id)
       .flatMap {
-        case None => Future successful None
+        case None => Future.successful(None)
         case Some(grp) =>
           val enrolmentKeys = grp.clients.map(_.enrolmentKey)
           agentUserClientDetailsConnector
@@ -141,23 +141,27 @@ class CustomGroupsServiceImpl @Inject() (
   )(using hc: HeaderCarrier, ec: ExecutionContext): Future[AccessGroupCreationStatus] =
     customGroupsRepository.get(accessGroup.arn, accessGroup.groupName) flatMap {
       case Some(_) =>
-        Future.successful(AccessGroupExistsForCreation)
+        Future.successful(AccessGroupCreationStatus.AccessGroupExistsForCreation)
       case _ =>
         for {
           maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupCreation(accessGroup)
           maybeCreationId            <- customGroupsRepository.insert(withClientNamesRemoved(accessGroup))
           accessGroupCreationStatus <- maybeCreationId match {
                                          case None =>
-                                           Future.successful(AccessGroupNotCreated)
+                                           Future.successful(AccessGroupCreationStatus.AccessGroupNotCreated)
                                          case Some(creationId) =>
                                            for {
                                              pushStatus <- pushAssignments(maybeCalculatedAssignments)
-                                             _ <- Future successful auditService.auditAccessGroupCreation(accessGroup)
+                                             _ <- Future.successful(auditService.auditAccessGroupCreation(accessGroup))
                                            } yield {
                                              logger.info(s"Created access group. DB id: '$creationId")
 
-                                             if (pushStatus == AssignmentsPushed) AccessGroupCreated(creationId)
-                                             else AccessGroupCreatedWithoutAssignmentsPushed(creationId)
+                                             if pushStatus == AssignmentsPushed then
+                                               AccessGroupCreationStatus.AccessGroupCreated(creationId)
+                                             else
+                                               AccessGroupCreationStatus.AccessGroupCreatedWithoutAssignmentsPushed(
+                                                 creationId
+                                               )
                                            }
                                        }
         } yield accessGroupCreationStatus
@@ -185,8 +189,8 @@ class CustomGroupsServiceImpl @Inject() (
       .get(arn)
       .map(accessGroups =>
         accessGroups
-          .filter(_.clients.map(_.enrolmentKey).contains(enrolmentKey))
-          .map(GroupSummary.of(_))
+          .filter(_.clients.exists(_.enrolmentKey == enrolmentKey))
+          .map(GroupSummary.of)
       )
 
   override def getCustomGroupSummariesForTeamMember(arn: Arn, userId: String)(using
@@ -196,8 +200,8 @@ class CustomGroupsServiceImpl @Inject() (
       .get(arn)
       .map(accessGroups =>
         accessGroups
-          .filter(_.teamMembers.map(_.id).contains(userId))
-          .map(GroupSummary.of(_))
+          .filter(_.teamMembers.exists(_.id == userId))
+          .map(GroupSummary.of)
       )
 
   override def delete(arn: Arn, groupName: String, agentUser: AgentUser)(using
@@ -209,23 +213,21 @@ class CustomGroupsServiceImpl @Inject() (
       maybeDeletedCount          <- customGroupsRepository.delete(arn, groupName)
       accessGroupDeletionStatus <- maybeDeletedCount match {
                                      case None =>
-                                       Future.successful(AccessGroupNotDeleted)
+                                       Future.successful(AccessGroupDeletionStatus.AccessGroupNotDeleted)
                                      case Some(deletedCount) =>
-                                       if (deletedCount == 1L) {
+                                       if deletedCount == 1L then
                                          for {
                                            pushStatus <- pushAssignments(maybeCalculatedAssignments)
-                                           _ <-
-                                             Future successful auditService
-                                               .auditAccessGroupDeletion(arn, groupName, agentUser)
+                                           _ <- Future.successful(
+                                                  auditService.auditAccessGroupDeletion(arn, groupName, agentUser)
+                                                )
                                          } yield pushStatus match {
                                            case AssignmentsPushed =>
-                                             AccessGroupDeleted
+                                             AccessGroupDeletionStatus.AccessGroupDeleted
                                            case AssignmentsNotPushed =>
-                                             AccessGroupDeletedWithoutAssignmentsPushed
+                                             AccessGroupDeletionStatus.AccessGroupDeletedWithoutAssignmentsPushed
                                          }
-                                       } else {
-                                         Future.successful(AccessGroupNotDeleted)
-                                       }
+                                       else Future.successful(AccessGroupDeletionStatus.AccessGroupNotDeleted)
                                    }
     } yield accessGroupDeletionStatus
 
@@ -269,27 +271,26 @@ class CustomGroupsServiceImpl @Inject() (
       accessGroupUpdateStatus <- maybeUpdatedCount match {
                                    case None =>
                                      logger.info(s"Access group '${updatedGroup.groupName}' not updated")
-                                     Future.successful(AccessGroupNotUpdated)
+                                     Future.successful(AccessGroupUpdateStatus.AccessGroupNotUpdated)
                                    case Some(updatedCount) =>
-                                     if (updatedCount == 1L) {
+                                     if updatedCount == 1L then
                                        for {
                                          pushStatus <- pushAssignments(maybeCalculatedAssignments)
                                          _ <-
-                                           Future successful auditService.auditAccessGroupUpdate(
-                                             updatedGroup
+                                           Future.successful(
+                                             auditService.auditAccessGroupUpdate(updatedGroup)
                                            ) // TODO update audit? instead of whole group, log NET change (userToRemove)
                                        } yield pushStatus match {
                                          case AssignmentsPushed =>
-                                           AccessGroupUpdated
+                                           AccessGroupUpdateStatus.AccessGroupUpdated
                                          case AssignmentsNotPushed =>
-                                           AccessGroupUpdatedWithoutAssignmentsPushed
+                                           AccessGroupUpdateStatus.AccessGroupUpdatedWithoutAssignmentsPushed
                                        }
-                                     } else {
+                                     else
                                        logger.warn(
                                          s"Access group '${updatedGroup.groupName}' update count should not have been $updatedCount"
                                        )
-                                       Future.successful(AccessGroupNotUpdated)
-                                     }
+                                       Future.successful(AccessGroupUpdateStatus.AccessGroupNotUpdated)
                                  }
     } yield accessGroupUpdateStatus
 
@@ -323,7 +324,7 @@ class CustomGroupsServiceImpl @Inject() (
             updateStatus <-
               handleUpdate(accessGroup.arn, accessGroup.groupName, updatedGroup, maybeCalculatedAssignments)
           } yield updateStatus
-        case _ => Future successful AccessGroupNotUpdated
+        case _ => Future.successful(AccessGroupUpdateStatus.AccessGroupNotUpdated)
       }
 
   def removeTeamMember(groupId: GroupId, teamMemberId: String, whoIsUpdating: AgentUser)(using
@@ -355,14 +356,14 @@ class CustomGroupsServiceImpl @Inject() (
             updateStatus <-
               handleUpdate(accessGroup.arn, accessGroup.groupName, updatedGroup, maybeCalculatedAssignments)
           } yield updateStatus
-        case _ => Future successful AccessGroupNotUpdated
+        case _ => Future.successful(AccessGroupUpdateStatus.AccessGroupNotUpdated)
       }
 
   // TODO move below to groups summary service
   override def getAllClients(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[ClientList] =
     for {
       clients      <- agentUserClientDetailsConnector.getClients(arn).map(_.toSet.flatten)
-      accessGroups <- if (clients.nonEmpty) customGroupsRepository.get(arn) else Future.successful(Seq.empty)
+      accessGroups <- if clients.nonEmpty then customGroupsRepository.get(arn) else Future.successful(Seq.empty)
       enrolmentKeysInCustomGroups = accessGroups.toSet[CustomGroup].flatMap(_.clients).map(_.enrolmentKey)
       taxServiceGroups <- taxGroupsService.getAllTaxServiceGroups(arn)
     } yield clients.foldLeft(ClientList(Set.empty, Set.empty)) { (clientList, client) =>
@@ -373,17 +374,13 @@ class CustomGroupsServiceImpl @Inject() (
         case sk                                    => sk
       }
       // The client is considered 'assigned' if: ...
-      if (
-        enrolmentKeysInCustomGroups.contains(client.enrolmentKey) || // ... they are in a custom access group, OR ...
+      if enrolmentKeysInCustomGroups.contains(client.enrolmentKey) || // ... they are in a custom access group, OR ...
         taxServiceGroups.exists(tsg => // ... there is a tax service group AND they are not excluded from it.
           tsg.service == serviceKey &&
             !tsg.excludedClients.exists(_.enrolmentKey == client.enrolmentKey)
         )
-      ) {
-        clientList.copy(assigned = clientList.assigned + client)
-      } else {
-        clientList.copy(unassigned = clientList.unassigned + client)
-      }
+      then clientList.copy(assigned = clientList.assigned + client)
+      else clientList.copy(unassigned = clientList.unassigned + client)
     }
 
   override def getAssignedClients(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Set[Client]] =
@@ -403,11 +400,9 @@ class CustomGroupsServiceImpl @Inject() (
     for {
       pushStatus <- userEnrolmentAssignmentService.pushCalculatedAssignments(maybeCalculatedAssignments)
     } yield {
-      if (pushStatus == AssignmentsPushed) {
+      if pushStatus == AssignmentsPushed then
         maybeCalculatedAssignments.foreach(auditService.auditEsAssignmentUnassignments)
-      } else {
-        logger.info(s"Nothing to audit ES Assignment Unassignments as pushStatus: $pushStatus")
-      }
+      else logger.info(s"Nothing to audit ES Assignment Unassignments as pushStatus: $pushStatus")
 
       logger.info(s"Push status: $pushStatus")
       pushStatus
@@ -419,7 +414,7 @@ class CustomGroupsServiceImpl @Inject() (
   private def withClientName(
     maybeAccessGroup: Option[CustomGroup]
   )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[CustomGroup]] =
-    maybeAccessGroup.fold(Future successful Option.empty[CustomGroup])(accessGroup =>
+    maybeAccessGroup.fold(Future.successful(None))(accessGroup =>
       agentUserClientDetailsConnector
         .getClients(accessGroup.arn)
         .map(
@@ -434,10 +429,10 @@ class CustomGroupsServiceImpl @Inject() (
   )(backendClients: Seq[Client]): Set[Client] = {
 
     def identifyFriendlyNameAmongBackendClients(accessGroupClient: Client): String =
-      backendClients.find(_.enrolmentKey == accessGroupClient.enrolmentKey) match {
-        case Some(matchingBackendClient) => matchingBackendClient.friendlyName
-        case None                        => ""
-      }
+      backendClients
+        .find(_.enrolmentKey == accessGroupClient.enrolmentKey)
+        .map(_.friendlyName)
+        .getOrElse("")
 
     accessGroupClients.map(accessGroupClient =>
       accessGroupClient.copy(friendlyName = identifyFriendlyNameAmongBackendClients(accessGroupClient))
@@ -448,7 +443,7 @@ class CustomGroupsServiceImpl @Inject() (
     accessGroups: Seq[CustomGroup]
   )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[CustomGroup]] =
     accessGroups match {
-      case Nil => Future successful accessGroups
+      case Nil => Future.successful(accessGroups)
       case accessGroups =>
         agentUserClientDetailsConnector.getClients(accessGroups.head.arn).map {
           case None => accessGroups
@@ -487,22 +482,25 @@ class CustomGroupsServiceImpl @Inject() (
             updateStatus <-
               handleUpdate(accessGroup.arn, accessGroup.groupName, updatedGroup, maybeCalculatedAssignments)
           } yield updateStatus
-        case _ => Future successful AccessGroupNotUpdated
+        case _ => Future.successful(AccessGroupUpdateStatus.AccessGroupNotUpdated)
       }
 }
 
-sealed trait AccessGroupCreationStatus
-case class AccessGroupCreated(creationId: String) extends AccessGroupCreationStatus
-case object AccessGroupExistsForCreation extends AccessGroupCreationStatus
-case object AccessGroupNotCreated extends AccessGroupCreationStatus
-case class AccessGroupCreatedWithoutAssignmentsPushed(creationId: String) extends AccessGroupCreationStatus
+enum AccessGroupCreationStatus {
+  case AccessGroupCreated(creationId: String)
+  case AccessGroupExistsForCreation
+  case AccessGroupNotCreated
+  case AccessGroupCreatedWithoutAssignmentsPushed(creationId: String)
+}
 
-sealed trait AccessGroupDeletionStatus
-case object AccessGroupDeleted extends AccessGroupDeletionStatus
-case object AccessGroupNotDeleted extends AccessGroupDeletionStatus
-case object AccessGroupDeletedWithoutAssignmentsPushed extends AccessGroupDeletionStatus
+enum AccessGroupDeletionStatus {
+  case AccessGroupDeleted
+  case AccessGroupNotDeleted
+  case AccessGroupDeletedWithoutAssignmentsPushed
+}
 
-sealed trait AccessGroupUpdateStatus
-case object AccessGroupNotUpdated extends AccessGroupUpdateStatus
-case object AccessGroupUpdated extends AccessGroupUpdateStatus
-case object AccessGroupUpdatedWithoutAssignmentsPushed extends AccessGroupUpdateStatus
+enum AccessGroupUpdateStatus {
+  case AccessGroupNotUpdated
+  case AccessGroupUpdated
+  case AccessGroupUpdatedWithoutAssignmentsPushed
+}

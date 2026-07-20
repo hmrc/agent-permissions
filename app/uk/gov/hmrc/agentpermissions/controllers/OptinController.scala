@@ -17,11 +17,11 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.libs.json.JsString
-import play.api.mvc._
+import play.api.mvc.*
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.service.OptinService
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import javax.inject.{Inject, Singleton}
@@ -96,9 +96,8 @@ class OptinController @Inject() (optinService: OptinService)(using
   private def withMatchedArn(providedArn: Arn, authorisedAgent: AuthorisedAgent)(
     body: => Future[Result]
   ): Future[Result] =
-    if (providedArn == authorisedAgent.arn) {
-      body
-    } else {
+    if providedArn == authorisedAgent.arn then body
+    else {
       logger.info("Provided ARN did not match with that identified by auth")
       Future.successful(BadRequest)
     }

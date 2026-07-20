@@ -16,14 +16,14 @@
 
 package uk.gov.hmrc.agentpermissions.model.accessgroups
 
-import play.api.libs.json._
+import play.api.libs.json.*
 import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.models.GroupId
 
 import java.time.LocalDateTime
-import java.util.UUID
 
 case class TaxGroup(
-  id: UUID,
+  id: GroupId,
   arn: Arn,
   groupName: String,
   created: LocalDateTime,

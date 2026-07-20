@@ -18,15 +18,18 @@ package uk.gov.hmrc.agentpermissions.service
 
 import com.mongodb.client.result.UpdateResult
 import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
-import org.scalamock.handlers._
+import org.scalamock.handlers.*
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.EacdAssignmentsPushStatus.{AssignmentsNotPushed, AssignmentsPushed}
-import uk.gov.hmrc.agentpermissions.model.accessgroups._
-import uk.gov.hmrc.agentpermissions.model._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.*
+import uk.gov.hmrc.agentpermissions.model.*
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
+import uk.gov.hmrc.agentpermissions.service.AccessGroupCreationStatus.{AccessGroupCreated, AccessGroupCreatedWithoutAssignmentsPushed, AccessGroupExistsForCreation, AccessGroupNotCreated}
+import uk.gov.hmrc.agentpermissions.service.AccessGroupDeletionStatus.{AccessGroupDeleted, AccessGroupDeletedWithoutAssignmentsPushed, AccessGroupNotDeleted}
+import uk.gov.hmrc.agentpermissions.service.AccessGroupUpdateStatus.{AccessGroupNotUpdated, AccessGroupUpdated, AccessGroupUpdatedWithoutAssignmentsPushed}
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -147,7 +150,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       (mockUserEnrolmentAssignmentService
         .calculateForGroupCreation(_: CustomGroup)(using _: ExecutionContext))
         .expects(accessGroup, *)
-        .returning(Future successful maybeUserEnrolmentAssignments)
+        .returning(Future.successful(maybeUserEnrolmentAssignments))
 
     def mockUserEnrolmentAssignmentServiceCalculateForDeletingGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
@@ -155,7 +158,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       (mockUserEnrolmentAssignmentService
         .calculateForGroupDeletion(_: Arn, _: String)(using _: ExecutionContext))
         .expects(arn, groupName, *)
-        .returning(Future successful maybeUserEnrolmentAssignments)
+        .returning(Future.successful(maybeUserEnrolmentAssignments))
 
     def mockUserEnrolmentAssignmentServiceCalculateForUpdatingGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
@@ -163,7 +166,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       (mockUserEnrolmentAssignmentService
         .calculateForGroupUpdate(_: Arn, _: String, _: CustomGroup)(using _: ExecutionContext))
         .expects(arn, groupName, accessGroup, *)
-        .returning(Future successful maybeUserEnrolmentAssignments)
+        .returning(Future.successful(maybeUserEnrolmentAssignments))
 
     def mockUserEnrolmentAssignmentServiceCalculateForRemoveFromGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
@@ -173,7 +176,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       (mockUserEnrolmentAssignmentService
         .calculateForRemoveFromGroup(_: Arn, _: String, _: Set[Client], _: Set[AgentUser])(using _: ExecutionContext))
         .expects(*, *, *, *, *)
-        .returning(Future successful maybeUserEnrolmentAssignments)
+        .returning(Future.successful(maybeUserEnrolmentAssignments))
 
     def mockUserEnrolmentAssignmentServiceCalculateForAddToGroup(
       maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
@@ -183,7 +186,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       (mockUserEnrolmentAssignmentService
         .calculateForAddToGroup(_: Arn, _: String, _: Set[Client], _: Set[AgentUser])(using _: ExecutionContext))
         .expects(*, *, *, *, *)
-        .returning(Future successful maybeUserEnrolmentAssignments)
+        .returning(Future.successful(maybeUserEnrolmentAssignments))
 
     def mockAccessGroupsRepositoryDelete(
       maybeDeletedCount: Option[Long]
@@ -237,7 +240,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       (mockUserClientDetailsConnector
         .getClients(_: Arn, _: Boolean, _: Option[String])(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *, *, *)
-        .returning(Future successful maybeClients)
+        .returning(Future.successful(maybeClients))
 
     def mockUserEnrolmentAssignmentServicePushCalculatedAssignments(
       eacdAssignmentsPushStatus: EacdAssignmentsPushStatus
@@ -247,7 +250,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       (mockUserEnrolmentAssignmentService
         .pushCalculatedAssignments(_: Option[UserEnrolmentAssignments])(using _: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
-        .returning(Future successful eacdAssignmentsPushStatus)
+        .returning(Future.successful(eacdAssignmentsPushStatus))
 
     def mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(
       maybeOutstandingAssignmentsWorkItemsExist: Option[Boolean]
@@ -255,7 +258,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       (mockUserClientDetailsConnector
         .outstandingAssignmentsWorkItemsExist(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, *, *)
-        .returning(Future successful maybeOutstandingAssignmentsWorkItemsExist)
+        .returning(Future.successful(maybeOutstandingAssignmentsWorkItemsExist))
 
     def mockAucdGetPaginatedClientsForArn(
       arn: Arn,
@@ -272,7 +275,7 @@ class CustomGroupsServiceSpec extends TestConstants {
           _: ExecutionContext
         ))
         .expects(arn, page, pageSize, search, filter, *, *)
-        .returning(Future successful mockedResponse)
+        .returning(Future.successful(mockedResponse))
 
     def mockAuditServiceAuditEsAssignmentUnassignments()
       : CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Unit] =

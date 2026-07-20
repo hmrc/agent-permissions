@@ -23,7 +23,8 @@ import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
+import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, RecordUpdated}
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
@@ -65,17 +66,16 @@ class OptinRepositorySpec
     "inserting a record" should {
       "store the record with field-level encryption" in new TestScope {
         optinRepository.upsert(optinRecord).futureValue
-        // checking at the raw Document level that the relevant fields have been encrypted
-        val document = optinRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue
-        document.toString should include(
-          optinRecord.status.value
-        ) // the opt-in/opt-out status string should be in plaintext
-        // But the agent user ids and names should be encrypted
-        optinRecord.history.map(_.user).foreach { agentUser =>
-          document.toString should not include agentUser.id
-          document.toString should not include agentUser.name
-        }
+        val document = optinRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue.head
+        val documentString = document.toString.replaceAll("\\s+", "")
 
+        documentString should include(s"""status,BsonString{value='${optinRecord.status.value}'}""")
+
+        // The agent user ids and names should be encrypted at rest.
+        optinRecord.history.map(_.user).foreach { agentUser =>
+          documentString should not include (agentUser.id)
+          documentString should not include (agentUser.name)
+        }
       }
     }
 

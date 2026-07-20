@@ -16,34 +16,27 @@
 
 package uk.gov.hmrc.agentpermissions.model.accessgroups.optin
 
-import play.api.libs.json._
+import play.api.libs.json.*
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 
 import java.time.LocalDateTime
 
-sealed trait OptinStatus {
-  val value: String
+enum OptinStatus(val value: String) {
+  case OptedInSingleUser extends OptinStatus("Opted-In_SINGLE_USER")
+  case OptedOutSingleUser extends OptinStatus("Opted-Out_SINGLE_USER")
+  case OptedOutWrongClientCount extends OptinStatus("Opted-Out_WRONG_CLIENT_COUNT")
+  case OptedOutEligible extends OptinStatus("Opted-Out_ELIGIBLE")
+  case OptedInReady extends OptinStatus("Opted-In_READY")
+  case OptedInNotReady extends OptinStatus("Opted-In_NOT_READY")
 }
 
-case object OptedInSingleUser extends OptinStatus {
-  override val value = "Opted-In_SINGLE_USER"
-}
-case object OptedOutSingleUser extends OptinStatus {
-  override val value = "Opted-Out_SINGLE_USER"
-}
-case object OptedOutWrongClientCount extends OptinStatus {
-  override val value = "Opted-Out_WRONG_CLIENT_COUNT"
-}
-case object OptedOutEligible extends OptinStatus {
-  override val value = "Opted-Out_ELIGIBLE"
-}
-case object OptedInReady extends OptinStatus {
-  override val value = "Opted-In_READY"
-}
-case object OptedInNotReady extends OptinStatus {
-  override val value = "Opted-In_NOT_READY"
-}
+val OptedInSingleUser: OptinStatus = OptinStatus.OptedInSingleUser
+val OptedOutSingleUser: OptinStatus = OptinStatus.OptedOutSingleUser
+val OptedOutWrongClientCount: OptinStatus = OptinStatus.OptedOutWrongClientCount
+val OptedOutEligible: OptinStatus = OptinStatus.OptedOutEligible
+val OptedInReady: OptinStatus = OptinStatus.OptedInReady
+val OptedInNotReady: OptinStatus = OptinStatus.OptedInNotReady
 
 object OptinStatus {
 
@@ -60,11 +53,13 @@ object OptinStatus {
   given Writes[OptinStatus] = (o: OptinStatus) => JsString(o.value)
 }
 
-sealed trait OptinEventType {
-  val value: String = getClass.getSimpleName.dropRight(1)
+enum OptinEventType(val value: String) {
+  case OptedIn extends OptinEventType("OptedIn")
+  case OptedOut extends OptinEventType("OptedOut")
 }
-case object OptedIn extends OptinEventType
-case object OptedOut extends OptinEventType
+
+val OptedIn: OptinEventType = OptinEventType.OptedIn
+val OptedOut: OptinEventType = OptinEventType.OptedOut
 
 object OptinEventType {
 
@@ -86,7 +81,7 @@ object OptinEvent {
 case class OptinRecord(arn: Arn, history: List[OptinEvent]) {
 
   lazy val status: OptinEventType = history match {
-    case Nil    => OptedOut
+    case Nil    => OptinEventType.OptedOut
     case events => events.sortWith((a, b) => a.eventDateTime.isAfter(b.eventDateTime)).head.optinEventType
   }
 }

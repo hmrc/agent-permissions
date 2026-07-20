@@ -21,7 +21,7 @@ import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
@@ -45,9 +45,9 @@ class NotOptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: Ag
           case None =>
             Future.successful(None)
           case Some(size) =>
-            if (size < 2 || size > appConfig.agentSizeMaxClientCountAllowed) {
+            if size < 2 || size > appConfig.agentSizeMaxClientCountAllowed then
               Future.successful(Option(OptedOutWrongClientCount))
-            } else {
+            else
               for {
                 maybeSingleUser <- agentUserClientDetailsConnector.isSingleUserAgency(arn)
                 maybeOptinStatus: Option[OptinStatus] <- {
@@ -55,15 +55,11 @@ class NotOptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: Ag
                     case None =>
                       Future.successful(None)
                     case Some(isSingleUser) =>
-                      if (isSingleUser) {
-                        Future.successful(Option(OptedOutSingleUser))
-                      } else {
-                        Future.successful(Option(OptedOutEligible))
-                      }
+                      if isSingleUser then Future.successful(Option(OptedOutSingleUser))
+                      else Future.successful(Option(OptedOutEligible))
                   }
                 }
               } yield maybeOptinStatus
-            }
         }
     } yield maybeOptinStatus
 

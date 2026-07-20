@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.agentpermissions.model
 
-import play.api.libs.json._
+import play.api.libs.json.*
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinRecord
-import uk.gov.hmrc.crypto._
+import uk.gov.hmrc.crypto.*
 
 /** Variant of OptinRecord suitable to be stored partially encrypted in Mongo. (APB-6461)
   */

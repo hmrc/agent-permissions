@@ -16,12 +16,13 @@
 
 package it.controllers
 
-import play.api.libs.json._
-import play.api.test.Helpers._
+import play.api.libs.json.*
+import play.api.test.Helpers.*
 import play.api.libs.ws.WSBodyReadables.readableAsString
 import support.ComponentBaseISpec
-import uk.gov.hmrc.agentpermissions.model._
+import uk.gov.hmrc.agentpermissions.model.*
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client}
+import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, TaxGroupsRepositoryV2}
 
 import java.util.UUID
@@ -377,7 +378,7 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
 
       givenAuthorisedAsAgentWith(arn.value)
       givenGetClientsSuccess(arn)
-      await(customGroupRepo.insert(customGroup.copy(id = UUID.randomUUID(), groupName = "easy")))
+      await(customGroupRepo.insert(customGroup.copy(id = GroupId.random(), groupName = "easy")))
       val gid: String = await(customGroupRepo.insert(customGroup)).get
 
       val result = delete(groupUrl(gid))
@@ -563,7 +564,7 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       await(
         customGroupRepo.insert(
           customGroup.copy(
-            id = UUID.randomUUID(),
+            id = GroupId.random(),
             groupName = "other group",
             teamMembers = customGroup.teamMembers + AgentUser("id3", "tm3")
           )
@@ -724,7 +725,7 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       givenAuthorisedAsAgentWith(arn.value)
       val gid: String = await(customGroupRepo.insert(customGroup)).get
 
-      await(customGroupRepo.insert(customGroup.copy(id = UUID.randomUUID(), groupName = "other"))).get
+      await(customGroupRepo.insert(customGroup.copy(id = GroupId.random(), groupName = "other"))).get
 
       val result = delete(removeClientUrl(gid, "HMRC-MTD-VAT~VRN~123456789"))
 
@@ -818,7 +819,7 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       givenAuthorisedAsAgentWith(arn.value)
       val gid: String = await(customGroupRepo.insert(customGroup)).get
 
-      await(customGroupRepo.insert(customGroup.copy(id = UUID.randomUUID(), groupName = "other"))).get
+      await(customGroupRepo.insert(customGroup.copy(id = GroupId.random(), groupName = "other"))).get
 
       val result = delete(removeTeamMemberUrl(gid, tm1.id))
 

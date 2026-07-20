@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service
 
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 
 import java.time.LocalDateTime
 import javax.inject.Singleton
@@ -36,14 +36,12 @@ class OptinRecordBuilder {
       case None =>
         Option(OptinRecord(arn, List(OptinEvent(optinEventTypeToMatch, user, LocalDateTime.now()))))
       case Some(existingOptinRecord) =>
-        if (existingOptinRecord.status == optinEventTypeToMatch) {
-          None
-        } else {
+        if existingOptinRecord.status == optinEventTypeToMatch then None
+        else
           Option(
             existingOptinRecord.copy(history =
               existingOptinRecord.history :+ OptinEvent(optinEventTypeToMatch, user, LocalDateTime.now())
             )
           )
-        }
     }
 }

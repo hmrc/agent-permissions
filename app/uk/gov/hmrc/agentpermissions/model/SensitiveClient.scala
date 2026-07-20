@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.model
 
-import play.api.libs.json._
+import play.api.libs.json.*
 import uk.gov.hmrc.agentpermissions.model.accessgroups.Client
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption

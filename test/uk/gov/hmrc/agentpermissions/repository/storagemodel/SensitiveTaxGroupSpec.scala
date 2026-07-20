@@ -20,10 +20,10 @@ import play.api.libs.json.{JsObject, Json}
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveTaxGroup}
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, TaxGroup}
+import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 import java.time.LocalDateTime
-import java.util.UUID
 
 class SensitiveTaxGroupSpec extends TestConstants {
 
@@ -33,7 +33,7 @@ class SensitiveTaxGroupSpec extends TestConstants {
   val client: Client = Client(enrolmentKey = "HMRC-MTD-VAT~VRN~123456789", friendlyName = "Smith Roberts")
 
   override val taxGroup: TaxGroup = TaxGroup(
-    id = UUID.fromString("00000abc-6789-6789-6789-0000000000aa"),
+    id = GroupId.fromString("00000abc-6789-6789-6789-0000000000aa"),
     arn = Arn("KARN1234567"),
     groupName = "some group",
     created = LocalDateTime.of(2020, 1, 1, 0, 0, 0, 1000),

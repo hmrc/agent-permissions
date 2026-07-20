@@ -17,12 +17,12 @@
 package uk.gov.hmrc.agentpermissions.model.accessgroups
 
 import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.models.GroupId
 
 import java.time.LocalDateTime
-import java.util.UUID
 
 trait AccessGroup {
-  def id: UUID
+  def id: GroupId
   def arn: Arn
   def groupName: String
   def created: LocalDateTime

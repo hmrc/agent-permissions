@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import play.api.mvc._
+import play.api.mvc.*
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.service.BetaInviteService
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -42,29 +42,20 @@ class ArnAllowListController @Inject() ()(using
   def hideBetaInviteCheck: Action[AnyContent] = Action.async { request =>
     given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true, allowlistEnabled = false) { authorisedAgent =>
-      if (appConfig.checkArnAllowList) {
-        if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
-          Future.successful(Ok)
-        } else {
+      if appConfig.checkArnAllowList then
+        if appConfig.allowedArns.contains(authorisedAgent.arn.value) then Future.successful(Ok)
+        else
           for {
             hideBetaInvite <- betaInviteService.hideBetaInviteCheck(authorisedAgent.arn, authorisedAgent.agentUser)
           } yield
-            if (hideBetaInvite) {
-              Ok
-            } else {
-              NotFound
-            }
-        }
-      } else {
+            if hideBetaInvite then Ok
+            else NotFound
+      else
         for {
           hideBetaInvite <- betaInviteService.hideBetaInviteCheck(authorisedAgent.arn, authorisedAgent.agentUser)
         } yield
-          if (hideBetaInvite) {
-            Ok
-          } else {
-            NotFound
-          }
-      }
+          if hideBetaInvite then Ok
+          else NotFound
     }
   }
 

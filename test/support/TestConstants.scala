@@ -22,10 +22,10 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup, TaxGroup}
+import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter, SymmetricCryptoFactory}
 
 import java.time.LocalDateTime
-import java.util.UUID
 
 trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with MockFactory with IntegrationPatience {
   val arn: Arn = Arn("XARN8686099")
@@ -61,7 +61,7 @@ trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with
   val teamMembers: Set[AgentUser] = Set(tm1, tm2)
 
   val customGroup: CustomGroup = CustomGroup(
-    id = UUID.randomUUID(),
+    id = GroupId.random(),
     arn = arn,
     groupName = "Group 1",
     created = now,
@@ -73,7 +73,7 @@ trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with
   )
 
   val taxGroup: TaxGroup = TaxGroup(
-    id = UUID.randomUUID(),
+    id = GroupId.random(),
     arn = arn,
     groupName = "Group 1",
     created = now,

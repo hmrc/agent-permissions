@@ -17,7 +17,7 @@
 package it.controllers
 
 import play.api.libs.json.Json
-import play.api.test.Helpers._
+import play.api.test.Helpers.*
 import play.api.libs.ws.WSBodyReadables.readableAsString
 import support.ComponentBaseISpec
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser

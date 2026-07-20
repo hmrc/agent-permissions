@@ -212,23 +212,19 @@ object UserEnrolmentAssignmentOps {
   ): UserEnrolmentAssignments =
     foundPairs
       .foldLeft(
-        if (isNetChangeAssign) {
-          UserEnrolmentAssignments(assign = maxNetChange, Set.empty, arn)
-        } else {
-          UserEnrolmentAssignments(Set.empty, unassign = maxNetChange, arn)
-        }
+        if isNetChangeAssign then UserEnrolmentAssignments(assign = maxNetChange, Set.empty, arn)
+        else UserEnrolmentAssignments(Set.empty, unassign = maxNetChange, arn)
       ) { (userEnrolmentAssignments, foundPairs) =>
-        if (isNetChangeAssign) {
+        if isNetChangeAssign then
           userEnrolmentAssignments.copy(
             assign = userEnrolmentAssignments.assign -- foundPairs,
             unassign = userEnrolmentAssignments.unassign
           )
-        } else {
+        else
           userEnrolmentAssignments.copy(
             assign = userEnrolmentAssignments.assign,
             unassign = userEnrolmentAssignments.unassign -- foundPairs
           )
-        }
       }
 
 }

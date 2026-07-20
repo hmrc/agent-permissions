@@ -18,9 +18,9 @@ package support
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
-import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.client.WireMock.*
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration.*
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.IntegrationPatience
@@ -108,7 +108,7 @@ object WiremockHelper extends Eventually with IntegrationPatience {
 
 trait WiremockHelper {
 
-  import WiremockHelper._
+  import WiremockHelper.*
 
   lazy val wmConfig: WireMockConfiguration = wireMockConfig().port(wiremockPort)
   lazy val wireMockServer: WireMockServer = new WireMockServer(wmConfig)

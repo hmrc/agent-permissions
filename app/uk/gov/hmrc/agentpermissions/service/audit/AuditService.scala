@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.service.audit
 
 import com.google.inject.ImplementedBy
 import play.api.Logging
-import play.api.libs.json._
+import play.api.libs.json.*
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.UserEnrolmentAssignments

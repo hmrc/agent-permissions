@@ -24,6 +24,9 @@ import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
+import uk.gov.hmrc.agentpermissions.service.TaxServiceGroupCreationStatus.{TaxServiceGroupCreated, TaxServiceGroupExistsForCreation, TaxServiceGroupNotCreated}
+import uk.gov.hmrc.agentpermissions.service.TaxServiceGroupDeletionStatus.{TaxServiceGroupDeleted, TaxServiceGroupNotDeleted}
+import uk.gov.hmrc.agentpermissions.service.TaxServiceGroupUpdateStatus.{TaxServiceGroupNotUpdated, TaxServiceGroupUpdated}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, GroupSummary, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 

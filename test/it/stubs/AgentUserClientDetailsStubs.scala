@@ -16,7 +16,7 @@
 
 package it.stubs
 
-import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.client.WireMock.*
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import play.api.libs.json.Json
 import uk.gov.hmrc.agentpermissions.TestConstants
@@ -74,7 +74,7 @@ trait AgentUserClientDetailsStubs { this: TestConstants =>
     sendEmail: Boolean = false,
     lang: Option[String] = None
   ): StubMapping = {
-    val params = if (sendEmail) "?sendEmail=true" + lang.fold("")("&lang=" + _) else ""
+    val params = if sendEmail then "?sendEmail=true" + lang.fold("")("&lang=" + _) else ""
     val uri = s"/client-list$params"
     stubFor(
       get(urlEqualTo(s"$aucdPath/arn/${arn.value}$uri")).willReturn(

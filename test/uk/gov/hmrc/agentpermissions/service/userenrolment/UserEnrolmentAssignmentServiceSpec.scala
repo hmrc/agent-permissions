@@ -54,7 +54,7 @@ class UserEnrolmentAssignmentServiceSpec extends TestConstants {
       (mockAccessGroupsRepository
         .get(_: Arn))
         .expects(arn)
-        .returning(Future successful accessGroups)
+        .returning(Future.successful(accessGroups))
 
     def mockAccessGroupsRepositoryGet(
       maybeAccessGroup: Option[CustomGroup]
@@ -62,7 +62,7 @@ class UserEnrolmentAssignmentServiceSpec extends TestConstants {
       (mockAccessGroupsRepository
         .get(_: Arn, _: String))
         .expects(arn, *)
-        .returning(Future successful maybeAccessGroup)
+        .returning(Future.successful(maybeAccessGroup))
 
     def mockUserClientDetailsConnectorPushAssignments(
       pushStatus: EacdAssignmentsPushStatus
@@ -71,7 +71,7 @@ class UserEnrolmentAssignmentServiceSpec extends TestConstants {
         .pushAssignments(_: UserEnrolmentAssignments)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(userEnrolmentAssignments, *, *)
         .anyNumberOfTimes()
-        .returning(Future successful pushStatus)
+        .returning(Future.successful(pushStatus))
   }
 
   "Calculating assignments during group creation" should {

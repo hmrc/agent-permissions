@@ -20,7 +20,9 @@ import org.scalamock.handlers.{CallHandler1, CallHandler3}
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
-import uk.gov.hmrc.agentpermissions.repository.{BetaInviteRepository, RecordInserted, UpsertType}
+import uk.gov.hmrc.agentpermissions.repository.BetaInviteRepository
+import uk.gov.hmrc.agentpermissions.repository.UpsertType
+import uk.gov.hmrc.agentpermissions.repository.UpsertType.RecordInserted
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.http.HeaderCarrier

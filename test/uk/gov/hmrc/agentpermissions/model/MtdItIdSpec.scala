@@ -18,7 +18,7 @@ package uk.gov.hmrc.agentpermissions.model
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalacheck._
+import org.scalacheck.*
 
 class MtdItIdSpec extends AnyFlatSpec with Matchers {
 

@@ -20,10 +20,14 @@ import org.scalamock.handlers.{CallHandler1, CallHandler3, CallHandler4, CallHan
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
-import uk.gov.hmrc.agentpermissions.repository.{OptinRepository, RecordInserted, RecordUpdated, UpsertType}
+import uk.gov.hmrc.agentpermissions.repository.OptinRepository
+import uk.gov.hmrc.agentpermissions.repository.UpsertType
+import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, RecordUpdated}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client}
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
+import uk.gov.hmrc.agentpermissions.service.OptinRequestStatus.{OptinCreated, OptinUpdated}
+import uk.gov.hmrc.agentpermissions.service.OptoutRequestStatus.{OptoutCreated, OptoutUpdated}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -60,7 +64,7 @@ class OptinServiceSpec extends TestConstants {
       (mockOptinRepository.get(_: Arn)).expects(arn).returning(Future.successful(maybeOptinRecord))
 
     def mockOptinRepositoryGetAll(optinRecords: Seq[OptinRecord]) =
-      (mockOptinRepository.getAll: () => Future[Seq[OptinRecord]]).expects().returning(Future successful optinRecords)
+      (mockOptinRepository.getAll: () => Future[Seq[OptinRecord]]).expects().returning(Future.successful(optinRecords))
 
     def mockOptinRecordBuilderForUpdating(
       maybeExistingOptinRecord: Option[OptinRecord],
@@ -103,7 +107,7 @@ class OptinServiceSpec extends TestConstants {
       (mockUserClientDetailsConnector
         .getClientListStatus(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, headerCarrier, executionContext)
-        .returning(Future successful maybeClientListStatus)
+        .returning(Future.successful(maybeClientListStatus))
 
     def mockAuditServiceAuditOptInEvent(): CallHandler4[Arn, AgentUser, HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
@@ -124,7 +128,7 @@ class OptinServiceSpec extends TestConstants {
       (mockUserClientDetailsConnector
         .getClients(_: Arn, _: Boolean, _: Option[String])(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, sendEmail, *, headerCarrier, executionContext)
-        .returning(Future successful returnValue)
+        .returning(Future.successful(returnValue))
   }
 
   s"Calling optin" when {

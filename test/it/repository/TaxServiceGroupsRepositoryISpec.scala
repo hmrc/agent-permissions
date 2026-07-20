@@ -30,7 +30,6 @@ import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
 import java.time.LocalDateTime
-import java.util.UUID
 import scala.concurrent.ExecutionContext
 
 class TaxServiceGroupsRepositorySpec
@@ -42,7 +41,7 @@ class TaxServiceGroupsRepositorySpec
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
-    val dbId: UUID = GroupId.random()
+    val dbId: GroupId = GroupId.random()
     val groupName: String = "Some Group".toLowerCase
     val agent: AgentUser = AgentUser("userId", "userName")
     val user1: AgentUser = AgentUser("user1", "User 1")
