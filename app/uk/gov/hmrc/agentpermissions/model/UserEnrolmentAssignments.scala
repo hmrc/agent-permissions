@@ -22,7 +22,7 @@ import uk.gov.hmrc.agentpermissions.model.Arn
 case class UserEnrolment(userId: String, enrolmentKey: String)
 
 object UserEnrolment {
-  implicit val formats: Format[UserEnrolment] = Json.format
+  given Format[UserEnrolment] = Json.format
 }
 
 /** Represents the user/client combinations to assign and unassign in EACD.
@@ -34,5 +34,5 @@ object UserEnrolment {
 case class UserEnrolmentAssignments(assign: Set[UserEnrolment], unassign: Set[UserEnrolment], arn: Arn)
 
 object UserEnrolmentAssignments {
-  implicit val formats: Format[UserEnrolmentAssignments] = Json.format
+  given Format[UserEnrolmentAssignments] = Json.format
 }

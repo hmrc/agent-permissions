@@ -16,9 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.model
 
-sealed trait EacdAssignmentsPushStatus
-
-object EacdAssignmentsPushStatus {
-  case object AssignmentsPushed extends EacdAssignmentsPushStatus
-  case object AssignmentsNotPushed extends EacdAssignmentsPushStatus
+enum EacdAssignmentsPushStatus {
+  case AssignmentsPushed
+  case AssignmentsNotPushed
 }

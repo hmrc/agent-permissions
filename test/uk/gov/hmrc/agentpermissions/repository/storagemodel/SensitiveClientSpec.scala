@@ -24,7 +24,7 @@ import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 class SensitiveClientSpec extends TestConstants {
 
-  implicit val crypto: Encrypter with Decrypter = aesCrypto
+  given crypto: (Encrypter & Decrypter) = aesCrypto
 
   val client: Client = Client("HMRC-MTD-VAT~VRN~123456789", "Smith Roberts")
   val sensitiveClient: SensitiveClient = SensitiveClient(client)

@@ -17,7 +17,8 @@
 package it.controllers
 
 import play.api.libs.json.Json
-import play.api.test.Helpers._
+import play.api.test.Helpers.*
+import play.api.libs.ws.WSBodyReadables.readableAsString
 import support.ComponentBaseISpec
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.model.{AddMembersToTaxServiceGroupRequest, AddOneTeamMemberToGroupRequest, CreateTaxServiceGroupRequest, UpdateTaxServiceGroupRequest}
@@ -84,7 +85,7 @@ class TaxServiceGroupsControllerISpec extends ComponentBaseISpec {
 
       result.status shouldBe BAD_REQUEST
       result.body should include(
-        """{"message":{"obj.service":[{"msg":["error.path.missing"],"args":[]}],"obj.groupName":[{"msg":["error.path.missing"],"args":[]}],"obj.autoUpdate":[{"msg":["error.path.missing"],"args":[]}]}}"""
+        """{"message":{"obj.service":[{"msg":["error.path.missing"],"args":[]}],"obj.groupName":[{"msg":["error.path.missing"],"args":[]}]}}"""
       )
     }
 

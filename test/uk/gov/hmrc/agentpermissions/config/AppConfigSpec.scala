@@ -31,5 +31,22 @@ class AppConfigSpec extends UnitSpec {
       appConfig.agentUserClientDetailsBaseUrl shouldBe "http://localhost:9449"
       appConfig.agentSizeMaxClientCountAllowed shouldBe 100000
     }
+
+    "read audit chunk sizes correctly" in {
+      val testConfiguration =
+        configuration ++ Configuration(
+          "audit.clients-removal-chunk-size"      -> 100,
+          "audit.team-members-removal-chunk-size" -> 200
+        )
+
+      val testAppConfig =
+        new AppConfigImpl(
+          new ServicesConfig(testConfiguration),
+          testConfiguration
+        )
+
+      testAppConfig.clientsRemovalChunkSize shouldBe 100
+      testAppConfig.teamMembersRemovalChunkSize shouldBe 200
+    }
   }
 }

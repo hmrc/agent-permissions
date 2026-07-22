@@ -16,38 +16,24 @@
 
 package uk.gov.hmrc.agentpermissions.model.accessgroups.optin
 
-import play.api.libs.json._
+import play.api.libs.json.*
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 
 import java.time.LocalDateTime
 
-sealed trait OptinStatus {
-  val value: String
-}
-
-case object OptedInSingleUser extends OptinStatus {
-  override val value = "Opted-In_SINGLE_USER"
-}
-case object OptedOutSingleUser extends OptinStatus {
-  override val value = "Opted-Out_SINGLE_USER"
-}
-case object OptedOutWrongClientCount extends OptinStatus {
-  override val value = "Opted-Out_WRONG_CLIENT_COUNT"
-}
-case object OptedOutEligible extends OptinStatus {
-  override val value = "Opted-Out_ELIGIBLE"
-}
-case object OptedInReady extends OptinStatus {
-  override val value = "Opted-In_READY"
-}
-case object OptedInNotReady extends OptinStatus {
-  override val value = "Opted-In_NOT_READY"
+enum OptinStatus(val value: String) {
+  case OptedInSingleUser extends OptinStatus("Opted-In_SINGLE_USER")
+  case OptedOutSingleUser extends OptinStatus("Opted-Out_SINGLE_USER")
+  case OptedOutWrongClientCount extends OptinStatus("Opted-Out_WRONG_CLIENT_COUNT")
+  case OptedOutEligible extends OptinStatus("Opted-Out_ELIGIBLE")
+  case OptedInReady extends OptinStatus("Opted-In_READY")
+  case OptedInNotReady extends OptinStatus("Opted-In_NOT_READY")
 }
 
 object OptinStatus {
 
-  implicit val reads: Reads[OptinStatus] = {
+  given Reads[OptinStatus] = {
     case JsString(OptedInReady.value)             => JsSuccess(OptedInReady)
     case JsString(OptedInNotReady.value)          => JsSuccess(OptedInNotReady)
     case JsString(OptedInSingleUser.value)        => JsSuccess(OptedInSingleUser)
@@ -57,46 +43,45 @@ object OptinStatus {
     case invalid                                  => JsError(s"Invalid OptedIn value found: $invalid")
   }
 
-  implicit val writes: Writes[OptinStatus] = (o: OptinStatus) => JsString(o.value)
+  given Writes[OptinStatus] = (o: OptinStatus) => JsString(o.value)
 }
 
-sealed trait OptinEventType {
-  val value: String = getClass.getSimpleName.dropRight(1)
+enum OptinEventType(val value: String) {
+  case OptedIn extends OptinEventType("OptedIn")
+  case OptedOut extends OptinEventType("OptedOut")
 }
-case object OptedIn extends OptinEventType
-case object OptedOut extends OptinEventType
 
 object OptinEventType {
 
-  implicit val reads: Reads[OptinEventType] = {
+  given Reads[OptinEventType] = {
     case JsString(OptedIn.value)  => JsSuccess(OptedIn)
     case JsString(OptedOut.value) => JsSuccess(OptedOut)
     case invalid                  => JsError(s"Invalid OptinEventType value found: $invalid")
   }
 
-  implicit val writes: Writes[OptinEventType] = (o: OptinEventType) => JsString(o.value)
+  given Writes[OptinEventType] = (o: OptinEventType) => JsString(o.value)
 }
 
 case class OptinEvent(optinEventType: OptinEventType, user: AgentUser, eventDateTime: LocalDateTime)
 
 object OptinEvent {
-  implicit val formatOptinEvent: OFormat[OptinEvent] = Json.format[OptinEvent]
+  given OFormat[OptinEvent] = Json.format[OptinEvent]
 }
 
 case class OptinRecord(arn: Arn, history: List[OptinEvent]) {
 
   lazy val status: OptinEventType = history match {
-    case Nil    => OptedOut
-    case events => events.sortWith(_.eventDateTime isAfter _.eventDateTime).head.optinEventType
+    case Nil    => OptinEventType.OptedOut
+    case events => events.sortWith((a, b) => a.eventDateTime.isAfter(b.eventDateTime)).head.optinEventType
   }
 }
 
 object OptinRecord {
 
-  implicit val reads: Reads[OptinRecord] = Json.reads[OptinRecord]
+  given reads: Reads[OptinRecord] = Json.reads[OptinRecord]
 
-  implicit val writes: Writes[OptinRecord] = (optinRecord: OptinRecord) =>
+  given writes: Writes[OptinRecord] = (optinRecord: OptinRecord) =>
     Json.obj(fields = "arn" -> optinRecord.arn, "status" -> optinRecord.status, "history" -> optinRecord.history)
 
-  implicit val format: Format[OptinRecord] = Format(reads, writes)
+  given format: Format[OptinRecord] = Format(reads, writes)
 }

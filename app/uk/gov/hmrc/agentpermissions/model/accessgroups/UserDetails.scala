@@ -29,5 +29,5 @@ case class UserDetails(
 )
 
 object UserDetails {
-  implicit val format: Format[UserDetails] = Json.format
+  given Format[UserDetails] = Json.format
 }

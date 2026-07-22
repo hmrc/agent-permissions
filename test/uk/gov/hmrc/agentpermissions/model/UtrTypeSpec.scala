@@ -18,29 +18,37 @@ package uk.gov.hmrc.agentpermissions.model
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalacheck.*
 
-class MtdItIdSpec extends AnyFlatSpec with Matchers {
+class UtrTypeSpec extends AnyFlatSpec with Matchers {
 
-  val permittedChars: Gen[Char] = Gen.oneOf("abcdefghijklmnoqprstuvwxyzABCDEFGHIJKLMNOQPRSTUVWXYZ0123456789")
-  val validMtdItId: Gen[String] = Gen.listOfN(15, permittedChars).map(_.toArray).map(new String(_))
-
-  it should "be true for a valid MTDITID" in {
-    validMtdItId.map { mtditid =>
-      MtdItIdType.isValid(mtditid) shouldBe true
-    }
-    MtdItId.isValid("abc123def456ghi") shouldBe true
+  it should "be true for a valid UTR" in {
+    UtrType.isValid("2000000000") shouldBe true
+    UtrType.isValid("9000000001") shouldBe true
+    UtrType.isValid("7000000002") shouldBe true
+    UtrType.isValid("5000000003") shouldBe true
   }
 
-  it should "be false when it has more than 15 digits" in {
-    MtdItIdType.isValid("0000000000000000") shouldBe false
+  it should "be false when it has more than 10 digits" in {
+    UtrType.isValid("20000000000") shouldBe false
   }
 
   it should "be false when it is empty" in {
-    MtdItIdType.isValid("") shouldBe false
+    UtrType.isValid("") shouldBe false
+  }
+
+  it should "be false when it has fewer than 10 digits" in {
+    UtrType.isValid("200000") shouldBe false
+  }
+
+  it should "be false when it has non-digit characters" in {
+    UtrType.isValid("200000000B") shouldBe false
   }
 
   it should "be false when it has non-alphanumeric characters" in {
-    MtdItIdType.isValid("00000000000000!") shouldBe false
+    UtrType.isValid("200000000!") shouldBe false
+  }
+
+  it should "be false when it false when the modulus checksum doesn't pass" in {
+    UtrType.isValid("0123456789") shouldBe false
   }
 }

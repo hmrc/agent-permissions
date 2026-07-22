@@ -26,6 +26,9 @@ import play.api.libs.json.Json
 
 import java.time.LocalDateTime
 
+import OptinEventType.*
+import OptinStatus.*
+
 class OptinRecordSpec extends AnyWordSpecLike with Matchers {
 
   val arn: Arn = Arn("KARN1234567")

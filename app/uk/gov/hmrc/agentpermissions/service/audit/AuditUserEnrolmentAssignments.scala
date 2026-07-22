@@ -26,5 +26,5 @@ case class AuditUserEnrolmentAssignments(
 )
 
 object AuditUserEnrolmentAssignments {
-  implicit val format: Format[AuditUserEnrolmentAssignments] = Json.format
+  given Format[AuditUserEnrolmentAssignments] = Json.format
 }

@@ -22,7 +22,7 @@ import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.auth.core.AuthProvider.GovernmentGateway
-import uk.gov.hmrc.auth.core._
+import uk.gov.hmrc.auth.core.*
 import uk.gov.hmrc.auth.core.retrieve.v2.Retrievals.{allEnrolments, credentialRole, credentials}
 import uk.gov.hmrc.auth.core.retrieve.{Credentials, ~}
 import uk.gov.hmrc.http.HeaderCarrier
@@ -37,40 +37,34 @@ class AuthAction @Inject() (
   val authConnector: AuthConnector,
   val env: Environment,
   val config: Configuration
-)(implicit appConfig: AppConfig)
+)(using appConfig: AppConfig)
     extends AuthorisedFunctions with Logging {
 
   private val agentEnrolment = "HMRC-AS-AGENT"
   private val agentReferenceNumberIdentifier = "AgentReferenceNumber"
 
-  def getAuthorisedAgent(allowStandardUser: Boolean = false, allowlistEnabled: Boolean = true)(implicit
+  def getAuthorisedAgent(allowStandardUser: Boolean = false, allowlistEnabled: Boolean = true)(using
     ec: ExecutionContext,
-    request: Request[_]
+    request: Request[?]
   ): Future[Option[AuthorisedAgent]] = {
 
-    implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+    given hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
 
     authorised(AuthProviders(GovernmentGateway) and Enrolment(agentEnrolment))
       .retrieve(allEnrolments and credentialRole and credentials) { case allEnrolments ~ credentialRole ~ credentials =>
         getArnAndAgentUser(allEnrolments, credentials) match {
           case Some(authorisedAgent) =>
-            if (
-              credentialRole.contains(User) | credentialRole
-                .contains(Admin) | (credentialRole.contains(Assistant) & allowStandardUser)
-            ) {
-              if (appConfig.checkArnAllowList & allowlistEnabled) {
-                if (appConfig.allowedArns.contains(authorisedAgent.arn.value)) {
-                  Future successful Option(authorisedAgent)
-                } else {
-                  Future successful None
-                }
-              } else {
-                Future successful Option(authorisedAgent)
-              }
-            } else {
+            if credentialRole.contains(User) || credentialRole
+                .contains(Admin) || (credentialRole.contains(Assistant) && allowStandardUser)
+            then
+              if appConfig.checkArnAllowList && allowlistEnabled then
+                if appConfig.allowedArns.contains(authorisedAgent.arn.value) then
+                  Future.successful(Some(authorisedAgent))
+                else Future.successful(None)
+              else Future.successful(Some(authorisedAgent))
+            else
               logger.warn(s"Invalid credential role $credentialRole")
               Future.successful(None)
-            }
           case None =>
             logger.warn("No " + agentReferenceNumberIdentifier + " in enrolment")
             Future.successful(None)

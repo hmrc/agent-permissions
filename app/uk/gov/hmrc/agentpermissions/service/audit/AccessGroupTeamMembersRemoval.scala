@@ -28,7 +28,7 @@ case class AccessGroupTeamMembersRemoval(
 )
 
 object AccessGroupTeamMembersRemoval {
-  implicit val writes: Writes[AccessGroupTeamMembersRemoval] = Json.writes[AccessGroupTeamMembersRemoval]
+  given Writes[AccessGroupTeamMembersRemoval] = Json.writes[AccessGroupTeamMembersRemoval]
 
   def split(
     agentReferenceNumber: String,

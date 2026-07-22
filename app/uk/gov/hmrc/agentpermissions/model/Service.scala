@@ -19,17 +19,14 @@ package uk.gov.hmrc.agentpermissions.model
 import uk.gov.hmrc.domain.Nino
 import uk.gov.hmrc.domain.TaxIdentifier
 
-sealed abstract class Service(
+enum Service(
   val id: String,
   val invitationIdPrefix: Char,
   val enrolmentKey: String,
-  val supportedSuppliedClientIdType: ClientIdType[_ <: TaxIdentifier],
-  val supportedClientIdType: ClientIdType[_ <: TaxIdentifier]
-)
-
-object Service {
-
-  case object MtdIt
+  val supportedSuppliedClientIdType: ClientIdType[? <: TaxIdentifier],
+  val supportedClientIdType: ClientIdType[? <: TaxIdentifier]
+):
+  case MtdIt
       extends Service(
         "HMRC-MTD-IT",
         'A',
@@ -38,7 +35,7 @@ object Service {
         MtdItIdType
       )
 
-  case object PersonalIncomeRecord
+  case PersonalIncomeRecord
       extends Service(
         "PERSONAL-INCOME-RECORD",
         'B',
@@ -47,7 +44,7 @@ object Service {
         NinoType
       )
 
-  case object Vat
+  case Vat
       extends Service(
         "HMRC-MTD-VAT",
         'C',
@@ -56,7 +53,7 @@ object Service {
         VrnType
       )
 
-  case object Trust
+  case Trust
       extends Service(
         "HMRC-TERS-ORG",
         'D',
@@ -65,7 +62,7 @@ object Service {
         UtrType
       )
 
-  case object TrustNT
+  case TrustNT
       extends Service(
         "HMRC-TERSNT-ORG",
         'F',
@@ -74,7 +71,7 @@ object Service {
         UrnType
       )
 
-  case object CapitalGains
+  case CapitalGains
       extends Service(
         "HMRC-CGT-PD",
         'E',
@@ -83,7 +80,7 @@ object Service {
         CgtRefType
       )
 
-  case object Ppt
+  case Ppt
       extends Service(
         "HMRC-PPT-ORG",
         'G',
@@ -92,7 +89,7 @@ object Service {
         PptRefType
       )
 
-  case object Cbc
+  case Cbc
       extends Service(
         "HMRC-CBC-ORG",
         'H',
@@ -101,7 +98,7 @@ object Service {
         CbcIdType
       )
 
-  case object CbcNonUk
+  case CbcNonUk
       extends Service(
         "HMRC-CBC-NONUK-ORG",
         'J',
@@ -110,7 +107,7 @@ object Service {
         CbcIdType
       )
 
-  case object Pillar2
+  case Pillar2
       extends Service(
         "HMRC-PILLAR2-ORG",
         'K',
@@ -119,7 +116,7 @@ object Service {
         PlrIdType
       )
 
-  case object MtdItSupp
+  case MtdItSupp
       extends Service(
         "HMRC-MTD-IT-SUPP",
         'L',
@@ -128,26 +125,14 @@ object Service {
         MtdItIdType
       )
 
-  val supportedServices: Seq[Service] = Seq(
-    MtdIt,
-    Vat,
-    PersonalIncomeRecord,
-    Trust,
-    TrustNT,
-    CapitalGains,
-    Ppt,
-    Cbc,
-    CbcNonUk,
-    Pillar2,
-    MtdItSupp
-  )
+object Service {
+  val supportedServices: Seq[Service] = values.toSeq
 
-  def findById(id: String): Option[Service] = supportedServices.find(_.id == id)
-
+  def findById(id: String): Option[Service] = values.find(_.id == id)
 }
 
 sealed abstract class ClientIdType[+T <: TaxIdentifier](
-  val clazz: Class[_],
+  val clazz: Class[?],
   val id: String,
   val enrolmentId: String,
   val createUnderlying: String => T

@@ -49,7 +49,7 @@ case class CreateAccessGroupRequest(
 }
 
 object CreateAccessGroupRequest {
-  implicit val formatCreateAccessGroupRequest: OFormat[CreateAccessGroupRequest] = Json.format[CreateAccessGroupRequest]
+  given OFormat[CreateAccessGroupRequest] = Json.format[CreateAccessGroupRequest]
 }
 
 case class UpdateAccessGroupRequest(
@@ -68,11 +68,11 @@ case class UpdateAccessGroupRequest(
 }
 
 object UpdateAccessGroupRequest {
-  implicit val format: OFormat[UpdateAccessGroupRequest] = Json.format[UpdateAccessGroupRequest]
+  given OFormat[UpdateAccessGroupRequest] = Json.format[UpdateAccessGroupRequest]
 }
 
 case class AddMembersToAccessGroupRequest(teamMembers: Option[Set[AgentUser]], clients: Option[Set[Client]])
 
 object AddMembersToAccessGroupRequest {
-  implicit val format: OFormat[AddMembersToAccessGroupRequest] = Json.format[AddMembersToAccessGroupRequest]
+  given OFormat[AddMembersToAccessGroupRequest] = Json.format[AddMembersToAccessGroupRequest]
 }

@@ -53,8 +53,7 @@ case class CreateTaxServiceGroupRequest(
 }
 
 object CreateTaxServiceGroupRequest {
-  implicit val formatCreateTaxServiceGroupRequest: OFormat[CreateTaxServiceGroupRequest] =
-    Json.format[CreateTaxServiceGroupRequest]
+  given OFormat[CreateTaxServiceGroupRequest] = Json.format[CreateTaxServiceGroupRequest]
 }
 
 case class UpdateTaxServiceGroupRequest(
@@ -79,17 +78,17 @@ case class UpdateTaxServiceGroupRequest(
 }
 
 object UpdateTaxServiceGroupRequest {
-  implicit val format: OFormat[UpdateTaxServiceGroupRequest] = Json.format[UpdateTaxServiceGroupRequest]
+  given OFormat[UpdateTaxServiceGroupRequest] = Json.format[UpdateTaxServiceGroupRequest]
 }
 
 case class AddMembersToTaxServiceGroupRequest(teamMembers: Option[Set[AgentUser]], excludedClients: Option[Set[Client]])
 
 object AddMembersToTaxServiceGroupRequest {
-  implicit val format: OFormat[AddMembersToTaxServiceGroupRequest] = Json.format[AddMembersToTaxServiceGroupRequest]
+  given OFormat[AddMembersToTaxServiceGroupRequest] = Json.format[AddMembersToTaxServiceGroupRequest]
 }
 
 case class AddOneTeamMemberToGroupRequest(teamMember: AgentUser)
 
 object AddOneTeamMemberToGroupRequest {
-  implicit val format: OFormat[AddOneTeamMemberToGroupRequest] = Json.format[AddOneTeamMemberToGroupRequest]
+  given OFormat[AddOneTeamMemberToGroupRequest] = Json.format[AddOneTeamMemberToGroupRequest]
 }

@@ -42,7 +42,7 @@ object EnrolmentKey {
     */
   def identifiersOf(ek: String): Seq[Identifier] = {
     val parts = ek.split('~')
-    if (parts.length % 2 == 0 /* is even */ || parts.length < 3)
+    if parts.length % 2 == 0 /* is even */ || parts.length < 3 then
       throw new IllegalArgumentException(s"Invalid enrolment key: $ek")
     else ek.split('~').tail.grouped(2).map(xs => Identifier(xs(0), xs(1))).toSeq
   }

@@ -79,8 +79,8 @@ class GroupOpsSpec extends TestConstants {
 
     val clientTrust: Client = Client(s"$serviceTrust~$serviceIdentifierKeyTrust~0123456789", "Trust Client")
 
-    implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given ExecutionContext = ExecutionContext.Implicits.global
+    given HeaderCarrier = HeaderCarrier()
 
     def buildAccessGroup(teamMembers: Set[AgentUser], clients: Set[Client]): CustomGroup =
       CustomGroup(

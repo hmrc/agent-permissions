@@ -16,12 +16,11 @@
 
 package uk.gov.hmrc.agentpermissions.model.accessgroups
 
-import play.api.libs.json._
-
-import java.util.UUID
+import play.api.libs.json.*
+import uk.gov.hmrc.agentpermissions.models.GroupId
 
 case class GroupSummary(
-  groupId: UUID,
+  groupId: GroupId,
   groupName: String,
   clientCount: Option[Int], // Will not be populated for tax service groups
   teamMemberCount: Int,
@@ -29,7 +28,7 @@ case class GroupSummary(
 ) {
   def isTaxGroup: Boolean = taxService.isDefined
   def isCustomGroup: Boolean = taxService.isEmpty
-  def groupType: String = if (isTaxGroup) "tax" else "custom" // used for url context paths
+  def groupType: String = if isTaxGroup then "tax" else "custom" // used for url context paths
 }
 
 object GroupSummary {
@@ -54,5 +53,5 @@ object GroupSummary {
         )
     }
 
-  implicit val format: OFormat[GroupSummary] = Json.format[GroupSummary]
+  given OFormat[GroupSummary] = Json.format[GroupSummary]
 }

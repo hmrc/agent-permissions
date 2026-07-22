@@ -16,14 +16,14 @@
 
 package uk.gov.hmrc.agentpermissions.model.accessgroups
 
-import play.api.libs.json._
+import play.api.libs.json.*
 import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.models.GroupId
 
 import java.time.LocalDateTime
-import java.util.UUID
 
 case class CustomGroup(
-  id: UUID,
+  id: GroupId,
   arn: Arn,
   groupName: String,
   created: LocalDateTime,
@@ -35,5 +35,5 @@ case class CustomGroup(
 ) extends AccessGroup
 
 object CustomGroup {
-  implicit val format: OFormat[CustomGroup] = Json.format[CustomGroup]
+  given OFormat[CustomGroup] = Json.format[CustomGroup]
 }

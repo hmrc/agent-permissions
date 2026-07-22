@@ -39,7 +39,7 @@ trait EacdSyncRepository {
 }
 
 @Singleton
-class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent, appConfig: AppConfig)(implicit
+class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent, appConfig: AppConfig)(using
   ec: ExecutionContext
 ) extends PlayMongoRepository[EacdSyncRecord](
       collectionName = "eacd-sync-records",
@@ -52,7 +52,7 @@ class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent, appConfi
           IndexOptions()
             .background(false)
             .name("idxUpdatedAt")
-            .expireAfter(appConfig.eacdSyncNotBeforeSeconds, SECONDS)
+            .expireAfter(appConfig.eacdSyncNotBeforeSeconds.toLong, SECONDS)
         )
       )
     ) with EacdSyncRepository with Logging {
@@ -87,6 +87,6 @@ class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent, appConfi
 case class EacdSyncRecord(arn: Arn, updatedAt: Instant)
 
 object EacdSyncRecord {
-  implicit val dtf: Format[Instant] = MongoJavatimeFormats.instantFormat
-  implicit val format: Format[EacdSyncRecord] = Json.format[EacdSyncRecord]
+  given dtf: Format[Instant] = MongoJavatimeFormats.instantFormat
+  given format: Format[EacdSyncRecord] = Json.format[EacdSyncRecord]
 }

@@ -20,7 +20,8 @@ import org.scalamock.handlers.CallHandler3
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinStatus.*
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -28,8 +29,8 @@ import scala.concurrent.{ExecutionContext, Future}
 class OptedInStatusHandlerSpec extends TestConstants {
 
   trait TestScope {
-    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    given headerCarrier: HeaderCarrier = HeaderCarrier()
 
     val mockUserClientDetailsConnector: AgentUserClientDetailsConnector = mock[AgentUserClientDetailsConnector]
     val optedInStatusHandler = new OptedInStatusHandlerImpl(mockUserClientDetailsConnector)
@@ -38,7 +39,7 @@ class OptedInStatusHandlerSpec extends TestConstants {
       maybeSingleUser: Option[Boolean]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
       (mockUserClientDetailsConnector
-        .isSingleUserAgency(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .isSingleUserAgency(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, headerCarrier, executionContext)
         .returning(Future.successful(maybeSingleUser))
 
@@ -46,7 +47,7 @@ class OptedInStatusHandlerSpec extends TestConstants {
       maybeWorkItemsExist: Option[Boolean]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
       (mockUserClientDetailsConnector
-        .outstandingWorkItemsExist(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .outstandingWorkItemsExist(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, headerCarrier, executionContext)
         .returning(Future.successful(maybeWorkItemsExist))
   }

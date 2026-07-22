@@ -17,11 +17,11 @@
 package uk.gov.hmrc.agentpermissions.binders
 
 import play.api.mvc.PathBindable
-
+import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
-class SimpleObjectBinder[T](bind: String => T, unbind: T => String)(implicit m: Manifest[T]) extends PathBindable[T] {
-  def bind(key: String, value: String): Either[String, T] =
+class SimpleObjectBinder[T](bind: String => T, unbind: T => String)(using m: ClassTag[T]) extends PathBindable[T] {
+  override def bind(key: String, value: String): Either[String, T] =
     try
       Right(bind(value))
     catch {
@@ -29,5 +29,5 @@ class SimpleObjectBinder[T](bind: String => T, unbind: T => String)(implicit m: 
         Left(s"Cannot parse parameter '$key' with value '$value' as '${m.runtimeClass.getSimpleName}'")
     }
 
-  def unbind(key: String, value: T): String = unbind(value)
+  override def unbind(key: String, value: T): String = unbind(value)
 }

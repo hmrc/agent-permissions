@@ -27,15 +27,15 @@ case class BetaInviteRecord(
 
 object BetaInviteRecord {
 
-  implicit val readsBetaInviteRecord: Reads[BetaInviteRecord] = Json.reads[BetaInviteRecord]
+  given readsBetaInviteRecord: Reads[BetaInviteRecord] = Json.reads[BetaInviteRecord]
 
-  implicit val writesBetaInviteRecord: Writes[BetaInviteRecord] = (betaInviteRecord: BetaInviteRecord) =>
+  given writesBetaInviteRecord: Writes[BetaInviteRecord] = (betaInviteRecord: BetaInviteRecord) =>
     Json.obj(
       fields = "arn" -> betaInviteRecord.arn,
       "agentUserId"    -> betaInviteRecord.agentUserId,
       "hideBetaInvite" -> betaInviteRecord.hideBetaInvite
     )
 
-  implicit val formatBetaInviteRecord: Format[BetaInviteRecord] =
+  given formatBetaInviteRecord: Format[BetaInviteRecord] =
     Format(readsBetaInviteRecord, writesBetaInviteRecord)
 }
