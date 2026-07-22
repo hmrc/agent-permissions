@@ -26,6 +26,7 @@ import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, Recor
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinEventType.*
 import uk.gov.hmrc.agentpermissions.service.OptinRequestStatus.{OptinCreated, OptinUpdated}
 import uk.gov.hmrc.agentpermissions.service.OptoutRequestStatus.{OptoutCreated, OptoutUpdated}
 import uk.gov.hmrc.http.HeaderCarrier

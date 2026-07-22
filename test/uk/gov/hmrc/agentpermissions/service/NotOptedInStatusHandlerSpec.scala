@@ -23,7 +23,7 @@ import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.http.HeaderCarrier
-
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinStatus.*
 import scala.concurrent.{ExecutionContext, Future}
 
 class NotOptedInStatusHandlerSpec extends TestConstants {

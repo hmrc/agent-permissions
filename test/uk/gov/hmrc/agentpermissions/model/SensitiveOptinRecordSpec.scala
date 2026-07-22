@@ -21,6 +21,7 @@ import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinEventType.*
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 import java.time.LocalDateTime

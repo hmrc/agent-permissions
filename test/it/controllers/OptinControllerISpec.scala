@@ -20,7 +20,8 @@ import play.api.libs.json.JsNull
 import play.api.test.Helpers.*
 import support.ComponentBaseISpec
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.{OptedIn, OptinEvent, OptinRecord}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.{OptinEvent, OptinRecord}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinEventType.*
 import uk.gov.hmrc.agentpermissions.repository.OptinRepository
 
 import java.time.LocalDateTime

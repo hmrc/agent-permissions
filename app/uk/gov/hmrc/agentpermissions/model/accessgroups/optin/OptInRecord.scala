@@ -31,13 +31,6 @@ enum OptinStatus(val value: String) {
   case OptedInNotReady extends OptinStatus("Opted-In_NOT_READY")
 }
 
-val OptedInSingleUser: OptinStatus = OptinStatus.OptedInSingleUser
-val OptedOutSingleUser: OptinStatus = OptinStatus.OptedOutSingleUser
-val OptedOutWrongClientCount: OptinStatus = OptinStatus.OptedOutWrongClientCount
-val OptedOutEligible: OptinStatus = OptinStatus.OptedOutEligible
-val OptedInReady: OptinStatus = OptinStatus.OptedInReady
-val OptedInNotReady: OptinStatus = OptinStatus.OptedInNotReady
-
 object OptinStatus {
 
   given Reads[OptinStatus] = {
@@ -57,9 +50,6 @@ enum OptinEventType(val value: String) {
   case OptedIn extends OptinEventType("OptedIn")
   case OptedOut extends OptinEventType("OptedOut")
 }
-
-val OptedIn: OptinEventType = OptinEventType.OptedIn
-val OptedOut: OptinEventType = OptinEventType.OptedOut
 
 object OptinEventType {
 

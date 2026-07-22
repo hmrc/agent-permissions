@@ -24,6 +24,7 @@ import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinEventType.*
 import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, RecordUpdated}
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}

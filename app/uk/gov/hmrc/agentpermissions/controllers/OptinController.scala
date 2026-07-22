@@ -23,6 +23,7 @@ import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.service.OptinService
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
+import OptinEventType.*
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}

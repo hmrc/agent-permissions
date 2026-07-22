@@ -22,6 +22,7 @@ import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinStatus.*
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
