@@ -21,5 +21,5 @@ import play.api.libs.json.{Json, OFormat}
 case class AgentClientSize(`client-count`: Int)
 
 object AgentClientSize {
-  implicit val format: OFormat[AgentClientSize] = Json.format[AgentClientSize]
+  given OFormat[AgentClientSize] = Json.format[AgentClientSize]
 }

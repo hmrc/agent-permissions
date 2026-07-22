@@ -21,27 +21,27 @@ import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.http.HeaderCarrier
-
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinStatus.*
 import scala.concurrent.{ExecutionContext, Future}
 
 class NotOptedInStatusHandlerSpec extends TestConstants {
 
   trait TestScope {
 
-    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    given headerCarrier: HeaderCarrier = HeaderCarrier()
 
     val mockUserClientDetailsConnector: AgentUserClientDetailsConnector = mock[AgentUserClientDetailsConnector]
-    implicit val mockAppConfig: AppConfig = mock[AppConfig]
+    given mockAppConfig: AppConfig = mock[AppConfig]
     val notOptedInStatusHandler = new NotOptedInStatusHandlerImpl(mockUserClientDetailsConnector)
 
     def mockUserClientDetailsConnectorAgentSize(
       maybeSize: Option[Int]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Int]]] =
       (mockUserClientDetailsConnector
-        .agentSize(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .agentSize(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, headerCarrier, executionContext)
         .returning(Future.successful(maybeSize))
 
@@ -54,7 +54,7 @@ class NotOptedInStatusHandlerSpec extends TestConstants {
       maybeSingleUser: Option[Boolean]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
       (mockUserClientDetailsConnector
-        .isSingleUserAgency(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .isSingleUserAgency(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, headerCarrier, executionContext)
         .returning(Future.successful(maybeSingleUser))
   }

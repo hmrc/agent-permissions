@@ -26,7 +26,7 @@ trait AuthorisedAgentSupport extends Logging {
 
   def withAuthorisedAgent[T](allowStandardUser: Boolean = false, allowlistEnabled: Boolean = true)(
     body: AuthorisedAgent => Future[Result]
-  )(implicit authAction: AuthAction, request: Request[T], ec: ExecutionContext): Future[Result] =
+  )(using authAction: AuthAction, request: Request[T], ec: ExecutionContext): Future[Result] =
     authAction
       .getAuthorisedAgent(allowStandardUser, allowlistEnabled)
       .flatMap {

@@ -22,7 +22,7 @@ import com.mongodb.client.model.{Collation, IndexOptions}
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
-import org.mongodb.scala.model._
+import org.mongodb.scala.model.*
 import org.mongodb.scala.result.UpdateResult
 import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveAgentUser, SensitiveTaxGroup}
@@ -48,16 +48,16 @@ trait TaxGroupsRepositoryV2 {
   def addTeamMember(id: GroupId, toAdd: AgentUser): Future[UpdateResult]
 }
 
-import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2Impl._
+import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2Impl.*
 
 @Singleton
 class TaxGroupsRepositoryV2Impl @Inject() (
   mongoComponent: MongoComponent,
-  @Named("aes") crypto: Encrypter with Decrypter
-)(implicit ec: ExecutionContext)
+  @Named("aes") crypto: Encrypter & Decrypter
+)(using ec: ExecutionContext)
     extends PlayMongoRepository[SensitiveTaxGroup](
       collectionName = "access-groups-tax",
-      domainFormat = SensitiveTaxGroup.databaseFormat(crypto),
+      domainFormat = SensitiveTaxGroup.databaseFormat(using crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending(FIELD_ARN), new IndexOptions().name("arnIdx").unique(false)),
@@ -77,7 +77,7 @@ class TaxGroupsRepositoryV2Impl @Inject() (
     s"Crypto algorithm provided is not deterministic."
   )
 
-  implicit val theCrypto: Encrypter with Decrypter = crypto
+  given theCrypto: (Encrypter & Decrypter) = crypto
 
   override def findById(id: GroupId): Future[Option[TaxGroup]] =
     collection
@@ -110,12 +110,11 @@ class TaxGroupsRepositoryV2Impl @Inject() (
 
   def groupExistsForTaxService(arn: Arn, service: String): Future[Boolean] = {
     // Services as 1 entity with multiple enrolments stored as single group
-    val svc = service match {
-      case _ if service.contains("HMRC-TERS")   => "HMRC-TERS" // HMRC-TERS-ORG & HMRC-TERSNT-ORG
-      case _ if service.contains("HMRC-CBC")    => "HMRC-CBC" // HMRC-CBC-ORG & HMRC-CBC-NONUK-ORG
-      case _ if service.contains("HMRC-MTD-IT") => "HMRC-MTD-IT" // HMRC-MTD-IT & HMRC-MTD-IT-SUPP
-      case _                                    => service
-    }
+    val svc =
+      if service.contains("HMRC-TERS") then "HMRC-TERS" // HMRC-TERS-ORG & HMRC-TERSNT-ORG
+      else if service.contains("HMRC-CBC") then "HMRC-CBC" // HMRC-CBC-ORG & HMRC-CBC-NONUK-ORG
+      else if service.contains("HMRC-MTD-IT") then "HMRC-MTD-IT" // HMRC-MTD-IT & HMRC-MTD-IT-SUPP
+      else service
     collection
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_SERVICE, svc)))
       .collation(caseInsensitiveCollation)
@@ -127,7 +126,7 @@ class TaxGroupsRepositoryV2Impl @Inject() (
     collection
       .insertOne(SensitiveTaxGroup(accessGroup))
       .headOption()
-      .map(_.map(result => result.getInsertedId.asString().getValue))
+      .map(_.map(_.getInsertedId.asString().getValue))
       .recoverWith { case _: MongoWriteException =>
         Future.successful(None)
       }
@@ -139,7 +138,7 @@ class TaxGroupsRepositoryV2Impl @Inject() (
         deleteOptions
       )
       .headOption()
-      .map(_.map(result => result.getDeletedCount))
+      .map(_.map(_.getDeletedCount))
 
   override def update(arn: Arn, groupName: String, accessGroup: TaxGroup): Future[Option[Long]] =
     collection
@@ -149,7 +148,7 @@ class TaxGroupsRepositoryV2Impl @Inject() (
         replaceOptions
       )
       .headOption()
-      .map(_.map(result => result.getModifiedCount))
+      .map(_.map(_.getModifiedCount))
 
   private lazy val deleteOptions: DeleteOptions = new DeleteOptions().collation(caseInsensitiveCollation)
 

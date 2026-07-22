@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.model
 
-import play.api.libs.json._
+import play.api.libs.json.*
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.model.accessgroups.TaxGroup
@@ -54,7 +54,7 @@ case class SensitiveTaxGroup(
 }
 
 object SensitiveTaxGroup {
-  implicit def apply(taxGroup: TaxGroup): SensitiveTaxGroup = SensitiveTaxGroup(
+  def apply(taxGroup: TaxGroup): SensitiveTaxGroup = SensitiveTaxGroup(
     _id = taxGroup.id.toString,
     arn = taxGroup.arn,
     groupName = taxGroup.groupName,
@@ -68,6 +68,6 @@ object SensitiveTaxGroup {
     excludedClients = taxGroup.excludedClients.map(SensitiveClient(_))
   )
 
-  implicit def databaseFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveTaxGroup] =
+  given databaseFormat(using crypto: Encrypter & Decrypter): Format[SensitiveTaxGroup] =
     Json.format[SensitiveTaxGroup]
 }

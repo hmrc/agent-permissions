@@ -29,7 +29,7 @@ class AuthActionISpec extends ComponentBaseISpec {
   "getAuthorisedAgent" should {
     "return Some[AuthorisedAgent] for a User" in {
 
-      implicit val request: Request[_] = FakeRequest().withHeaders("Authorization" -> "Bearer xyz")
+      given Request[?] = FakeRequest().withHeaders("Authorization" -> "Bearer xyz")
 
       givenAuthorisedAsAgentWith(arn.value)
       val result = authAction.getAuthorisedAgent(allowStandardUser = true, allowlistEnabled = false).futureValue
@@ -39,7 +39,7 @@ class AuthActionISpec extends ComponentBaseISpec {
 
     "return Some[AuthorisedAgent] for a Standard User" in {
 
-      implicit val request: Request[_] = FakeRequest().withHeaders("Authorization" -> "Bearer xyz")
+      given Request[?] = FakeRequest().withHeaders("Authorization" -> "Bearer xyz")
 
       givenAuthorisedAsAgentWith(arn.value, isAdmin = false)
       val result = authAction.getAuthorisedAgent(allowStandardUser = true, allowlistEnabled = false).futureValue
@@ -49,7 +49,7 @@ class AuthActionISpec extends ComponentBaseISpec {
 
     "return None for a Standard User when Standard Users are not allowed" in {
 
-      implicit val request: Request[_] = FakeRequest().withHeaders("Authorization" -> "Bearer xyz")
+      given Request[?] = FakeRequest().withHeaders("Authorization" -> "Bearer xyz")
 
       givenAuthorisedAsAgentWith(arn.value, isAdmin = false)
       val result = authAction.getAuthorisedAgent(allowlistEnabled = false).futureValue
@@ -59,7 +59,7 @@ class AuthActionISpec extends ComponentBaseISpec {
 
     "return None for a User when they are not on the allow list and the allow list is enabled" in {
 
-      implicit val request: Request[_] = FakeRequest().withHeaders("Authorization" -> "Bearer xyz")
+      given Request[?] = FakeRequest().withHeaders("Authorization" -> "Bearer xyz")
 
       givenAuthorisedAsAgentWith("RARN8603525")
       val result = authAction.getAuthorisedAgent().futureValue
@@ -69,7 +69,7 @@ class AuthActionISpec extends ComponentBaseISpec {
 
     "return None for a legacy agent" in {
 
-      implicit val request: Request[_] = FakeRequest().withHeaders("Authorization" -> "Bearer xyz")
+      given Request[?] = FakeRequest().withHeaders("Authorization" -> "Bearer xyz")
 
       givenLegacyAgent()
       val result = authAction.getAuthorisedAgent().futureValue
@@ -79,7 +79,7 @@ class AuthActionISpec extends ComponentBaseISpec {
 
     "return None if the user is not signed in" in {
 
-      implicit val request: Request[_] = FakeRequest()
+      given Request[?] = FakeRequest()
 
       givenIsNotLoggedIn()
       val result = authAction.getAuthorisedAgent().futureValue

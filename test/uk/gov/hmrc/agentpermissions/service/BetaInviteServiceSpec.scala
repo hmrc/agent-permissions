@@ -20,7 +20,9 @@ import org.scalamock.handlers.{CallHandler1, CallHandler3}
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
-import uk.gov.hmrc.agentpermissions.repository.{BetaInviteRepository, RecordInserted, UpsertType}
+import uk.gov.hmrc.agentpermissions.repository.BetaInviteRepository
+import uk.gov.hmrc.agentpermissions.repository.UpsertType
+import uk.gov.hmrc.agentpermissions.repository.UpsertType.RecordInserted
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.http.HeaderCarrier
@@ -38,8 +40,8 @@ class BetaInviteServiceSpec extends TestConstants {
     val mockBetaInviteRecordBuilder: BetaInviteRecordBuilder = mock[BetaInviteRecordBuilder]
     val mockAuditService: AuditService = mock[AuditService]
 
-    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    given HeaderCarrier = HeaderCarrier()
 
     val betaInviteService =
       new BetaInviteServiceImpl(

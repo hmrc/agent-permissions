@@ -20,20 +20,20 @@ import play.api.libs.json.{JsObject, Json}
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveCustomGroup}
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
+import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 import java.time.LocalDateTime
-import java.util.UUID
 
 class SensitiveCustomGroupSpec extends TestConstants {
 
-  implicit val crypto: Encrypter with Decrypter = aesCrypto
+  given crypto: (Encrypter & Decrypter) = aesCrypto
 
   val agentUser: AgentUser = AgentUser(id = "agentUser1", name = "Robert Smith")
   val client: Client = Client(enrolmentKey = "HMRC-MTD-VAT~VRN~123456789", friendlyName = "Smith Roberts")
 
   override val customGroup: CustomGroup = CustomGroup(
-    id = UUID.fromString("00000abc-6789-6789-6789-0000000000aa"),
+    id = GroupId.fromString("00000abc-6789-6789-6789-0000000000aa"),
     arn = Arn("KARN1234567"),
     groupName = "some group",
     created = LocalDateTime.of(2020, 1, 1, 0, 0, 0, 1000),

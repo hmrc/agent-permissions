@@ -21,9 +21,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
+import uk.gov.hmrc.agentpermissions.models.GroupId
 
 import java.time.LocalDateTime
-import java.util.UUID
 
 class TaxGroupSpec extends AnyFlatSpec with Matchers {
 
@@ -34,7 +34,7 @@ class TaxGroupSpec extends AnyFlatSpec with Matchers {
   val user2: AgentUser = AgentUser("user2", "User 2")
   val client1: Client = Client("HMRC-MTD-VAT~VRN~101747641", "John Innes")
 
-  val id = UUID.randomUUID()
+  val id = GroupId.random()
   val now: LocalDateTime = LocalDateTime.now()
 
   "TaxServiceAccessGroup" should "serialise to JSON and deserialize from string" in {

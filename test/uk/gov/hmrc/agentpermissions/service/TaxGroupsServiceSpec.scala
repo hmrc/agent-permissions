@@ -24,6 +24,9 @@ import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
+import uk.gov.hmrc.agentpermissions.service.TaxServiceGroupCreationStatus.{TaxServiceGroupCreated, TaxServiceGroupExistsForCreation, TaxServiceGroupNotCreated}
+import uk.gov.hmrc.agentpermissions.service.TaxServiceGroupDeletionStatus.{TaxServiceGroupDeleted, TaxServiceGroupNotDeleted}
+import uk.gov.hmrc.agentpermissions.service.TaxServiceGroupUpdateStatus.{TaxServiceGroupNotUpdated, TaxServiceGroupUpdated}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, GroupSummary, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
@@ -72,8 +75,8 @@ class TaxGroupsServiceSpec extends TestConstants {
       "HMRC-CBC-NONUK-ORG" -> 2
     )
 
-    implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    given headerCarrier: HeaderCarrier = HeaderCarrier()
 
     val mockAUCDConnector: AgentUserClientDetailsConnector = mock[AgentUserClientDetailsConnector]
     val mockTaxServiceGroupsRepository: TaxGroupsRepositoryV2 = mock[TaxGroupsRepositoryV2]
@@ -92,7 +95,7 @@ class TaxGroupsServiceSpec extends TestConstants {
       clientCountMap: Option[Map[String, Int]]
     ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Map[String, Int]]]] =
       (mockAUCDConnector
-        .clientCountByTaxService(_: Arn)(_: HeaderCarrier, _: ExecutionContext))
+        .clientCountByTaxService(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(arn, headerCarrier, executionContext)
         .returning(Future.successful(clientCountMap))
 
@@ -145,7 +148,7 @@ class TaxGroupsServiceSpec extends TestConstants {
       (mockTaxServiceGroupsRepository
         .addTeamMember(_: GroupId, _: AgentUser))
         .expects(groupId, member)
-        .returning(Future.successful(UpdateResult.acknowledged(updatedCount, updatedCount, null)))
+        .returning(Future.successful(UpdateResult.acknowledged(updatedCount, updatedCount.toLong, null)))
 
     def mockTaxServiceGroupsRepositoryInsert(
       accessGroup: TaxGroup,
@@ -174,20 +177,20 @@ class TaxGroupsServiceSpec extends TestConstants {
 
     def mockAuditServiceAuditAccessGroupCreation(): CallHandler3[TaxGroup, HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupCreation(_: TaxGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupCreation(_: TaxGroup)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(())
 
     def mockAuditServiceAuditAccessGroupUpdate(): CallHandler3[TaxGroup, HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupUpdate(_: TaxGroup)(_: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupUpdate(_: TaxGroup)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *)
         .returning(())
 
     def mockAuditServiceAuditAccessGroupDeletion()
       : CallHandler5[Arn, String, AgentUser, HeaderCarrier, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupDeletion(_: Arn, _: String, _: AgentUser)(_: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupDeletion(_: Arn, _: String, _: AgentUser)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(*, *, *, *, *)
         .returning(())
 

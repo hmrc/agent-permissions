@@ -40,7 +40,7 @@ object GroupOps {
         }
       }
 
-    if (clientsToRemoveFromAccessGroup.nonEmpty) {
+    if clientsToRemoveFromAccessGroup.nonEmpty then
       val (clientsToRemove, clientsToKeep): (Set[Client], Set[Client]) =
         accessGroup.clients.partition(client =>
           clientsToRemoveFromAccessGroup.exists(clientToRemove => client.enrolmentKey == clientToRemove.enrolmentKey)
@@ -53,9 +53,7 @@ object GroupOps {
       )
 
       (modifiedAccessGroup, clientsToRemove)
-    } else {
-      (accessGroup, Set.empty)
-    }
+    else (accessGroup, Set.empty)
   }
 
   /** Remove from a group all the team members who appear in the given list
@@ -76,7 +74,7 @@ object GroupOps {
         }
       }
 
-    if (teamMembersToRemoveFromAccessGroup.nonEmpty) {
+    if teamMembersToRemoveFromAccessGroup.nonEmpty then
       val (teamMembersToRemove, teamMembersToKeep): (Set[AgentUser], Set[AgentUser]) =
         accessGroup.teamMembers.partition(agentUser =>
           teamMembersToRemoveFromAccessGroup.exists(userToRemove => agentUser.id == userToRemove.id)
@@ -88,9 +86,7 @@ object GroupOps {
         teamMembers = teamMembersToKeep
       )
       (modifiedAccessGroup, teamMembersToRemove)
-    } else {
-      (accessGroup, Set.empty)
-    }
+    else (accessGroup, Set.empty)
   }
 
 }

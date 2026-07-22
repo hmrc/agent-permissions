@@ -20,7 +20,8 @@ import play.api.libs.json.Json
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinEventType.*
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 import java.time.LocalDateTime
@@ -41,7 +42,7 @@ class SensitiveOptinRecordSpec extends TestConstants {
 
   "SensitiveOptinRecord" should {
     "serialise and unserialise correctly" in {
-      implicit val crypto: Encrypter with Decrypter = aesCrypto
+      given crypto: (Encrypter & Decrypter) = aesCrypto
       val sensitiveOptinRecord = SensitiveOptinRecord(optinRecord)
       val json = Json.toJson(sensitiveOptinRecord)
       val deserialised: SensitiveOptinRecord = Json.fromJson[SensitiveOptinRecord](json).get
@@ -50,7 +51,7 @@ class SensitiveOptinRecordSpec extends TestConstants {
     }
 
     "be serialised to JSON with certain fields encrypted" in {
-      implicit val crypto: Encrypter with Decrypter = aesCrypto
+      given crypto: (Encrypter & Decrypter) = aesCrypto
       val sensitiveOptinRecord = SensitiveOptinRecord(optinRecord)
       val json = Json.toJson(sensitiveOptinRecord)
       val userIds = optinRecord.history.indices.map { index =>

@@ -16,7 +16,7 @@
 
 package it.stubs
 
-import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.client.WireMock.*
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
 
 trait AuthStubs {
@@ -26,10 +26,8 @@ trait AuthStubs {
     isAdmin: Boolean = true
   ): StubMapping = {
     val credRole =
-      if (isAdmin)
-        "Admin"
-      else
-        "Assistant"
+      if isAdmin then "Admin"
+      else "Assistant"
     stubFor(
       post(urlEqualTo("/auth/authorise"))
         .willReturn(
@@ -56,10 +54,8 @@ trait AuthStubs {
     email: String = "bob@builder.com"
   ): StubMapping = {
     val credRole =
-      if (isAdmin)
-        "Admin"
-      else
-        "Assistant"
+      if isAdmin then "Admin"
+      else "Assistant"
     stubFor(
       post(urlEqualTo("/auth/authorise"))
         .willReturn(

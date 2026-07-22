@@ -47,14 +47,14 @@ class UserEnrolmentAssignmentServiceSpec extends TestConstants {
         mockUserClientDetailsConnector
       )
 
-    implicit val executionContext: ExecutionContext = ExecutionContext.Implicits.global
-    implicit val headerCarrier: HeaderCarrier = HeaderCarrier()
+    given ExecutionContext = ExecutionContext.Implicits.global
+    given HeaderCarrier = HeaderCarrier()
 
     def mockAccessGroupsRepositoryGetAll(accessGroups: Seq[CustomGroup]): CallHandler1[Arn, Future[Seq[CustomGroup]]] =
       (mockAccessGroupsRepository
         .get(_: Arn))
         .expects(arn)
-        .returning(Future successful accessGroups)
+        .returning(Future.successful(accessGroups))
 
     def mockAccessGroupsRepositoryGet(
       maybeAccessGroup: Option[CustomGroup]
@@ -62,16 +62,16 @@ class UserEnrolmentAssignmentServiceSpec extends TestConstants {
       (mockAccessGroupsRepository
         .get(_: Arn, _: String))
         .expects(arn, *)
-        .returning(Future successful maybeAccessGroup)
+        .returning(Future.successful(maybeAccessGroup))
 
     def mockUserClientDetailsConnectorPushAssignments(
       pushStatus: EacdAssignmentsPushStatus
     ): CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Future[EacdAssignmentsPushStatus]] =
       (mockUserClientDetailsConnector
-        .pushAssignments(_: UserEnrolmentAssignments)(_: HeaderCarrier, _: ExecutionContext))
+        .pushAssignments(_: UserEnrolmentAssignments)(using _: HeaderCarrier, _: ExecutionContext))
         .expects(userEnrolmentAssignments, *, *)
         .anyNumberOfTimes()
-        .returning(Future successful pushStatus)
+        .returning(Future.successful(pushStatus))
   }
 
   "Calculating assignments during group creation" should {

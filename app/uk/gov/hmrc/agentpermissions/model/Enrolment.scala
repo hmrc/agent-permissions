@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.model
 
-import play.api.libs.json._
+import play.api.libs.json.*
 
 case class Enrolment(
   service: String,
@@ -28,7 +28,7 @@ case class Enrolment(
 )
 
 object Enrolment {
-  implicit val format: Format[Enrolment] = Json.format[Enrolment]
+  given Format[Enrolment] = Json.format[Enrolment]
 }
 
 case class Identifier(key: String, value: String) {
@@ -36,6 +36,6 @@ case class Identifier(key: String, value: String) {
 }
 
 object Identifier {
-  implicit val format: Format[Identifier] = Json.format[Identifier]
-  implicit val ordering: Ordering[Identifier] = Ordering.by(_.key)
+  given Format[Identifier] = Json.format[Identifier]
+  given Ordering[Identifier] = Ordering.by(_.key)
 }

@@ -16,11 +16,13 @@
 
 package it.controllers
 
-import play.api.libs.json._
-import play.api.test.Helpers._
+import play.api.libs.json.*
+import play.api.test.Helpers.*
+import play.api.libs.ws.WSBodyReadables.readableAsString
 import support.ComponentBaseISpec
-import uk.gov.hmrc.agentpermissions.model._
+import uk.gov.hmrc.agentpermissions.model.*
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client}
+import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, TaxGroupsRepositoryV2}
 
 import java.util.UUID
@@ -376,7 +378,7 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
 
       givenAuthorisedAsAgentWith(arn.value)
       givenGetClientsSuccess(arn)
-      await(customGroupRepo.insert(customGroup.copy(id = UUID.randomUUID(), groupName = "easy")))
+      await(customGroupRepo.insert(customGroup.copy(id = GroupId.random(), groupName = "easy")))
       val gid: String = await(customGroupRepo.insert(customGroup)).get
 
       val result = delete(groupUrl(gid))
@@ -484,6 +486,35 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
 
       result.status shouldBe OK
     }
+    s"return $OK when adding clients" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+
+      val gid = await(customGroupRepo.insert(customGroup)).get
+
+      givenPushUserAssignmentSuccess(
+        UserEnrolmentAssignments(
+          assign = Set(
+            UserEnrolment("id3", c1.enrolmentKey)
+          ),
+          unassign = Set.empty,
+          arn
+        )
+      )
+
+      val result =
+        put(addMembersToGroupUrl(gid))(
+          Json.toJson(
+            AddMembersToAccessGroupRequest(
+              teamMembers = None,
+              clients = Some(Set(c1))
+            )
+          )
+        )
+
+      result.status shouldBe OK
+    }
     s"return $OK without assignments pushed" in {
 
       givenAuthorisedAsAgentWith(arn.value)
@@ -533,7 +564,7 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       await(
         customGroupRepo.insert(
           customGroup.copy(
-            id = UUID.randomUUID(),
+            id = GroupId.random(),
             groupName = "other group",
             teamMembers = customGroup.teamMembers + AgentUser("id3", "tm3")
           )
@@ -574,6 +605,43 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       body.pageContent shouldBe Seq(c2, c1)
 
     }
+    s"return $OK when searching clients" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+      val gid: String = await(customGroupRepo.insert(customGroup)).get
+
+      val result =
+        get(s"${paginatedClientsToGroupUrl(gid)}?page=1&pageSize=10&search=bob")
+
+      result.status shouldBe OK
+    }
+    s"return $OK when filtering TRUST clients" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+
+      val gid = await(customGroupRepo.insert(customGroup)).get
+
+      val result =
+        get(s"${paginatedClientsToGroupUrl(gid)}?page=1&pageSize=10&filter=TRUST")
+
+      result.status shouldBe OK
+    }
+    s"return $OK when filtering by service" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+
+      val gid = await(customGroupRepo.insert(customGroup)).get
+
+      val result =
+        get(
+          s"${paginatedClientsToGroupUrl(gid)}?page=1&pageSize=10&filter=HMRC-MTD"
+        )
+
+      result.status shouldBe OK
+    }
     s"return $FORBIDDEN" in {
 
       givenAuthorisedAsAgentWith("HARN1155367")
@@ -603,6 +671,19 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       val gid: String = await(customGroupRepo.insert(customGroup)).get
 
       val result = get(s"${paginatedClientsAddingToGroupUrl(gid)}?page=1&pageSize=10")
+
+      result.status shouldBe OK
+    }
+
+    s"return $OK using default pagination values" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+      givenGetPaginatedClientsSuccess(arn = arn, pageSize = 20)(Seq(c1, c2))
+
+      val gid: String = await(customGroupRepo.insert(customGroup)).get
+
+      val result = get(paginatedClientsAddingToGroupUrl(gid))
 
       result.status shouldBe OK
     }
@@ -639,17 +720,68 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       result.status shouldBe NO_CONTENT
 
     }
-    s"return $NO_CONTENT without assignments pushed" in {
+    s"return $NO_CONTENT when there are no assignments to push" in {
 
       givenAuthorisedAsAgentWith(arn.value)
       val gid: String = await(customGroupRepo.insert(customGroup)).get
 
-      await(customGroupRepo.insert(customGroup.copy(id = UUID.randomUUID(), groupName = "other"))).get
+      await(customGroupRepo.insert(customGroup.copy(id = GroupId.random(), groupName = "other"))).get
 
       val result = delete(removeClientUrl(gid, "HMRC-MTD-VAT~VRN~123456789"))
 
       result.status shouldBe NO_CONTENT
 
+    }
+    s"return $NO_CONTENT when assignments fail to be pushed" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+
+      val gid: String = await(customGroupRepo.insert(customGroup)).get
+
+      givenPushUserAssignmentFails(
+        UserEnrolmentAssignments(
+          assign = Set.empty,
+          unassign = Set(
+            UserEnrolment(userId = "id1", enrolmentKey = c1.enrolmentKey),
+            UserEnrolment(userId = "id2", enrolmentKey = c1.enrolmentKey)
+          ),
+          arn
+        ),
+        INTERNAL_SERVER_ERROR
+      )
+
+      val result = delete(removeClientUrl(gid, c1.enrolmentKey))
+
+      result.status shouldBe NO_CONTENT
+    }
+    s"return $OK when team member added but assignments are not pushed" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+
+      val gid = await(customGroupRepo.insert(customGroup)).get
+
+      givenPushUserAssignmentFails(
+        UserEnrolmentAssignments(
+          assign = Set(
+            UserEnrolment(userId = "id3", enrolmentKey = c1.enrolmentKey),
+            UserEnrolment(userId = "id3", enrolmentKey = c2.enrolmentKey)
+          ),
+          unassign = Set.empty,
+          arn
+        ),
+        INTERNAL_SERVER_ERROR
+      )
+
+      val result = patch(addMembersToGroupUrl(gid))(
+        Json.toJson(
+          AddOneTeamMemberToGroupRequest(
+            teamMember = AgentUser("id3", "tm3")
+          )
+        )
+      )
+
+      result.status shouldBe OK
     }
     s"return $NOT_MODIFIED" in {
 
@@ -687,7 +819,7 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       givenAuthorisedAsAgentWith(arn.value)
       val gid: String = await(customGroupRepo.insert(customGroup)).get
 
-      await(customGroupRepo.insert(customGroup.copy(id = UUID.randomUUID(), groupName = "other"))).get
+      await(customGroupRepo.insert(customGroup.copy(id = GroupId.random(), groupName = "other"))).get
 
       val result = delete(removeTeamMemberUrl(gid, tm1.id))
 
@@ -738,6 +870,55 @@ class AccessGroupsControllerISpec extends ComponentBaseISpec {
       await(customGroupRepo.insert(customGroup))
 
       val result = get(s"$unassignedClientsUrl?search=bob&filter=HMRC-TERS-ORG")
+
+      result.status shouldBe OK
+    }
+    s"return $OK using default pagination values" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+      await(customGroupRepo.insert(customGroup))
+
+      val result = get(unassignedClientsUrl)
+
+      result.status shouldBe OK
+    }
+    s"return $OK when filtering unassigned clients" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+
+      val result =
+        get(s"$unassignedClientsUrl?filter=HMRC-MTD-VAT")
+
+      result.status shouldBe OK
+    }
+    s"return $OK when filtering unassigned clients by TRUST" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn = arn, clients = Seq(c1, c3))
+
+      val result =
+        get(s"$unassignedClientsUrl?filter=TRUST")
+
+      result.status shouldBe OK
+    }
+    s"return $OK when searching unassigned clients" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+
+      val result =
+        get(s"$unassignedClientsUrl?search=bob")
+
+      result.status shouldBe OK
+    }
+    s"return $OK without filters" in {
+
+      givenAuthorisedAsAgentWith(arn.value)
+      givenGetClientsSuccess(arn)
+
+      val result = get(unassignedClientsUrl)
 
       result.status shouldBe OK
     }

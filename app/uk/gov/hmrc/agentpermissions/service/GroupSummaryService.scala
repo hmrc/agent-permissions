@@ -28,12 +28,12 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[GroupSummaryServiceImpl])
 trait GroupSummaryService {
-  def getAllGroupSummaries(arn: Arn)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]]
-  def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
+  def getAllGroupSummaries(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]]
+  def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]]
-  def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+  def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(using
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]]
 
@@ -48,10 +48,10 @@ class GroupSummaryServiceImpl @Inject() (
 
   override def getAllGroupSummaries(
     arn: Arn
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]] =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]] =
     for {
       customGroups <- customGroupsService.getAllCustomGroups(arn)
-      customSummaries = customGroups.map(GroupSummary.of(_))
+      customSummaries = customGroups.map(GroupSummary.of)
       taxGroups           <- taxGroupsService.getAllTaxServiceGroups(arn)
       taxGroupClientCount <- taxGroupsService.clientCountForTaxGroups(arn)
       taxSummaries = taxGroups.map(group =>
@@ -62,27 +62,27 @@ class GroupSummaryServiceImpl @Inject() (
       combinedSorted = (customSummaries ++ taxSummaries).sortBy(_.groupName.toLowerCase())
     } yield combinedSorted
 
-  override def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(implicit
+  override def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]] = {
-    val service = if (enrolmentKey.contains("HMRC-TERS")) { "HMRC-TERS" }
-    else if (enrolmentKey.contains("HMRC-CBC")) { "HMRC-CBC" }
-    else enrolmentKey.split('~').head
+    val service =
+      if enrolmentKey.contains("HMRC-TERS") then "HMRC-TERS"
+      else if enrolmentKey.contains("HMRC-CBC") then "HMRC-CBC"
+      else enrolmentKey.split('~').head
     for {
       customSummaries <- customGroupsService.getCustomGroupSummariesForClient(arn, enrolmentKey)
       maybeTaxGroup   <- taxGroupsRepo.getByService(arn, service)
       maybeTaxGroupSummary =
         maybeTaxGroup.fold(Seq.empty[GroupSummary])(group =>
-          if (group.excludedClients.exists(client => client.enrolmentKey == enrolmentKey)) {
-            Seq.empty[GroupSummary]
-          } else Seq(GroupSummary.of(group))
+          if group.excludedClients.exists(_.enrolmentKey == enrolmentKey) then Seq.empty[GroupSummary]
+          else Seq(GroupSummary.of(group))
         )
       combinedSummaries = customSummaries ++ maybeTaxGroupSummary
     } yield combinedSummaries
   }
 
-  override def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(implicit
+  override def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(using
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]] =
     for {

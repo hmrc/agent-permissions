@@ -30,12 +30,12 @@ import scala.concurrent.{ExecutionContext, Future}
 @ImplementedBy(classOf[BetaInviteServiceImpl])
 trait BetaInviteService {
 
-  def hideBetaInvite(arn: Arn, user: AgentUser)(implicit
+  def hideBetaInvite(arn: Arn, user: AgentUser)(using
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[UpsertType]]
 
-  def hideBetaInviteCheck(arn: Arn, user: AgentUser)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean]
+  def hideBetaInviteCheck(arn: Arn, user: AgentUser)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean]
 }
 
 @Singleton
@@ -44,7 +44,7 @@ class BetaInviteServiceImpl @Inject() (
   betaInviteRecordBuilder: BetaInviteRecordBuilder
 ) extends BetaInviteService with Logging {
 
-  override def hideBetaInvite(arn: Arn, user: AgentUser)(implicit
+  override def hideBetaInvite(arn: Arn, user: AgentUser)(using
     ec: ExecutionContext,
     headerCarrier: HeaderCarrier
   ): Future[Option[UpsertType]] =
@@ -62,7 +62,7 @@ class BetaInviteServiceImpl @Inject() (
 
     } yield maybeUpsertResult
 
-  override def hideBetaInviteCheck(arn: Arn, user: AgentUser)(implicit
+  override def hideBetaInviteCheck(arn: Arn, user: AgentUser)(using
     ec: ExecutionContext,
     hc: HeaderCarrier
   ): Future[Boolean] =

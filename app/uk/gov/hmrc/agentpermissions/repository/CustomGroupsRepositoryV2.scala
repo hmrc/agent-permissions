@@ -23,13 +23,13 @@ import org.mongodb.scala.bson.Document
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
-import org.mongodb.scala.model._
+import org.mongodb.scala.model.*
 import org.mongodb.scala.result.UpdateResult
 import play.api.Logging
 import play.api.libs.json.Format
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveAgentUser, SensitiveCustomGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2Impl._
+import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2Impl.*
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, CustomGroup}
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption
@@ -71,11 +71,11 @@ trait CustomGroupsRepositoryV2 {
 @Singleton
 class CustomGroupsRepositoryV2Impl @Inject() (
   mongoComponent: MongoComponent,
-  @Named("aes") crypto: Encrypter with Decrypter
-)(implicit ec: ExecutionContext)
+  @Named("aes") crypto: Encrypter & Decrypter
+)(using ec: ExecutionContext)
     extends PlayMongoRepository[SensitiveCustomGroup](
       collectionName = "access-groups-custom",
-      domainFormat = SensitiveCustomGroup.databaseFormat(crypto),
+      domainFormat = SensitiveCustomGroup.databaseFormat(using crypto),
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending(FIELD_ARN), new IndexOptions().name("arnIdx").unique(false)),
@@ -89,7 +89,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
       ),
       extraCodecs = Seq(
         // Sensitive string codec so we can operate on individual string fields
-        Codecs.playFormatCodec(sensitiveStringFormat(crypto))
+        Codecs.playFormatCodec(sensitiveStringFormat(using crypto))
       )
     ) with CustomGroupsRepositoryV2 with Logging {
 
@@ -99,7 +99,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
     s"Crypto algorithm provided is not deterministic."
   )
 
-  implicit val theCrypto: Encrypter with Decrypter = crypto
+  given theCrypto: (Encrypter & Decrypter) = crypto
 
   def findById(id: GroupId): Future[Option[CustomGroup]] =
     collection
@@ -126,7 +126,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
     collection
       .insertOne(SensitiveCustomGroup(customGroup))
       .headOption()
-      .map(_.map(result => result.getInsertedId.asString().getValue))
+      .map(_.map(_.getInsertedId.asString().getValue))
       .recoverWith { case _: MongoWriteException =>
         Future.successful(None)
       }
@@ -138,7 +138,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
         deleteOptions
       )
       .headOption()
-      .map(_.map(result => result.getDeletedCount))
+      .map(_.map(_.getDeletedCount))
 
   def update(arn: Arn, groupName: String, customGroup: CustomGroup): Future[Option[Long]] =
     collection
@@ -148,7 +148,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
         replaceOptions
       )
       .headOption()
-      .map(_.map(result => result.getModifiedCount))
+      .map(_.map(_.getModifiedCount))
 
   private lazy val deleteOptions: DeleteOptions = new DeleteOptions().collation(caseInsensitiveCollation)
 
@@ -169,7 +169,9 @@ class CustomGroupsRepositoryV2Impl @Inject() (
         filter = Filters.equal("_id", groupId.toString),
         update = Updates.pullByFilter(
           Document(
-            "clients" -> Document("enrolmentKey" -> Codecs.toBson(SensitiveString(enrolmentKey))(sensitiveStringFormat))
+            "clients" -> Document(
+              "enrolmentKey" -> Codecs.toBson(SensitiveString(enrolmentKey))(using sensitiveStringFormat)
+            )
           )
         )
       )
@@ -187,6 +189,6 @@ object CustomGroupsRepositoryV2Impl {
   private def caseInsensitiveCollation: Collation =
     Collation.builder().locale("en").collationStrength(SECONDARY).build()
 
-  private def sensitiveStringFormat(implicit crypto: Encrypter with Decrypter): Format[SensitiveString] =
+  private def sensitiveStringFormat(using crypto: Encrypter & Decrypter): Format[SensitiveString] =
     JsonEncryption.sensitiveEncrypterDecrypter(SensitiveString.apply)
 }

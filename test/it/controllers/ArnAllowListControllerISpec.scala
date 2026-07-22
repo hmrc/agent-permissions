@@ -18,7 +18,7 @@ package it.controllers
 
 import play.api.http.Status.OK
 import play.api.libs.json.JsNull
-import play.api.test.Helpers._
+import play.api.test.Helpers.*
 import support.ComponentBaseISpec
 import uk.gov.hmrc.agentpermissions.model.{Arn, BetaInviteRecord}
 import uk.gov.hmrc.agentpermissions.repository.BetaInviteRepository

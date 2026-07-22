@@ -20,7 +20,6 @@ import org.apache.pekko.actor.ActorSystem
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, EacdSyncRepository, TaxGroupsRepositoryV2}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
@@ -38,16 +37,15 @@ case class RemovalSet(enrolmentKeysToRemove: Set[String], userIdsToRemove: Set[S
   def isEmpty: Boolean = enrolmentKeysToRemove.isEmpty && userIdsToRemove.isEmpty
 }
 
-sealed trait SyncResult
-object SyncResult {
-  case object AccessGroupUpdateSuccess extends SyncResult
-  case object AccessGroupUpdateFailure extends SyncResult
-  case object AccessGroupUnchanged extends SyncResult
+enum SyncResult {
+  case AccessGroupUpdateSuccess
+  case AccessGroupUpdateFailure
+  case AccessGroupUnchanged
 }
 
 @ImplementedBy(classOf[EacdSynchronizerImpl])
 trait EacdSynchronizer {
-  def syncWithEacd(arn: Arn, fullSync: Boolean = false)(implicit
+  def syncWithEacd(arn: Arn, fullSync: Boolean = false)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Option[Map[SyncResult, Int]]]
@@ -60,8 +58,7 @@ class EacdSynchronizerImpl @Inject() (
   taxGroupsRepository: TaxGroupsRepositoryV2, // TODO consider importing service instead of repository
   eacdSyncRepository: EacdSyncRepository, // TODO consider importing service instead of repository
   auditService: AuditService,
-  actorSystem: ActorSystem,
-  appConfig: AppConfig
+  actorSystem: ActorSystem
 ) extends EacdSynchronizer with Logging {
 
   /** Interrogate EACD to find out whether the stored access groups are referencing any clients or team members who are
@@ -70,11 +67,10 @@ class EacdSynchronizerImpl @Inject() (
     * @return
     *   the lists of clients and team members which should removed from access groups.
     */
-  private[service] def calculateRemovalSet(arn: Arn, accessGroups: Seq[AccessGroup])(implicit
+  private[service] def calculateRemovalSet(arn: Arn, accessGroups: Seq[AccessGroup])(using
     ec: ExecutionContext,
     hc: HeaderCarrier
-  ): Future[RemovalSet] = if (accessGroups.isEmpty)
-    Future.successful(RemovalSet(Set.empty, Set.empty))
+  ): Future[RemovalSet] = if accessGroups.isEmpty then Future.successful(RemovalSet(Set.empty, Set.empty))
   else
     for {
       clientsInEacd <- agentUserClientDetailsConnector
@@ -111,7 +107,7 @@ class EacdSynchronizerImpl @Inject() (
     accessGroup: CustomGroup,
     removalSet: RemovalSet,
     whoIsUpdating: AgentUser
-  )(implicit
+  )(using
     ec: ExecutionContext,
     hc: HeaderCarrier
   ): Future[CustomGroup] = {
@@ -123,7 +119,7 @@ class EacdSynchronizerImpl @Inject() (
           removalSet.enrolmentKeysToRemove,
           whoIsUpdating
         )
-      if (clientsRemovedFromGroup.nonEmpty)
+      if clientsRemovedFromGroup.nonEmpty then
         auditService.auditAccessGroupClientsRemoval(accessGroup, clientsRemovedFromGroup)
       updatedGroup
     }
@@ -132,7 +128,7 @@ class EacdSynchronizerImpl @Inject() (
     val accessGroup2 = {
       val (updatedGroup, membersRemovedFromGroup) =
         GroupOps.removeTeamMembersFromGroup(accessGroup1, removalSet.userIdsToRemove, whoIsUpdating)
-      if (membersRemovedFromGroup.nonEmpty)
+      if membersRemovedFromGroup.nonEmpty then
         auditService.auditAccessGroupTeamMembersRemoval(accessGroup1, membersRemovedFromGroup)
       updatedGroup
     }
@@ -152,7 +148,7 @@ class EacdSynchronizerImpl @Inject() (
     accessGroup: TaxGroup,
     removalSet: RemovalSet,
     whoIsUpdating: AgentUser
-  )(implicit
+  )(using
     ec: ExecutionContext,
     hc: HeaderCarrier
   ): Future[TaxGroup] = {
@@ -168,20 +164,20 @@ class EacdSynchronizerImpl @Inject() (
     val excludedClientsRemoved =
       accessGroup.excludedClients.diff(updatedGroup.excludedClients)
 
-    if (membersRemoved.nonEmpty) auditService.auditAccessGroupTeamMembersRemoval(accessGroup, membersRemoved)
-    if (excludedClientsRemoved.nonEmpty)
+    if membersRemoved.nonEmpty then auditService.auditAccessGroupTeamMembersRemoval(accessGroup, membersRemoved)
+    if excludedClientsRemoved.nonEmpty then
       auditService.auditAccessGroupExcludedClientsRemoval(accessGroup, excludedClientsRemoved)
     /* There is really no need for this function to return a Future, but since this function sends audit events
       a Future return type is a way to signal the presence of side effects */
     val isChanged = membersRemoved.nonEmpty || excludedClientsRemoved.nonEmpty
-    Future.successful(if (isChanged) updatedGroup else accessGroup)
+    Future.successful(if isChanged then updatedGroup else accessGroup)
   }
 
   private[service] def applyRemovalSet(
     accessGroup: AccessGroup,
     removalSet: RemovalSet,
     whoIsUpdating: AgentUser
-  )(implicit
+  )(using
     ec: ExecutionContext,
     hc: HeaderCarrier
   ): Future[AccessGroup] = accessGroup match {
@@ -192,17 +188,17 @@ class EacdSynchronizerImpl @Inject() (
 
   /** Force the assigned enrolments in EACD to match those stored here.
     */
-  private[service] def doFullSync(arn: Arn, customGroups: Seq[CustomGroup])(implicit
+  private[service] def doFullSync(arn: Arn, customGroups: Seq[CustomGroup])(using
     ec: ExecutionContext,
     hc: HeaderCarrier
   ): Future[Unit] = {
     logger.info(s"Starting full sync for $arn.")
     for {
       usersInAgency <- agentUserClientDetailsConnector.getTeamMembers(arn)
-      userIds = usersInAgency.map(_.userId).collect { case Some(id) => id }.toSet
+      userIds = usersInAgency.flatMap(_.userId).toSet
       fullSyncResults <- Future.traverse(userIds) { userId =>
                            val expectedAssignments = customGroups
-                             .filter(_.teamMembers.map(_.id).contains(userId))
+                             .filter(_.teamMembers.exists(_.id == userId))
                              .flatMap(_.clients.map(_.enrolmentKey))
                            agentUserClientDetailsConnector
                              .syncTeamMember(arn, userId, expectedAssignments)
@@ -217,18 +213,17 @@ class EacdSynchronizerImpl @Inject() (
         case _                       => false
       }
       val exceptions = fullSyncResults.collect { case (userId, Failure(e)) => (userId, e) }
-      val failuresText = if (exceptions.isEmpty) "No failures." else s"${exceptions.size} failures."
+      val failuresText = if exceptions.isEmpty then "No failures." else s"${exceptions.size} failures."
       logger.info(
         s"Full sync finished for $arn. $resyncedCount users of ${fullSyncResults.size} needed syncing in EACD. $failuresText"
       )
-      if (exceptions.nonEmpty) {
+      if exceptions.nonEmpty then
         val failuresDetails = exceptions.map { case (userId, e) => s"userId $userId got ${e.getMessage}" }
         logger.warn(s"Full sync for $arn failed for the following users: " + failuresDetails.mkString("; "))
-      }
     }
   }
 
-  private[service] def persistAccessGroup(accessGroup: AccessGroup)(implicit
+  private[service] def persistAccessGroup(accessGroup: AccessGroup)(using
     ec: ExecutionContext
   ): Future[SyncResult] = {
     logger.info(
@@ -249,7 +244,7 @@ class EacdSynchronizerImpl @Inject() (
   /** Run the enclosed function only if safe (i.e. there are no outstanding assignment work item and the sync lock can
     * be acquired)
     */
-  def ifSyncShouldOccur[A](arn: Arn)(action: => Future[A])(implicit
+  def ifSyncShouldOccur[A](arn: Arn)(action: => Future[A])(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Option[A]] = for {
@@ -282,7 +277,7 @@ class EacdSynchronizerImpl @Inject() (
     *   None if sync was not done (if too soon after previous sync or items still outstanding). A list of update
     *   statuses otherwise
     */
-  def syncWithEacd(arn: Arn, fullSync: Boolean = false)(implicit
+  def syncWithEacd(arn: Arn, fullSync: Boolean)(using
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Option[Map[SyncResult, Int]]] = ifSyncShouldOccur(arn) {
@@ -310,19 +305,21 @@ class EacdSynchronizerImpl @Inject() (
 
       // Persist the updated access groups.
       updateStatuses: Seq[SyncResult] <-
-        if (removalSet.isEmpty) Future.successful(Seq.empty)
+        if removalSet.isEmpty then Future.successful(Seq.empty)
         else Future.traverse(accessGroupsToPersist)(persistAccessGroup(_))
 
       // Optionally ensure that in EACD the enrolment assignments match those kept by agent-permissions.
       // This is scheduled asynchronously as it could take some time.
-      _ = if (fullSync) actorSystem.scheduler.scheduleOnce(FiniteDuration(0, "s")) {
-            val _ = doFullSync(arn, updatedAccessGroups.collect { case cg: CustomGroup => cg })
-          }
+      _ = if fullSync then
+            actorSystem.scheduler.scheduleOnce(FiniteDuration(0, "s")) {
+              val _ = doFullSync(arn, updatedAccessGroups.collect { case cg: CustomGroup => cg })
+            }
+            ()
 
     } yield Map[SyncResult, Int](
       SyncResult.AccessGroupUpdateSuccess -> updateStatuses.count(_ == SyncResult.AccessGroupUpdateSuccess),
       SyncResult.AccessGroupUpdateFailure -> updateStatuses.count(_ == SyncResult.AccessGroupUpdateFailure),
       SyncResult.AccessGroupUnchanged     -> nrUnchangedAccessGroups
-    ).filter(_._2 > 0)
+    ).filterNot(_._2 == 0)
   }
 }

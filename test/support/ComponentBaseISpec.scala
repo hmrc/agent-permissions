@@ -24,14 +24,16 @@ import org.scalatestplus.play.guice.GuiceOneServerPerSuite
 import play.api.Application
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.json.JsValue
+import play.api.libs.ws.JsonBodyWritables.writeableOf_JsValue
 import play.api.libs.ws.{WSClient, WSRequest, WSResponse}
 import play.api.mvc.{AnyContent, Request}
-import play.api.test.Helpers._
+import play.api.test.Helpers.*
 import play.api.test.{FakeRequest, Injecting}
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.mongo.MongoComponent
+import uk.gov.hmrc.mongo.logging.ObservableFutureImplicits.SingleObservableFuture
 
 import scala.concurrent.ExecutionContext
 
@@ -80,8 +82,8 @@ trait ComponentBaseISpec
       .toFuture()
       .futureValue
 
-  implicit val ws: WSClient = app.injector.instanceOf[WSClient]
-  implicit val executionContext: ExecutionContext = app.injector.instanceOf[ExecutionContext]
+  private val ws: WSClient = app.injector.instanceOf[WSClient]
+  given ExecutionContext = app.injector.instanceOf[ExecutionContext]
   val appConfig: AppConfig = app.injector.instanceOf[AppConfig]
 
   protected val selfPath: String = "/agent-permissions"
@@ -129,9 +131,9 @@ trait ComponentBaseISpec
       "Content-Type"  -> "application/json"
     )
 
-  implicit val request: Request[AnyContent] =
+  given Request[AnyContent] =
     FakeRequest().withHeaders()
 
-  implicit val hc: HeaderCarrier = HeaderCarrier()
+  given hc: HeaderCarrier = HeaderCarrier()
 
 }

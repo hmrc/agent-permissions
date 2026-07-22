@@ -34,9 +34,9 @@ case class PaginationMetaData(
 case class PaginatedList[T](pageContent: Seq[T], paginationMetaData: PaginationMetaData)
 
 case object PaginationMetaData {
-  implicit val format: Format[PaginationMetaData] = Json.format[PaginationMetaData]
+  given Format[PaginationMetaData] = Json.format[PaginationMetaData]
 }
 
 case object PaginatedList {
-  implicit def format[A](implicit format: Format[A]): Format[PaginatedList[A]] = Json.format[PaginatedList[A]]
+  given format[A](using format: Format[A]): Format[PaginatedList[A]] = Json.format[PaginatedList[A]]
 }

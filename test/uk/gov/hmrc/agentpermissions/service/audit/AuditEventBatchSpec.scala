@@ -25,7 +25,7 @@ class AuditEventBatchSpec extends UnitSpec {
 
   case class TestObject(name: String)
   object TestObject {
-    implicit val writes: Writes[TestObject] = Json.writes[TestObject]
+    given Writes[TestObject] = Json.writes[TestObject]
   }
 
   "Batch creation" should {

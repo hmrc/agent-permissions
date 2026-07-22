@@ -31,15 +31,15 @@ import scala.concurrent.{ExecutionContext, Future}
 @ImplementedBy(classOf[UserEnrolmentAssignmentServiceImpl])
 trait UserEnrolmentAssignmentService {
 
-  def calculateForGroupCreation(accessGroup: CustomGroup)(implicit
+  def calculateForGroupCreation(accessGroup: CustomGroup)(using
     ec: ExecutionContext
   ): Future[Option[UserEnrolmentAssignments]]
 
-  def calculateForGroupDeletion(arn: Arn, groupName: String)(implicit
+  def calculateForGroupDeletion(arn: Arn, groupName: String)(using
     ec: ExecutionContext
   ): Future[Option[UserEnrolmentAssignments]]
 
-  def calculateForGroupUpdate(arn: Arn, groupName: String, accessGroupToUpdate: CustomGroup)(implicit
+  def calculateForGroupUpdate(arn: Arn, groupName: String, accessGroupToUpdate: CustomGroup)(using
     ec: ExecutionContext
   ): Future[Option[UserEnrolmentAssignments]]
 
@@ -48,18 +48,18 @@ trait UserEnrolmentAssignmentService {
     groupName: String,
     clients: Set[Client],
     teamMembers: Set[AgentUser]
-  )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
+  )(using ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
 
   def calculateForRemoveFromGroup(
     arn: Arn,
     groupName: String,
     clients: Set[Client],
     teamMembers: Set[AgentUser]
-  )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
+  )(using ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]]
 
   def pushCalculatedAssignments(
     maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus]
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus]
 }
 
 @Singleton
@@ -70,14 +70,14 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
 
   override def calculateForGroupCreation(
     accessGroup: CustomGroup
-  )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
+  )(using ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
       existingAccessGroups <- customGroupsRepository.get(accessGroup.arn)
       maybeUserEnrolmentAssignments <-
         Future.successful(UserEnrolmentAssignmentOps.forGroupCreation(accessGroup, existingAccessGroups))
     } yield maybeUserEnrolmentAssignments
 
-  override def calculateForGroupDeletion(arn: Arn, groupName: String)(implicit
+  override def calculateForGroupDeletion(arn: Arn, groupName: String)(using
     ec: ExecutionContext
   ): Future[Option[UserEnrolmentAssignments]] =
     for {
@@ -95,7 +95,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     arn: Arn,
     groupName: String,
     accessGroupToUpdate: CustomGroup
-  )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
+  )(using ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
       existingAccessGroups <- customGroupsRepository.get(arn)
       maybeUserEnrolmentAssignments <-
@@ -119,7 +119,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     groupName: String,
     clients: Set[Client],
     teamMembers: Set[AgentUser]
-  )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
+  )(using ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
       /* TODO: Replace pulling existing access groups with mongo query for pairs of UserEnrolments
        *   eg. maxNetChangePairs <- userEnrolmentAssignmentCalculator.pairUserEnrolments(Set[AgentUser], Set[Client])
@@ -139,7 +139,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     groupName: String,
     clients: Set[Client],
     teamMembers: Set[AgentUser]
-  )(implicit ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
+  )(using ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
       /* TODO: Replace pulling existing access groups with mongo query for pairs of UserEnrolments */
       existingAccessGroups <- customGroupsRepository.get(arn)
@@ -152,7 +152,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
 
   override def pushCalculatedAssignments(
     maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] =
+  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] =
     maybeUserEnrolmentAssignments match {
       case None =>
         Future.successful(AssignmentsNotPushed)
@@ -168,7 +168,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
               .map(agentUserClientDetailsConnector.pushAssignments(_))
           )
           .map(pushStatuses =>
-            if (pushStatuses.forall(_ == AssignmentsPushed)) AssignmentsPushed else AssignmentsNotPushed
+            if pushStatuses.forall(_ == AssignmentsPushed) then AssignmentsPushed else AssignmentsNotPushed
           )
     }
 

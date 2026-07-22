@@ -20,7 +20,8 @@ import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinStatus.*
 import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.{Inject, Singleton}
@@ -28,14 +29,14 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[OptedInStatusHandlerImpl])
 trait OptedInStatusHandler {
-  def identifyStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]]
+  def identifyStatus(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]]
 }
 
 @Singleton
 class OptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: AgentUserClientDetailsConnector)
     extends OptedInStatusHandler with Logging {
 
-  def identifyStatus(arn: Arn)(implicit ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
+  def identifyStatus(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
     for {
       maybeSingleUser <- agentUserClientDetailsConnector.isSingleUserAgency(arn)
       maybeOptinStatus: Option[OptinStatus] <- {
@@ -43,23 +44,18 @@ class OptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: Agent
           case None =>
             Future.successful(None)
           case Some(singleUser) =>
-            if (singleUser) {
-              Future.successful(Option(OptedInSingleUser))
-            } else {
+            if singleUser then Future.successful(Option(OptedInSingleUser))
+            else
               for {
                 maybeWorkItemsExist <- agentUserClientDetailsConnector.outstandingWorkItemsExist(arn)
                 maybeOptinStatus <- maybeWorkItemsExist match {
                                       case None =>
                                         Future.successful(None)
                                       case Some(workItemsExist) =>
-                                        if (workItemsExist) {
-                                          Future.successful(Option(OptedInNotReady))
-                                        } else {
-                                          Future.successful(Option(OptedInReady))
-                                        }
+                                        if workItemsExist then Future.successful(Option(OptedInNotReady))
+                                        else Future.successful(Option(OptedInReady))
                                     }
               } yield maybeOptinStatus
-            }
         }
       }
     } yield maybeOptinStatus

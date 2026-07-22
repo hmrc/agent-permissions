@@ -25,7 +25,8 @@ object PaginatedListBuilder {
     val pageStart = (page - 1) * pageSize
     val pageEnd = pageStart + pageSize
     val numberOfPages = Math.ceil(fullList.length.toDouble / pageSize.toDouble).toInt
-    val pageSliceUntil = Math.min(pageEnd, if (numberOfPages == page) fullList.length else fullList.length - 1)
+    val pageSliceUntil =
+      Math.min(pageEnd, if numberOfPages == page then fullList.length else fullList.length - 1)
 
     val currentPageContent = fullList.slice(pageStart, pageSliceUntil)
 

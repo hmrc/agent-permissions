@@ -25,16 +25,14 @@ import java.util.Base64
 
 class CryptoProviderModule extends Module {
 
-  def aesCryptoInstance(configuration: Configuration): Encrypter with Decrypter = if (
-    configuration.underlying.getBoolean("fieldLevelEncryption.enable")
-  )
-    SymmetricCryptoFactory.aesCryptoFromConfig("fieldLevelEncryption", configuration.underlying)
-  else
-    NoCrypto
+  def aesCryptoInstance(configuration: Configuration): Encrypter & Decrypter =
+    if configuration.underlying.getBoolean("fieldLevelEncryption.enable") then
+      SymmetricCryptoFactory.aesCryptoFromConfig("fieldLevelEncryption", configuration.underlying)
+    else NoCrypto
 
-  def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
+  def bindings(environment: Environment, configuration: Configuration): Seq[Binding[?]] =
     Seq(
-      bind[Encrypter with Decrypter].qualifiedWith("aes").toInstance(aesCryptoInstance(configuration))
+      bind[Encrypter & Decrypter].qualifiedWith("aes").toInstance(aesCryptoInstance(configuration))
     )
 }
 

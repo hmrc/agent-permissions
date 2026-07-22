@@ -28,7 +28,7 @@ import scala.concurrent.ExecutionContext
 class TestOnlyController @Inject() (
   customGroupsRepositoryV2: CustomGroupsRepositoryV2,
   optinRepository: OptinRepository
-)(implicit ec: ExecutionContext, cc: ControllerComponents)
+)(using ec: ExecutionContext, cc: ControllerComponents)
     extends BackendController(cc) with Logging {
 
   def delete(arn: String): Action[AnyContent] = Action.async { _ =>

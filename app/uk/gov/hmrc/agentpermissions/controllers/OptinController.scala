@@ -17,26 +17,28 @@
 package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.libs.json.JsString
-import play.api.mvc._
+import play.api.mvc.*
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.service.OptinService
-import uk.gov.hmrc.agentpermissions.model.accessgroups.optin._
+import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
+import OptinEventType.*
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 @Singleton()
-class OptinController @Inject() (optinService: OptinService)(implicit
+class OptinController @Inject() (optinService: OptinService)(using
   authAction: AuthAction,
   val appConfig: AppConfig,
   cc: ControllerComponents,
   val ec: ExecutionContext
 ) extends BackendController(cc) with AuthorisedAgentSupport {
 
-  def optin(arn: Arn, lang: Option[String] = None): Action[AnyContent] = Action.async { implicit request =>
+  def optin(arn: Arn, lang: Option[String] = None): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       withMatchedArn(arn, authorisedAgent) {
         optinService.optin(authorisedAgent.arn, authorisedAgent.agentUser, lang) flatMap {
@@ -51,7 +53,8 @@ class OptinController @Inject() (optinService: OptinService)(implicit
     } transformWith failureHandler
   }
 
-  def optout(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def optout(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent() { authorisedAgent =>
       withMatchedArn(arn, authorisedAgent) {
         optinService.optout(authorisedAgent.arn, authorisedAgent.agentUser) flatMap {
@@ -66,7 +69,8 @@ class OptinController @Inject() (optinService: OptinService)(implicit
     } transformWith failureHandler
   }
 
-  def optinStatus(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def optinStatus(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { _ =>
       optinService
         .optinStatus(arn)
@@ -78,7 +82,8 @@ class OptinController @Inject() (optinService: OptinService)(implicit
     } transformWith failureHandler
   }
 
-  def optinRecordExists(arn: Arn): Action[AnyContent] = Action.async { implicit request =>
+  def optinRecordExists(arn: Arn): Action[AnyContent] = Action.async { request =>
+    given Request[AnyContent] = request
     withAuthorisedAgent(allowStandardUser = true) { _ =>
       optinService
         .optinRecordExists(arn)
@@ -92,9 +97,8 @@ class OptinController @Inject() (optinService: OptinService)(implicit
   private def withMatchedArn(providedArn: Arn, authorisedAgent: AuthorisedAgent)(
     body: => Future[Result]
   ): Future[Result] =
-    if (providedArn == authorisedAgent.arn) {
-      body
-    } else {
+    if providedArn == authorisedAgent.arn then body
+    else {
       logger.info("Provided ARN did not match with that identified by auth")
       Future.successful(BadRequest)
     }

@@ -22,10 +22,10 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup, TaxGroup}
+import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter, SymmetricCryptoFactory}
 
 import java.time.LocalDateTime
-import java.util.UUID
 
 trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with MockFactory with IntegrationPatience {
   val arn: Arn = Arn("XARN8686099")
@@ -50,6 +50,7 @@ trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with
 
   val c1: Client = Client("HMRC-MTD-VAT~VRN~123456789", "vat1")
   val c2: Client = Client("HMRC-MTD-IT~MTDITID~WOHV90190595538", "itsa1")
+  val c3: Client = Client("HMRC-TERS-ORG~SAUTR~1731139143", "itsa1")
 
   val tm1: AgentUser = AgentUser("id1", "tm1")
   val tm2: AgentUser = AgentUser("id2", "tm2")
@@ -60,7 +61,7 @@ trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with
   val teamMembers: Set[AgentUser] = Set(tm1, tm2)
 
   val customGroup: CustomGroup = CustomGroup(
-    id = UUID.randomUUID(),
+    id = GroupId.random(),
     arn = arn,
     groupName = "Group 1",
     created = now,
@@ -72,7 +73,7 @@ trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with
   )
 
   val taxGroup: TaxGroup = TaxGroup(
-    id = UUID.randomUUID(),
+    id = GroupId.random(),
     arn = arn,
     groupName = "Group 1",
     created = now,
@@ -88,6 +89,6 @@ trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with
   val expectedCount: Map[String, Int] = Map("HMRC-MTD-IT" -> 4, "HMRC-MTD-VAT" -> 3)
 
   // Note: This is simply a randomly-chosen secret key to run tests
-  val aesCrypto: Encrypter with Decrypter =
+  val aesCrypto: Encrypter & Decrypter =
     SymmetricCryptoFactory.aesCrypto(secretKey = "hWmZq3t6w9zrCeF5JiNcRfUjXn2r5u7x")
 }
