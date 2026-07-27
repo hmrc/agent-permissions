@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
-import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.TestConstants
-import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.config.{AppConfig, KeyRotationConfig}
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.mongo.logging.ObservableFutureImplicits.SingleObservableFuture
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
@@ -92,6 +92,8 @@ class EacdSyncRepositorySpec
     override def accessGroupChunkSize: Int = 100
     override def useEnrolmentAssignmentsChunkSize: Int = 100
     override def eacdSyncNotBeforeSeconds: Int = 10 // <- The value we care about in this test
+
+    override def keyRotation: KeyRotationConfig = ???
   }
 
 }

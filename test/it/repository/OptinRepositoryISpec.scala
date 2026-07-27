@@ -16,26 +16,31 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
-import uk.gov.hmrc.mongo.logging.ObservableFutureImplicits.SingleObservableFuture
+import org.apache.pekko.actor.ActorSystem
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
-import uk.gov.hmrc.agentpermissions.model.Arn
+import org.scalatest.OptionValues
+import support.KeyRotationSupport
 import uk.gov.hmrc.agentpermissions.TestConstants
-import uk.gov.hmrc.agentpermissions.model.SensitiveOptinRecord
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinEventType.*
+import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveOptinRecord}
 import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, RecordUpdated}
+import uk.gov.hmrc.mongo.logging.ObservableFutureImplicits.{ObservableFuture, SingleObservableFuture}
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
 import java.time.LocalDateTime
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Random
 
 class OptinRepositorySpec
-    extends TestConstants with PlayMongoRepositorySupport[SensitiveOptinRecord] with CleanMongoCollectionSupport {
+    extends TestConstants with PlayMongoRepositorySupport[SensitiveOptinRecord] with CleanMongoCollectionSupport
+    with OptionValues with KeyRotationSupport {
 
   given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  given ActorSystem = ActorSystem()
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -118,8 +123,33 @@ class OptinRepositorySpec
       }
     }
 
+    "encryption key migration" should {
+      "rotate the encryption key for records by reading them out and writing them back again" in new TestScope {
+        def generateRecord =
+          OptinRecord(
+            Arn(Random.alphanumeric.take(10).mkString),
+            List(OptinEvent(OptedIn, user, LocalDateTime.now()))
+          )
+
+        val testData = Seq.fill(20)(generateRecord)
+        Future.traverse(testData)(optinRepository.upsert).futureValue
+
+        // simulate a newly deployed encryption key
+        KeyRotationCrypto.rotateSecretKey(to = "eu2IgkfpOI9MYvoG1Q3eoFsWzyHO8fw/bwaSdS+21zg=", keepPreviousKey = true)
+
+        optinRepositoryImpl.migrate(batchSize = 5, deadline = patienceConfig.timeout.fromNow).futureValue
+
+        // ensure all records were processed correctly
+        val results = optinRepositoryImpl.collection.find().map(_.decryptedValue).toFuture().futureValue
+        results should contain theSameElementsAs testData
+
+        // the old encryption key can no longer decrypt the record
+        KeyRotationCrypto.rotateSecretKey(to = DefaultSecretKey)
+        optinRepositoryImpl.collection.find().toFuture().failed.futureValue shouldBe a[SecurityException]
+      }
+    }
   }
 
   override protected val repository: PlayMongoRepository[SensitiveOptinRecord] =
-    new OptinRepositoryImpl(mongoComponent, aesCrypto)
+    new OptinRepositoryImpl(mongoComponent, KeyRotationCrypto)
 }

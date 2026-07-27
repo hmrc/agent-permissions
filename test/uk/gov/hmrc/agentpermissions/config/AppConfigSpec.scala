@@ -49,4 +49,16 @@ class AppConfigSpec extends UnitSpec {
       testAppConfig.teamMembersRemovalChunkSize shouldBe 200
     }
   }
+
+  "read key rotation config correctly" in {
+    val testAppConfig =
+      new AppConfigImpl(
+        new ServicesConfig(configuration),
+        configuration
+      )
+
+    testAppConfig.keyRotation.enabled shouldBe false
+    testAppConfig.keyRotation.maxTotalDuration.toSeconds shouldBe 10
+    testAppConfig.keyRotation.batchSize shouldBe 1
+  }
 }

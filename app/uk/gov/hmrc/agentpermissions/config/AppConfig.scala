@@ -33,6 +33,7 @@ trait AppConfig {
   def accessGroupChunkSize: Int
   def useEnrolmentAssignmentsChunkSize: Int
   def eacdSyncNotBeforeSeconds: Int
+  def keyRotation: KeyRotationConfig
 }
 
 @Singleton
@@ -47,4 +48,5 @@ class AppConfigImpl @Inject() (servicesConfig: ServicesConfig, configuration: Co
   override lazy val useEnrolmentAssignmentsChunkSize: Int =
     servicesConfig.getInt("audit.user-enrolment-assignments-chunk-size")
   override lazy val eacdSyncNotBeforeSeconds: Int = configuration.underlying.getInt("eacdsync.notBeforeSeconds")
+  override lazy val keyRotation: KeyRotationConfig = configuration.get[KeyRotationConfig]("keyRotation")
 }

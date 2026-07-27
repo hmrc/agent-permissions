@@ -18,8 +18,8 @@ package uk.gov.hmrc.agentpermissions.model
 
 import play.api.libs.json.*
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.model.accessgroups.TaxGroup
+import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter, Sensitive}
 
 import java.time.LocalDateTime
