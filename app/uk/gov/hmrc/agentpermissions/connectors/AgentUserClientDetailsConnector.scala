@@ -109,7 +109,7 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
 
     httpV2.get(url"$url").execute[HttpResponse].map { response =>
       response.status match {
-        case OK => Option(response.json.as[Map[String, Int]])
+        case OK    => Option(response.json.as[Map[String, Int]])
         case other =>
           logger.warn(s"Received $other status: ${response.body}")
           None
@@ -275,8 +275,8 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
       .execute[HttpResponse]
       .flatMap { response =>
         response.status match {
-          case OK       => Future.successful(false)
-          case ACCEPTED => Future.successful(true)
+          case OK        => Future.successful(false)
+          case ACCEPTED  => Future.successful(true)
           case NOT_FOUND =>
             logger.warn(s"Team member assignment failed: Not found $arn / $userId")
             Future.failed(new NotFoundException(response.body))

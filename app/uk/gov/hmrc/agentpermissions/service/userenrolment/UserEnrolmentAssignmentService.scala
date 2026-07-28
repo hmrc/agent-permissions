@@ -72,7 +72,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     accessGroup: CustomGroup
   )(using ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
-      existingAccessGroups <- customGroupsRepository.get(accessGroup.arn)
+      existingAccessGroups          <- customGroupsRepository.get(accessGroup.arn)
       maybeUserEnrolmentAssignments <-
         Future.successful(UserEnrolmentAssignmentOps.forGroupCreation(accessGroup, existingAccessGroups))
     } yield maybeUserEnrolmentAssignments
@@ -81,8 +81,8 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     ec: ExecutionContext
   ): Future[Option[UserEnrolmentAssignments]] =
     for {
-      existingAccessGroups     <- customGroupsRepository.get(arn)
-      maybeExistingAccessGroup <- customGroupsRepository.get(arn, groupName)
+      existingAccessGroups          <- customGroupsRepository.get(arn)
+      maybeExistingAccessGroup      <- customGroupsRepository.get(arn, groupName)
       maybeUserEnrolmentAssignments <-
         Future.successful(
           maybeExistingAccessGroup.flatMap(
@@ -97,7 +97,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
     accessGroupToUpdate: CustomGroup
   )(using ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
-      existingAccessGroups <- customGroupsRepository.get(arn)
+      existingAccessGroups          <- customGroupsRepository.get(arn)
       maybeUserEnrolmentAssignments <-
         Future.successful(
           UserEnrolmentAssignmentOps.forGroupUpdate(accessGroupToUpdate, existingAccessGroups)
@@ -127,7 +127,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
        *       maybeUserEnrolmentAssignments <-
        *         Future.successful(userEnrolmentAssignmentCalculator.assessUserEnrolmentPairs(maxNetChangePairs, foundPairs))
        */
-      existingAccessGroups <- customGroupsRepository.get(arn)
+      existingAccessGroups          <- customGroupsRepository.get(arn)
       maybeUserEnrolmentAssignments <-
         Future.successful(
           UserEnrolmentAssignmentOps.forAddToGroup(clients, teamMembers, existingAccessGroups, arn, groupName)
@@ -142,7 +142,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
   )(using ec: ExecutionContext): Future[Option[UserEnrolmentAssignments]] =
     for {
       /* TODO: Replace pulling existing access groups with mongo query for pairs of UserEnrolments */
-      existingAccessGroups <- customGroupsRepository.get(arn)
+      existingAccessGroups          <- customGroupsRepository.get(arn)
       maybeUserEnrolmentAssignments <-
         Future.successful(
           UserEnrolmentAssignmentOps

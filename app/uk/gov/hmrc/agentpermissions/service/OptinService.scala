@@ -111,7 +111,7 @@ class OptinServiceImpl @Inject() (
   ): Future[Option[UpsertType]] =
     for {
       maybeExistingOptinRecord <- optinRepository.get(arn)
-      maybeUpdateOptinRecord <-
+      maybeUpdateOptinRecord   <-
         Future.successful(optinRecordBuilder.forUpdating(arn, agentUser, maybeExistingOptinRecord, optinEventType))
       maybeUpsertResult <- maybeUpdateOptinRecord match {
                              case None =>

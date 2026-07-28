@@ -40,7 +40,7 @@ class NotOptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: Ag
 
   def identifyStatus(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
     for {
-      maybeSize <- agentUserClientDetailsConnector.agentSize(arn)
+      maybeSize                             <- agentUserClientDetailsConnector.agentSize(arn)
       maybeOptinStatus: Option[OptinStatus] <-
         maybeSize match {
           case None =>
@@ -50,7 +50,7 @@ class NotOptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: Ag
               Future.successful(Option(OptedOutWrongClientCount))
             else
               for {
-                maybeSingleUser <- agentUserClientDetailsConnector.isSingleUserAgency(arn)
+                maybeSingleUser                       <- agentUserClientDetailsConnector.isSingleUserAgency(arn)
                 maybeOptinStatus: Option[OptinStatus] <- {
                   maybeSingleUser match {
                     case None =>

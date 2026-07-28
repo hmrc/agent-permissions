@@ -119,7 +119,7 @@ class CustomGroupsServiceImpl @Inject() (
     customGroupsRepository
       .findById(id)
       .flatMap {
-        case None => Future.successful(None)
+        case None      => Future.successful(None)
         case Some(grp) =>
           val enrolmentKeys = grp.clients.map(_.enrolmentKey)
           agentUserClientDetailsConnector
@@ -146,7 +146,7 @@ class CustomGroupsServiceImpl @Inject() (
         for {
           maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupCreation(accessGroup)
           maybeCreationId            <- customGroupsRepository.insert(withClientNamesRemoved(accessGroup))
-          accessGroupCreationStatus <- maybeCreationId match {
+          accessGroupCreationStatus  <- maybeCreationId match {
                                          case None =>
                                            Future.successful(AccessGroupCreationStatus.AccessGroupNotCreated)
                                          case Some(creationId) =>
@@ -211,14 +211,14 @@ class CustomGroupsServiceImpl @Inject() (
     for {
       maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupDeletion(arn, groupName)
       maybeDeletedCount          <- customGroupsRepository.delete(arn, groupName)
-      accessGroupDeletionStatus <- maybeDeletedCount match {
+      accessGroupDeletionStatus  <- maybeDeletedCount match {
                                      case None =>
                                        Future.successful(AccessGroupDeletionStatus.AccessGroupNotDeleted)
                                      case Some(deletedCount) =>
                                        if deletedCount == 1L then
                                          for {
                                            pushStatus <- pushAssignments(maybeCalculatedAssignments)
-                                           _ <- Future.successful(
+                                           _          <- Future.successful(
                                                   auditService.auditAccessGroupDeletion(arn, groupName, agentUser)
                                                 )
                                          } yield pushStatus match {
@@ -238,7 +238,7 @@ class CustomGroupsServiceImpl @Inject() (
     for {
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(accessGroup, whoIsUpdating)
       maybeCalculatedAssignments <- userEnrolmentAssignmentService.calculateForGroupUpdate(arn, groupName, accessGroup)
-      accessGroupUpdateStatus <- handleUpdate(
+      accessGroupUpdateStatus    <- handleUpdate(
                                    arn,
                                    groupName,
                                    accessGroupWithWhoIsUpdating,
@@ -276,7 +276,7 @@ class CustomGroupsServiceImpl @Inject() (
                                      if updatedCount == 1L then
                                        for {
                                          pushStatus <- pushAssignments(maybeCalculatedAssignments)
-                                         _ <-
+                                         _          <-
                                            Future.successful(
                                              auditService.auditAccessGroupUpdate(updatedGroup)
                                            ) // TODO update audit? instead of whole group, log NET change (userToRemove)
@@ -443,10 +443,10 @@ class CustomGroupsServiceImpl @Inject() (
     accessGroups: Seq[CustomGroup]
   )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[CustomGroup]] =
     accessGroups match {
-      case Nil => Future.successful(accessGroups)
+      case Nil          => Future.successful(accessGroups)
       case accessGroups =>
         agentUserClientDetailsConnector.getClients(accessGroups.head.arn).map {
-          case None => accessGroups
+          case None                 => accessGroups
           case Some(backendClients) =>
             accessGroups.map(accessGroup =>
               accessGroup.copy(clients = copyNamesFromBackendClients(accessGroup.clients)(backendClients))

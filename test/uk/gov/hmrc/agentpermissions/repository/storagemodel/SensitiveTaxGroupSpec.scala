@@ -53,7 +53,7 @@ class SensitiveTaxGroupSpec extends TestConstants {
     "groupName"   -> "some group",
     "created"     -> "2020-01-01T00:00:00.000001",
     "lastUpdated" -> "2020-01-01T00:00:00.000001",
-    "createdBy" -> Json.obj(
+    "createdBy"   -> Json.obj(
       "id"   -> "b1R0M181YgUTX4YUs596jg==",
       "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
     ),
@@ -69,7 +69,7 @@ class SensitiveTaxGroupSpec extends TestConstants {
     ),
     "service"          -> "HMRC-MTD-VAT",
     "automaticUpdates" -> true,
-    "excludedClients" -> Json.arr(
+    "excludedClients"  -> Json.arr(
       Json.obj(
         "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
         "friendlyName" -> "RRhGxwmDG4jML/ChHcNOYA=="

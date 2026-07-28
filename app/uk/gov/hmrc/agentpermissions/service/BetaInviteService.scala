@@ -50,7 +50,7 @@ class BetaInviteServiceImpl @Inject() (
   ): Future[Option[UpsertType]] =
     for {
       maybeExistingBetaInviteRecord <- betaInviteRepository.get(user)
-      maybeUpdateBetaInviteRecord <-
+      maybeUpdateBetaInviteRecord   <-
         Future.successful(betaInviteRecordBuilder.forUpdating(arn, user, maybeExistingBetaInviteRecord))
       maybeUpsertResult <- maybeUpdateBetaInviteRecord match {
                              case None =>
