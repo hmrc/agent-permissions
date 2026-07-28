@@ -51,7 +51,7 @@ class SensitiveCustomGroupSpec extends TestConstants {
     "groupName"   -> "some group",
     "created"     -> "2020-01-01T00:00:00.000001",
     "lastUpdated" -> "2020-01-01T00:00:00.000001",
-    "createdBy" -> Json.obj(
+    "createdBy"   -> Json.obj(
       "id"   -> "b1R0M181YgUTX4YUs596jg==",
       "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
     ),

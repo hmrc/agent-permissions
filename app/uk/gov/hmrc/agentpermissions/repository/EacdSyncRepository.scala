@@ -69,7 +69,7 @@ class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent, appConfi
                )
              )
              .toFuture()
-      syncRecords <- collection.find(equal("arn", arn.value)).toFuture()
+      syncRecords    <- collection.find(equal("arn", arn.value)).toFuture()
       maybeNewRecord <- syncRecords.toList match {
                           case Nil =>
                             collection

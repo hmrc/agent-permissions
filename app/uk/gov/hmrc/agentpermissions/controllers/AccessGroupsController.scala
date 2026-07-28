@@ -319,7 +319,7 @@ class AccessGroupsController @Inject() (
           case AccessGroupNotUpdated =>
             logger.info(s"Custom group '$gid' didn't remove client '$clientId''")
             NotModified
-          case AccessGroupUpdated => NoContent
+          case AccessGroupUpdated                         => NoContent
           case AccessGroupUpdatedWithoutAssignmentsPushed =>
             logger.info(s"Custom group removed a client, but assignments were not pushed")
             NoContent
@@ -336,7 +336,7 @@ class AccessGroupsController @Inject() (
           case AccessGroupNotUpdated =>
             logger.info(s"Custom group '$gid' didn't remove member '$memberId''")
             NotModified
-          case AccessGroupUpdated => NoContent
+          case AccessGroupUpdated                         => NoContent
           case AccessGroupUpdatedWithoutAssignmentsPushed =>
             logger.info(s"Custom group removed a team member, but assignments were not pushed")
             NoContent
@@ -381,7 +381,7 @@ class AccessGroupsController @Inject() (
       withJsonParsed[AddOneTeamMemberToGroupRequest] { addRequest =>
         customGroupsService
           .addMemberToGroup(GroupId.fromUuid(gid), addRequest.teamMember, authorisedAgent.agentUser) map {
-          case AccessGroupUpdated => Ok
+          case AccessGroupUpdated                         => Ok
           case AccessGroupUpdatedWithoutAssignmentsPushed =>
             logger.info(s"Custom group added a team member, but assignments were not pushed")
             Ok

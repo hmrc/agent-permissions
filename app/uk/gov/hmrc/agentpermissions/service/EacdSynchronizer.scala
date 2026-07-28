@@ -80,7 +80,7 @@ class EacdSynchronizerImpl @Inject() (
       clientsInAccessGroups = accessGroups.flatMap {
                                 case cg: CustomGroup => cg.clients
                                 case tg: TaxGroup    => tg.excludedClients
-                                case other =>
+                                case other           =>
                                   throw new RuntimeException(
                                     s"Access group is not a CustomGroup or TaxGroup: ${other.toString}"
                                   )
@@ -88,7 +88,7 @@ class EacdSynchronizerImpl @Inject() (
       membersInAccessGroups = accessGroups.flatMap {
                                 case cg: CustomGroup => cg.teamMembers
                                 case tg: TaxGroup    => tg.teamMembers
-                                case other =>
+                                case other           =>
                                   throw new RuntimeException(
                                     s"Access group is not a CustomGroup or TaxGroup: ${other.toString}"
                                   )
@@ -205,7 +205,7 @@ class EacdSynchronizerImpl @Inject() (
                              .transformWith { res =>
                                Future.successful((userId, res))
                              }
-                         // return value is Future of (userId, Success(bool: updated or not)) or (userId, Failure(exception))
+                           // return value is Future of (userId, Success(bool: updated or not)) or (userId, Failure(exception))
                          }
     } yield {
       val resyncedCount = fullSyncResults.count {
@@ -311,10 +311,10 @@ class EacdSynchronizerImpl @Inject() (
       // Optionally ensure that in EACD the enrolment assignments match those kept by agent-permissions.
       // This is scheduled asynchronously as it could take some time.
       _ = if fullSync then
-            actorSystem.scheduler.scheduleOnce(FiniteDuration(0, "s")) {
-              val _ = doFullSync(arn, updatedAccessGroups.collect { case cg: CustomGroup => cg })
-            }
-            ()
+        actorSystem.scheduler.scheduleOnce(FiniteDuration(0, "s")) {
+          val _ = doFullSync(arn, updatedAccessGroups.collect { case cg: CustomGroup => cg })
+        }
+        ()
 
     } yield Map[SyncResult, Int](
       SyncResult.AccessGroupUpdateSuccess -> updateStatuses.count(_ == SyncResult.AccessGroupUpdateSuccess),

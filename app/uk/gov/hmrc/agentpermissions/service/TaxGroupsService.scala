@@ -199,7 +199,7 @@ class TaxGroupsServiceImpl @Inject() (
     ec: ExecutionContext
   ): Future[TaxServiceGroupDeletionStatus] =
     for {
-      maybeDeletedCount <- taxServiceGroupsRepository.delete(arn, groupName)
+      maybeDeletedCount             <- taxServiceGroupsRepository.delete(arn, groupName)
       taxServiceGroupDeletionStatus <- maybeDeletedCount match {
                                          case Some(1L) =>
                                            auditService.auditAccessGroupDeletion(arn, groupName, agentUser)
@@ -215,7 +215,7 @@ class TaxGroupsServiceImpl @Inject() (
   ): Future[TaxServiceGroupUpdateStatus] =
     for {
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(taxGroup, whoIsUpdating)
-      maybeUpdatedCount <-
+      maybeUpdatedCount            <-
         taxServiceGroupsRepository
           .update(arn, groupName, accessGroupWithWhoIsUpdating)
       accessGroupUpdateStatus <- maybeUpdatedCount match {

@@ -38,7 +38,7 @@ class OptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: Agent
 
   def identifyStatus(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
     for {
-      maybeSingleUser <- agentUserClientDetailsConnector.isSingleUserAgency(arn)
+      maybeSingleUser                       <- agentUserClientDetailsConnector.isSingleUserAgency(arn)
       maybeOptinStatus: Option[OptinStatus] <- {
         maybeSingleUser match {
           case None =>
@@ -48,7 +48,7 @@ class OptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: Agent
             else
               for {
                 maybeWorkItemsExist <- agentUserClientDetailsConnector.outstandingWorkItemsExist(arn)
-                maybeOptinStatus <- maybeWorkItemsExist match {
+                maybeOptinStatus    <- maybeWorkItemsExist match {
                                       case None =>
                                         Future.successful(None)
                                       case Some(workItemsExist) =>
