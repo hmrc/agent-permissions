@@ -63,7 +63,7 @@ class OptinServiceImpl @Inject() (
     ExecutionContext
   ): Future[Option[OptinRequestStatus]] =
     for {
-      maybeUpsertType <- handleOptinOptout(arn, user, OptedIn, lang)
+      maybeUpsertType <- handleOptinOptout(arn, OptedIn, lang)
       _               <- Future.successful(maybeUpsertType.foreach(_ => auditService.auditOptInEvent(arn, user)))
     } yield maybeUpsertType.map {
       case RecordInserted(_) => OptinRequestStatus.OptinCreated
@@ -75,7 +75,7 @@ class OptinServiceImpl @Inject() (
     ExecutionContext
   ): Future[Option[OptoutRequestStatus]] =
     for {
-      maybeUpsertType <- handleOptinOptout(arn, user, OptedOut, lang = None)
+      maybeUpsertType <- handleOptinOptout(arn, OptedOut, lang = None)
       _               <- Future.successful(maybeUpsertType.foreach(_ => auditService.auditOptOutEvent(arn, user)))
     } yield maybeUpsertType.map {
       case RecordInserted(_) => OptoutRequestStatus.OptoutCreated
@@ -100,15 +100,14 @@ class OptinServiceImpl @Inject() (
 
   override def getAll(): Future[Seq[OptinRecord]] = optinRepository.getAll()
 
-  private def handleOptinOptout(arn: Arn, agentUser: AgentUser, optinEventType: OptinEventType, lang: Option[String])(
-    using
+  private def handleOptinOptout(arn: Arn, optinEventType: OptinEventType, lang: Option[String])(using
     RequestHeader,
     ExecutionContext
   ): Future[Option[UpsertType]] =
     for {
       maybeExistingOptinRecord <- optinRepository.get(arn)
       maybeUpdateOptinRecord   <-
-        Future.successful(optinRecordBuilder.forUpdating(arn, agentUser, maybeExistingOptinRecord, optinEventType))
+        Future.successful(optinRecordBuilder.forUpdating(arn, maybeExistingOptinRecord, optinEventType))
       maybeUpsertResult <- maybeUpdateOptinRecord match {
                              case None =>
                                Future.successful(None)

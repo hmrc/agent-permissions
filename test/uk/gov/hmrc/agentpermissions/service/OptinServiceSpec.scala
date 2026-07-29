@@ -71,10 +71,10 @@ class OptinServiceSpec extends TestConstants {
       maybeExistingOptinRecord: Option[OptinRecord],
       maybeOptinRecordToUpdate: Option[OptinRecord],
       optinEventType: OptinEventType
-    ): CallHandler4[Arn, AgentUser, Option[OptinRecord], OptinEventType, Option[OptinRecord]] =
+    ): CallHandler3[Arn, Option[OptinRecord], OptinEventType, Option[OptinRecord]] =
       (mockOptinRecordBuilder
-        .forUpdating(_: Arn, _: AgentUser, _: Option[OptinRecord], _: OptinEventType))
-        .expects(arn, user, maybeExistingOptinRecord, optinEventType)
+        .forUpdating(_: Arn, _: Option[OptinRecord], _: OptinEventType))
+        .expects(arn, maybeExistingOptinRecord, optinEventType)
         .returning(maybeOptinRecordToUpdate)
 
     def mockOptinRepositoryUpsert(
@@ -140,7 +140,7 @@ class OptinServiceSpec extends TestConstants {
 
         mockOptinRepositoryGet(None)
         val maybeOptinRecordToUpdate: Option[OptinRecord] =
-          Some(OptinRecord(arn, List(OptinEvent(OptedIn, user, LocalDateTime.now()))))
+          Some(OptinRecord(arn, List(OptinEvent(OptedIn, LocalDateTime.now()))))
         mockOptinRecordBuilderForUpdating(None, maybeOptinRecordToUpdate, OptedIn)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordInserted(insertedId)))
         mockAuditServiceAuditOptInEvent()
@@ -157,7 +157,7 @@ class OptinServiceSpec extends TestConstants {
       "not update the optin record" in new TestScope {
 
         val maybeExistingOptinRecord: Option[OptinRecord] =
-          Some(OptinRecord(arn, List(OptinEvent(OptedIn, user, LocalDateTime.now()))))
+          Some(OptinRecord(arn, List(OptinEvent(OptedIn, LocalDateTime.now()))))
         mockOptinRepositoryGet(maybeExistingOptinRecord)
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, None, OptedIn)
         mockUserClientDetailsConnectorGetClients(sendEmail = true, returnValue = Some(Seq.empty))
@@ -173,10 +173,10 @@ class OptinServiceSpec extends TestConstants {
       "update the optin record" in new TestScope {
 
         val maybeExistingOptinRecord: Option[OptinRecord] =
-          Some(OptinRecord(arn, List(OptinEvent(OptedOut, user, LocalDateTime.now()))))
+          Some(OptinRecord(arn, List(OptinEvent(OptedOut, LocalDateTime.now()))))
         mockOptinRepositoryGet(maybeExistingOptinRecord)
         val maybeOptinRecordToUpdate: Option[OptinRecord] = maybeExistingOptinRecord.map(record =>
-          record.copy(history = record.history :+ OptinEvent(OptedIn, user, LocalDateTime.now()))
+          record.copy(history = record.history :+ OptinEvent(OptedIn, LocalDateTime.now()))
         )
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, maybeOptinRecordToUpdate, OptedIn)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordUpdated))
@@ -198,7 +198,7 @@ class OptinServiceSpec extends TestConstants {
 
         mockOptinRepositoryGet(None)
         val maybeOptinRecordToUpdate: Option[OptinRecord] =
-          Some(OptinRecord(arn, List(OptinEvent(OptedOut, user, LocalDateTime.now()))))
+          Some(OptinRecord(arn, List(OptinEvent(OptedOut, LocalDateTime.now()))))
         mockOptinRecordBuilderForUpdating(None, maybeOptinRecordToUpdate, OptedOut)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordInserted(insertedId)))
         mockAuditServiceAuditOptOutEvent()
@@ -215,7 +215,7 @@ class OptinServiceSpec extends TestConstants {
       "not update the optin record" in new TestScope {
 
         val maybeExistingOptinRecord: Option[OptinRecord] =
-          Some(OptinRecord(arn, List(OptinEvent(OptedOut, user, LocalDateTime.now()))))
+          Some(OptinRecord(arn, List(OptinEvent(OptedOut, LocalDateTime.now()))))
         mockOptinRepositoryGet(maybeExistingOptinRecord)
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, None, OptedOut)
         mockUserClientDetailsConnectorGetClients(sendEmail = false, returnValue = Some(Seq.empty))
@@ -231,10 +231,10 @@ class OptinServiceSpec extends TestConstants {
       "update the optin record" in new TestScope {
 
         val maybeExistingOptinRecord: Option[OptinRecord] =
-          Some(OptinRecord(arn, List(OptinEvent(OptedIn, user, LocalDateTime.now()))))
+          Some(OptinRecord(arn, List(OptinEvent(OptedIn, LocalDateTime.now()))))
         mockOptinRepositoryGet(maybeExistingOptinRecord)
         val maybeOptinRecordToUpdate: Option[OptinRecord] = maybeExistingOptinRecord.map(record =>
-          record.copy(history = record.history :+ OptinEvent(OptedOut, user, LocalDateTime.now()))
+          record.copy(history = record.history :+ OptinEvent(OptedOut, LocalDateTime.now()))
         )
         mockOptinRecordBuilderForUpdating(maybeExistingOptinRecord, maybeOptinRecordToUpdate, OptedOut)
         mockOptinRepositoryUpsert(maybeOptinRecordToUpdate, Some(RecordUpdated))
@@ -266,7 +266,7 @@ class OptinServiceSpec extends TestConstants {
 
         s"delegate to OptedInStatusHandler" in new TestScope {
           val optinEventType: OptinEventType = OptedIn
-          mockOptinRepositoryGet(Some(OptinRecord(arn, List(OptinEvent(optinEventType, user, LocalDateTime.now())))))
+          mockOptinRepositoryGet(Some(OptinRecord(arn, List(OptinEvent(optinEventType, LocalDateTime.now())))))
           mockOptedInStatusHandlerIdentifyStatus(None)
 
           optinService.optinStatus(arn).futureValue shouldBe None
@@ -277,7 +277,7 @@ class OptinServiceSpec extends TestConstants {
 
         s"delegate to NotOptedInStatusHandler" in new TestScope {
           val optinEventType: OptinEventType = OptedOut
-          mockOptinRepositoryGet(Some(OptinRecord(arn, List(OptinEvent(optinEventType, user, LocalDateTime.now())))))
+          mockOptinRepositoryGet(Some(OptinRecord(arn, List(OptinEvent(optinEventType, LocalDateTime.now())))))
           mockNotOptedInStatusHandlerIdentifyStatus(None)
 
           optinService.optinStatus(arn).futureValue shouldBe None
@@ -303,7 +303,7 @@ class OptinServiceSpec extends TestConstants {
       s"optin record status is $OptedIn" should {
 
         s"return true" in new TestScope {
-          mockOptinRepositoryGet(Some(OptinRecord(arn, List(OptinEvent(OptedIn, user, LocalDateTime.now())))))
+          mockOptinRepositoryGet(Some(OptinRecord(arn, List(OptinEvent(OptedIn, LocalDateTime.now())))))
 
           optinService.optinRecordExists(arn).futureValue shouldBe true
         }
@@ -312,7 +312,7 @@ class OptinServiceSpec extends TestConstants {
       s"optin record status is $OptedOut" should {
 
         s"return false" in new TestScope {
-          mockOptinRepositoryGet(Some(OptinRecord(arn, List(OptinEvent(OptedOut, user, LocalDateTime.now())))))
+          mockOptinRepositoryGet(Some(OptinRecord(arn, List(OptinEvent(OptedOut, LocalDateTime.now())))))
 
           optinService.optinRecordExists(arn).futureValue shouldBe false
         }
@@ -328,10 +328,10 @@ class OptinServiceSpec extends TestConstants {
       val optinRecord: OptinRecord = OptinRecord(
         arn,
         List(
-          OptinEvent(OptedOut, user, now.minusSeconds(1)),
-          OptinEvent(OptedIn, user, now.minusSeconds(2)),
-          OptinEvent(OptedOut, user, now.minusSeconds(3)),
-          OptinEvent(OptedIn, user, now.minusSeconds(4))
+          OptinEvent(OptedOut, now.minusSeconds(1)),
+          OptinEvent(OptedIn, now.minusSeconds(2)),
+          OptinEvent(OptedOut, now.minusSeconds(3)),
+          OptinEvent(OptedIn, now.minusSeconds(4))
         )
       )
 

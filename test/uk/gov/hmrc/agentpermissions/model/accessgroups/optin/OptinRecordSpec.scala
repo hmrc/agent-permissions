@@ -35,7 +35,7 @@ class OptinRecordSpec extends AnyWordSpecLike with Matchers {
   val user: AgentUser = AgentUser("userId", "userName")
 
   def withOptinRecord(mapStatusToEpoch: List[(OptinEventType, LocalDateTime)]): OptinRecord =
-    OptinRecord(arn, mapStatusToEpoch.map { case (optedStatus, epoch) => OptinEvent(optedStatus, user, epoch) })
+    OptinRecord(arn, mapStatusToEpoch.map { case (optedStatus, epoch) => OptinEvent(optedStatus, epoch) })
 
   s"OptinRecord status" when {
 
@@ -94,11 +94,9 @@ class OptinRecordSpec extends AnyWordSpecLike with Matchers {
     }
 
     "return the correct history" in {
-      val user1 = AgentUser("user1", "User One")
-      val user2 = AgentUser("user2", "User Two")
       val history = List(
-        OptinEvent(OptedIn, user1, LocalDateTime.now()),
-        OptinEvent(OptedOut, user2, LocalDateTime.now())
+        OptinEvent(OptedIn, LocalDateTime.now()),
+        OptinEvent(OptedOut, LocalDateTime.now())
       )
       val optinRecord = OptinRecord(Arn("KARN1234567"), history)
       optinRecord.history shouldBe history

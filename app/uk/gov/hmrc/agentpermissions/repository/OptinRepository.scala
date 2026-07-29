@@ -21,15 +21,14 @@ import com.mongodb.client.model.{IndexOptions, ReplaceOptions}
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.Indexes.ascending
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
-import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveOptinRecord}
 import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, RecordUpdated}
 import uk.gov.hmrc.agentpermissions.util.{Migrations, PlayMongoMigrations, RequestAwareLogging}
-import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
-import javax.inject.{Inject, Named, Singleton}
+import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[OptinRepositoryImpl])
@@ -43,12 +42,11 @@ trait OptinRepository extends Migrations {
 
 @Singleton
 class OptinRepositoryImpl @Inject() (
-  val mongoComponent: MongoComponent,
-  @Named("aes") crypto: Encrypter & Decrypter
+  val mongoComponent: MongoComponent
 )(using ec: ExecutionContext)
-    extends PlayMongoRepository[SensitiveOptinRecord](
+    extends PlayMongoRepository[OptinRecord](
       collectionName = "optin",
-      domainFormat = SensitiveOptinRecord.format(using crypto),
+      domainFormat = OptinRecord.format,
       mongoComponent = mongoComponent,
       indexes = Seq(
         IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true))
@@ -56,11 +54,11 @@ class OptinRepositoryImpl @Inject() (
     ) with OptinRepository with PlayMongoMigrations with RequestAwareLogging {
 
   def get(arn: Arn): Future[Option[OptinRecord]] =
-    collection.find(equal("arn", arn.value)).headOption().map(_.map(_.decryptedValue))
+    collection.find(equal("arn", arn.value)).headOption()
 
   def upsert(optinRecord: OptinRecord): Future[Option[UpsertType]] =
     collection
-      .replaceOne(equal("arn", optinRecord.arn.value), SensitiveOptinRecord(optinRecord), upsertOptions)
+      .replaceOne(equal("arn", optinRecord.arn.value), optinRecord, upsertOptions)
       .headOption()
       .map(
         _.map(result =>
@@ -75,7 +73,7 @@ class OptinRepositoryImpl @Inject() (
   def delete(arn: String): Future[Long] =
     collection.deleteOne(equal("arn", arn)).toFuture().map(_.getDeletedCount)
 
-  override def getAll(): Future[Seq[OptinRecord]] = collection.find().toFuture().map(_.map(_.decryptedValue))
+  override def getAll(): Future[Seq[OptinRecord]] = collection.find().toFuture()
 
   private def upsertOptions = new ReplaceOptions().upsert(true)
 }

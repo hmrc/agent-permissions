@@ -45,14 +45,14 @@ class OptinRecordBuilderSpec extends TestConstants {
           val maybeExistingOptinRecord: Option[OptinRecord] = None
 
           val optinRecord: OptinRecord =
-            optinRecordBuilder.forUpdating(arn, user, maybeExistingOptinRecord, optinEventType).get
+            optinRecordBuilder.forUpdating(arn, maybeExistingOptinRecord, optinEventType).get
 
           optinRecord.arn shouldBe arn
           optinRecord.status shouldBe OptedIn
           optinRecord.history.size shouldBe 1
           val optinEvent: OptinEvent = optinRecord.history.head
           optinEvent.optinEventType shouldBe OptedIn
-          optinEvent.user shouldBe user
+
         }
       }
 
@@ -66,15 +66,15 @@ class OptinRecordBuilderSpec extends TestConstants {
               OptinRecord(
                 arn,
                 List(
-                  OptinEvent(OptedIn, user, now.minusSeconds(1)),
-                  OptinEvent(OptedOut, user, now.minusSeconds(2)),
-                  OptinEvent(OptedIn, user, now.minusSeconds(3)),
-                  OptinEvent(OptedOut, user, now.minusSeconds(4))
+                  OptinEvent(OptedIn, now.minusSeconds(1)),
+                  OptinEvent(OptedOut, now.minusSeconds(2)),
+                  OptinEvent(OptedIn, now.minusSeconds(3)),
+                  OptinEvent(OptedOut, now.minusSeconds(4))
                 )
               )
             )
 
-          optinRecordBuilder.forUpdating(arn, user, maybeExistingOptinRecord, optinEventType) shouldBe None
+          optinRecordBuilder.forUpdating(arn, maybeExistingOptinRecord, optinEventType) shouldBe None
         }
       }
 
@@ -88,35 +88,34 @@ class OptinRecordBuilderSpec extends TestConstants {
               OptinRecord(
                 arn,
                 List(
-                  OptinEvent(OptedOut, user, now.minusSeconds(1)),
-                  OptinEvent(OptedIn, user, now.minusSeconds(2)),
-                  OptinEvent(OptedOut, user, now.minusSeconds(3)),
-                  OptinEvent(OptedIn, user, now.minusSeconds(4))
+                  OptinEvent(OptedOut, now.minusSeconds(1)),
+                  OptinEvent(OptedIn, now.minusSeconds(2)),
+                  OptinEvent(OptedOut, now.minusSeconds(3)),
+                  OptinEvent(OptedIn, now.minusSeconds(4))
                 )
               )
             )
 
           val optinRecord: OptinRecord =
-            optinRecordBuilder.forUpdating(arn, user, maybeExistingOptinRecord, optinEventType).get
+            optinRecordBuilder.forUpdating(arn, maybeExistingOptinRecord, optinEventType).get
 
           optinRecord.arn shouldBe arn
           optinRecord.status shouldBe OptedIn
 
           optinRecord.history.size shouldBe 5
           val optinEvent1: OptinEvent = optinRecord.history.head
-          optinEvent1.user shouldBe user
           optinEvent1.optinEventType shouldBe OptedOut
           val optinEvent2: OptinEvent = optinRecord.history(1)
-          optinEvent2.user shouldBe user
+
           optinEvent2.optinEventType shouldBe OptedIn
           val optinEvent3: OptinEvent = optinRecord.history(2)
-          optinEvent3.user shouldBe user
+
           optinEvent3.optinEventType shouldBe OptedOut
           val optinEvent4: OptinEvent = optinRecord.history(3)
-          optinEvent4.user shouldBe user
+
           optinEvent4.optinEventType shouldBe OptedIn
           val optinEvent5: OptinEvent = optinRecord.history(4)
-          optinEvent5.user shouldBe user
+
           optinEvent5.optinEventType shouldBe OptedIn
         }
       }
@@ -132,14 +131,14 @@ class OptinRecordBuilderSpec extends TestConstants {
           val maybeExistingOptinRecord: Option[OptinRecord] = None
 
           val optinRecord: OptinRecord =
-            optinRecordBuilder.forUpdating(arn, user, maybeExistingOptinRecord, optinEventType).get
+            optinRecordBuilder.forUpdating(arn, maybeExistingOptinRecord, optinEventType).get
 
           optinRecord.arn shouldBe arn
           optinRecord.status shouldBe OptedOut
           optinRecord.history.size shouldBe 1
           val optinEvent: OptinEvent = optinRecord.history.head
           optinEvent.optinEventType shouldBe OptedOut
-          optinEvent.user shouldBe user
+
         }
       }
 
@@ -153,15 +152,15 @@ class OptinRecordBuilderSpec extends TestConstants {
               OptinRecord(
                 arn,
                 List(
-                  OptinEvent(OptedOut, user, now.minusSeconds(1)),
-                  OptinEvent(OptedIn, user, now.minusSeconds(2)),
-                  OptinEvent(OptedOut, user, now.minusSeconds(3)),
-                  OptinEvent(OptedIn, user, now.minusSeconds(4))
+                  OptinEvent(OptedOut, now.minusSeconds(1)),
+                  OptinEvent(OptedIn, now.minusSeconds(2)),
+                  OptinEvent(OptedOut, now.minusSeconds(3)),
+                  OptinEvent(OptedIn, now.minusSeconds(4))
                 )
               )
             )
 
-          optinRecordBuilder.forUpdating(arn, user, maybeExistingOptinRecord, optinEventType) shouldBe None
+          optinRecordBuilder.forUpdating(arn, maybeExistingOptinRecord, optinEventType) shouldBe None
         }
       }
 
@@ -175,35 +174,35 @@ class OptinRecordBuilderSpec extends TestConstants {
               OptinRecord(
                 arn,
                 List(
-                  OptinEvent(OptedIn, user, now.minusSeconds(1)),
-                  OptinEvent(OptedOut, user, now.minusSeconds(2)),
-                  OptinEvent(OptedIn, user, now.minusSeconds(3)),
-                  OptinEvent(OptedOut, user, now.minusSeconds(4))
+                  OptinEvent(OptedIn, now.minusSeconds(1)),
+                  OptinEvent(OptedOut, now.minusSeconds(2)),
+                  OptinEvent(OptedIn, now.minusSeconds(3)),
+                  OptinEvent(OptedOut, now.minusSeconds(4))
                 )
               )
             )
 
           val optinRecord: OptinRecord =
-            optinRecordBuilder.forUpdating(arn, user, maybeExistingOptinRecord, optinEventType).get
+            optinRecordBuilder.forUpdating(arn, maybeExistingOptinRecord, optinEventType).get
 
           optinRecord.arn shouldBe arn
           optinRecord.status shouldBe OptedOut
 
           optinRecord.history.size shouldBe 5
           val optinEvent1: OptinEvent = optinRecord.history.head
-          optinEvent1.user shouldBe user
+
           optinEvent1.optinEventType shouldBe OptedIn
           val optinEvent2: OptinEvent = optinRecord.history(1)
-          optinEvent2.user shouldBe user
+
           optinEvent2.optinEventType shouldBe OptedOut
           val optinEvent3: OptinEvent = optinRecord.history(2)
-          optinEvent3.user shouldBe user
+
           optinEvent3.optinEventType shouldBe OptedIn
           val optinEvent4: OptinEvent = optinRecord.history(3)
-          optinEvent4.user shouldBe user
+
           optinEvent4.optinEventType shouldBe OptedOut
           val optinEvent5: OptinEvent = optinRecord.history(4)
-          optinEvent5.user shouldBe user
+
           optinEvent5.optinEventType shouldBe OptedOut
         }
       }

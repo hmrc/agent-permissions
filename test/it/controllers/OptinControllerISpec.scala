@@ -19,7 +19,6 @@ package it.controllers
 import play.api.libs.json.JsNull
 import play.api.test.Helpers.*
 import support.ComponentBaseISpec
-import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.{OptinEvent, OptinRecord}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinEventType.*
 import uk.gov.hmrc.agentpermissions.repository.OptinRepository
@@ -49,7 +48,7 @@ class OptinControllerISpec extends ComponentBaseISpec {
 
       givenAuthorisedAsAgentWith(arn.value)
       givenGetClientsSuccess(arn, sendEmail = true)
-      await(repo.upsert(OptinRecord(arn, List(OptinEvent(OptedIn, AgentUser("id1", "tm1"), LocalDateTime.now)))))
+      await(repo.upsert(OptinRecord(arn, List(OptinEvent(OptedIn, LocalDateTime.now)))))
 
       val result = post(optInUrl)(JsNull)
 
@@ -96,7 +95,7 @@ class OptinControllerISpec extends ComponentBaseISpec {
     s"return $OK" in {
 
       givenAuthorisedAsAgentWith(arn.value)
-      await(repo.upsert(OptinRecord(arn, List(OptinEvent(OptedIn, AgentUser("id1", "tm1"), LocalDateTime.now)))))
+      await(repo.upsert(OptinRecord(arn, List(OptinEvent(OptedIn, LocalDateTime.now)))))
       givenUserCheck(arn)
       givenOutstandingWorkItems(arn)
 
@@ -121,7 +120,7 @@ class OptinControllerISpec extends ComponentBaseISpec {
     s"return $NO_CONTENT" in {
 
       givenAuthorisedAsAgentWith(arn.value)
-      await(repo.upsert(OptinRecord(arn, List(OptinEvent(OptedIn, AgentUser("id1", "tm1"), LocalDateTime.now)))))
+      await(repo.upsert(OptinRecord(arn, List(OptinEvent(OptedIn, LocalDateTime.now)))))
 
       val result = get(optInRecordExistsUrl)
 

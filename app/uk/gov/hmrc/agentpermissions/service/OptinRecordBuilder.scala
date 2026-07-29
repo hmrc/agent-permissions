@@ -17,7 +17,6 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 
 import java.time.LocalDateTime
@@ -28,19 +27,18 @@ class OptinRecordBuilder {
 
   def forUpdating(
     arn: Arn,
-    user: AgentUser,
     maybeExistingOptinRecord: Option[OptinRecord],
     optinEventTypeToMatch: OptinEventType
   ): Option[OptinRecord] =
     maybeExistingOptinRecord match {
       case None =>
-        Option(OptinRecord(arn, List(OptinEvent(optinEventTypeToMatch, user, LocalDateTime.now()))))
+        Option(OptinRecord(arn, List(OptinEvent(optinEventTypeToMatch, LocalDateTime.now()))))
       case Some(existingOptinRecord) =>
         if existingOptinRecord.status == optinEventTypeToMatch then None
         else
           Option(
             existingOptinRecord.copy(history =
-              existingOptinRecord.history :+ OptinEvent(optinEventTypeToMatch, user, LocalDateTime.now())
+              existingOptinRecord.history :+ OptinEvent(optinEventTypeToMatch, LocalDateTime.now())
             )
           )
     }

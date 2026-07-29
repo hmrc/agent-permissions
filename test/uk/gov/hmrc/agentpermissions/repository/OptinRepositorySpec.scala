@@ -17,33 +17,30 @@
 package uk.gov.hmrc.agentpermissions.repository
 
 import org.apache.pekko.actor.ActorSystem
-import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
 import org.scalatest.OptionValues
 import support.KeyRotationSupport
 import uk.gov.hmrc.agentpermissions.TestConstants
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinEventType.*
-import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveOptinRecord}
 import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, RecordUpdated}
-import uk.gov.hmrc.mongo.logging.ObservableFutureImplicits.{ObservableFuture, SingleObservableFuture}
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
 import java.time.LocalDateTime
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Random
+import scala.concurrent.ExecutionContext
 
 class OptinRepositorySpec
-    extends TestConstants with PlayMongoRepositorySupport[SensitiveOptinRecord] with CleanMongoCollectionSupport
+    extends TestConstants with PlayMongoRepositorySupport[OptinRecord] with CleanMongoCollectionSupport
     with OptionValues with KeyRotationSupport {
 
   given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
   given ActorSystem = ActorSystem()
 
-  override protected val repository: PlayMongoRepository[SensitiveOptinRecord] =
-    new OptinRepositoryImpl(mongoComponent, KeyRotationCrypto)
+  override protected val repository: PlayMongoRepository[OptinRecord] =
+    new OptinRepositoryImpl(mongoComponent)
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -51,7 +48,7 @@ class OptinRepositorySpec
     val optinRecord: OptinRecord = OptinRecord(
       arn,
       List(
-        OptinEvent(OptedIn, user, LocalDateTime.now())
+        OptinEvent(OptedIn, LocalDateTime.now())
       )
     )
 
@@ -69,22 +66,6 @@ class OptinRepositorySpec
         assert(indexModel.getKeys.toBsonDocument.containsKey("arn"))
         indexModel.getOptions.getName shouldBe "arnIdx"
         assert(indexModel.getOptions.isUnique)
-      }
-    }
-
-    "inserting a record" should {
-      "store the record with field-level encryption" in new TestScope {
-        optinRepository.upsert(optinRecord).futureValue
-        val document: Document = optinRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue.head
-        val documentString: String = document.toString.replaceAll("\\s+", "")
-
-        documentString should include(s"""status,BsonString{value='${optinRecord.status.value}'}""")
-
-        // The agent user ids and names should be encrypted at rest.
-        optinRecord.history.map(_.user).foreach { agentUser =>
-          documentString should not include agentUser.id
-          documentString should not include agentUser.name
-        }
       }
     }
 
@@ -123,33 +104,6 @@ class OptinRepositorySpec
         val deletion: Long = optinRepository.delete(arnToDelete.value).futureValue
         optinRepository.get(arnToDelete).futureValue shouldBe None
         deletion shouldBe 1L
-      }
-    }
-
-    "encryption key migration" should {
-      "rotate the encryption key for records by reading them out and writing them back again" in new TestScope {
-        def generateRecord =
-          OptinRecord(
-            Arn(Random.alphanumeric.take(10).mkString),
-            List(OptinEvent(OptedIn, user, LocalDateTime.now()))
-          )
-
-        val testData: Seq[OptinRecord] = Seq.fill(20)(generateRecord)
-        Future.traverse(testData)(optinRepository.upsert).futureValue
-
-        // simulate a newly deployed encryption key
-        KeyRotationCrypto.rotateSecretKey(to = "eu2IgkfpOI9MYvoG1Q3eoFsWzyHO8fw/bwaSdS+21zg=", keepPreviousKey = true)
-
-        optinRepositoryImpl.migrate(batchSize = 5, deadline = patienceConfig.timeout.fromNow).futureValue
-
-        // ensure all records were processed correctly
-        val results: Seq[OptinRecord] =
-          optinRepositoryImpl.collection.find().map(_.decryptedValue).toFuture().futureValue
-        results should contain theSameElementsAs testData
-
-        // the old encryption key can no longer decrypt the record
-        KeyRotationCrypto.rotateSecretKey(to = DefaultSecretKey)
-        optinRepositoryImpl.collection.find().toFuture().failed.futureValue shouldBe a[SecurityException]
       }
     }
   }
