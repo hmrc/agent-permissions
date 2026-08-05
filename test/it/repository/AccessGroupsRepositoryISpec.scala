@@ -19,21 +19,25 @@ package uk.gov.hmrc.agentpermissions.repository
 import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
+import org.mongodb.scala.gridfs.ObservableFuture
 import org.mongodb.scala.model.{Filters, IndexModel}
 import org.mongodb.scala.result.UpdateResult
+import org.scalatest.OptionValues
+import support.KeyRotationSupport
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveAgentUser, SensitiveClient, SensitiveCustomGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
-import org.mongodb.scala.gridfs.ObservableFuture
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.test.{CleanMongoCollectionSupport, PlayMongoRepositorySupport}
 
 import java.time.LocalDateTime
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Random
 
 class AccessGroupsRepositorySpec
-    extends TestConstants with PlayMongoRepositorySupport[SensitiveCustomGroup] with CleanMongoCollectionSupport {
+    extends TestConstants with PlayMongoRepositorySupport[SensitiveCustomGroup] with CleanMongoCollectionSupport
+    with OptionValues with KeyRotationSupport {
 
   given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
   val actorSystem: ActorSystem = ActorSystem()
@@ -333,8 +337,34 @@ class AccessGroupsRepositorySpec
         }
       }
     }
+
+    "encryption key migration" should {
+      "rotate the encryption key for records by reading them out and writing them back again" in new TestScope {
+        def generateRecord =
+          accessGroup.copy(
+            id = GroupId.random(),
+            arn = Arn(Random.alphanumeric.take(10).mkString)
+          )
+
+        val testData = Seq.fill(20)(generateRecord)
+        Future.traverse(testData)(accessGroupsRepository.insert).futureValue
+
+        // simulate a newly deployed encryption key
+        KeyRotationCrypto.rotateSecretKey(to = "eu2IgkfpOI9MYvoG1Q3eoFsWzyHO8fw/bwaSdS+21zg=", keepPreviousKey = true)
+
+        accessGroupsRepository.migrate(batchSize = 5, deadline = patienceConfig.timeout.fromNow).futureValue
+
+        // ensure all records were processed correctly
+        val results = accessGroupsRepository.collection.find().map(_.decryptedValue).toFuture().futureValue
+        results should contain theSameElementsAs testData
+
+        // the old encryption key can no longer decrypt the record
+        KeyRotationCrypto.rotateSecretKey(to = DefaultSecretKey)
+        accessGroupsRepository.collection.find().toFuture().failed.futureValue shouldBe a[SecurityException]
+      }
+    }
   }
 
   override protected val repository: PlayMongoRepository[SensitiveCustomGroup] =
-    new CustomGroupsRepositoryV2Impl(mongoComponent, aesCrypto)
+    new CustomGroupsRepositoryV2Impl(mongoComponent, KeyRotationCrypto)
 }

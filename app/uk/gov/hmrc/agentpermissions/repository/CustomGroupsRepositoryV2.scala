@@ -20,17 +20,18 @@ import com.google.inject.ImplementedBy
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.{Collation, IndexOptions}
 import org.mongodb.scala.bson.Document
+import org.mongodb.scala.model.*
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
-import org.mongodb.scala.model.*
 import org.mongodb.scala.result.UpdateResult
 import play.api.Logging
 import play.api.libs.json.Format
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, CustomGroup}
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveAgentUser, SensitiveCustomGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2Impl.*
-import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, CustomGroup}
+import uk.gov.hmrc.agentpermissions.util.{Migrations, PlayMongoMigrations}
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter, PlainText}
@@ -41,7 +42,7 @@ import javax.inject.{Inject, Named, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[CustomGroupsRepositoryV2Impl])
-trait CustomGroupsRepositoryV2 {
+trait CustomGroupsRepositoryV2 extends Migrations {
 
   /* TODO: add following functionality
    *   [ ] pull list of tm from group
@@ -70,7 +71,7 @@ trait CustomGroupsRepositoryV2 {
 
 @Singleton
 class CustomGroupsRepositoryV2Impl @Inject() (
-  mongoComponent: MongoComponent,
+  val mongoComponent: MongoComponent,
   @Named("aes") crypto: Encrypter & Decrypter
 )(using ec: ExecutionContext)
     extends PlayMongoRepository[SensitiveCustomGroup](
@@ -91,7 +92,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
         // Sensitive string codec so we can operate on individual string fields
         Codecs.playFormatCodec(sensitiveStringFormat(using crypto))
       )
-    ) with CustomGroupsRepositoryV2 with Logging {
+    ) with CustomGroupsRepositoryV2 with PlayMongoMigrations with Logging {
 
   // Ensure that we are using a deterministic cryptographic algorithm, or we won't be able to search on encrypted fields
   require(
