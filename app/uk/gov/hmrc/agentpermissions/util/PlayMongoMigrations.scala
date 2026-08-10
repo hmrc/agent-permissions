@@ -37,12 +37,12 @@ trait PlayMongoMigrations(using ExecutionContext) extends Migrations with Transa
 
   /** Runs a server-side migration in batches until all records are processed or the deadline is reached.
     *
-    * The migration mechanism is the repository's current domain format: each stored record is read,
-    * decoded with the local model format, then written back. This allows schema evolution to be
-    * applied by the latest application codecs without a separate one-off mapping layer.
+    * The migration mechanism is the repository's current domain format: each stored record is read, decoded with the
+    * local model format, then written back. This allows schema evolution to be applied by the latest application codecs
+    * without a separate one-off mapping layer.
     *
-    * Each batch runs in a transaction because records may be updated concurrently while migration is
-    * in progress. Transactional execution ensures each read/replace step is applied safely.
+    * Each batch runs in a transaction because records may be updated concurrently while migration is in progress.
+    * Transactional execution ensures each read/replace step is applied safely.
     *
     * If the deadline is exceeded, the migration fails with a timeout.
     *
@@ -64,7 +64,6 @@ trait PlayMongoMigrations(using ExecutionContext) extends Migrations with Transa
 
     def replaceBatch(cursor: Bson) =
       withSessionAndTransaction: session =>
-        logger.info(s"transaction=${session.getServerSession.getTransactionNumber}}")
         for
           documents <- collection
                          .find[Document](session, cursor)
@@ -87,7 +86,9 @@ trait PlayMongoMigrations(using ExecutionContext) extends Migrations with Transa
       else
         replaceBatch(cursor)
           .flatMap:
-            case Some(lastId -> modified) => loop(cursor = gt("_id", lastId), totalModified + modified)
-            case None                     => Future.successful(totalModified)
+            case Some(lastId -> modified) =>
+              logger.info(s"[$collectionName] Processed batch of $modified documents.")
+              loop(cursor = gt("_id", lastId), totalModified + modified)
+            case None => Future.successful(totalModified)
 
     loop(cursor = Document.empty, totalModified = 0)
