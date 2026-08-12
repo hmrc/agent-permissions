@@ -47,9 +47,9 @@ class KeyRotationService @Inject (
       val batchSize = appConfig.keyRotation.batchSize
       val deadline = appConfig.keyRotation.maxTotalDuration.fromNow
 
-      logger.info("Starting key rotation migration")
-
       lockService.withLock:
+        logger.info("Starting key rotation migration.")
+
         for
           _ <- optinRepository.migrate(batchSize, deadline)
           _ <- customGroupsRepositoryV2.migrate(batchSize, deadline)

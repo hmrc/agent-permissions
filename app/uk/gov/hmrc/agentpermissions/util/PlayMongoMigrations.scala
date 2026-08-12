@@ -57,10 +57,14 @@ trait PlayMongoMigrations(using ExecutionContext) extends Migrations with Transa
     given TransactionConfiguration = TransactionConfiguration.strict
 
     def asUpdate(document: Document) =
-      val domainModel = document.fromBson(using self.domainFormat)
-      val isUnchanged = and(equal("_id", document("_id")))
-
-      ReplaceOneModel(filter = isUnchanged, replacement = domainModel)
+      val _id = document("_id")
+      try
+        val domainModel = document.fromBson(using self.domainFormat)
+        Some(ReplaceOneModel(filter = equal("_id", _id), replacement = domainModel))
+      catch
+        case e: Exception =>
+          logger.error(s"Failed to decode document (_id=${})", e)
+          None
 
     def replaceBatch(cursor: Bson) =
       withSessionAndTransaction: session =>
@@ -72,8 +76,10 @@ trait PlayMongoMigrations(using ExecutionContext) extends Migrations with Transa
                          .maxTime(deadline.timeLeft.max(Duration.Zero))
                          .toFuture()
 
+          updates = documents.flatMap(asUpdate)
+
           resultsOrNone <-
-            if documents.nonEmpty then collection.bulkWrite(session, documents.map(asUpdate)).headOption()
+            if updates.nonEmpty then collection.bulkWrite(session, updates).headOption()
             else Future.successful(None)
 
         yield resultsOrNone.map: results =>
@@ -82,7 +88,8 @@ trait PlayMongoMigrations(using ExecutionContext) extends Migrations with Transa
     // Repeatedly execute the batch replacement, advancing the cursor to the last processed `_id`
     // until there are no more matching documents to migrate.
     def loop(cursor: Bson, totalModified: Int): Future[Int] =
-      if deadline.isOverdue then Future.failed(new TimeoutException("Key rotation migration exceeded maximum duration"))
+      if deadline.isOverdue then
+        Future.failed(new TimeoutException(s"[$collectionName] Key rotation migration exceeded maximum duration"))
       else
         replaceBatch(cursor)
           .flatMap:
