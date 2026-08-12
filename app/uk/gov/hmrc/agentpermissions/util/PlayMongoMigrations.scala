@@ -63,7 +63,7 @@ trait PlayMongoMigrations(using ExecutionContext) extends Migrations with Transa
         Some(ReplaceOneModel(filter = equal("_id", _id), replacement = domainModel))
       catch
         case e: Exception =>
-          logger.error(s"Failed to decode document (_id=${})", e)
+          logger.error(s"Failed to decode document (_id=${_id})", e)
           None
 
     def replaceBatch(cursor: Bson) =
