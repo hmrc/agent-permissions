@@ -42,6 +42,9 @@ class OptinRepositorySpec
   given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
   given ActorSystem = ActorSystem()
 
+  override protected val repository: PlayMongoRepository[SensitiveOptinRecord] =
+    new OptinRepositoryImpl(mongoComponent, KeyRotationCrypto)
+
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
     val user: AgentUser = AgentUser("userId", "userName")
@@ -72,15 +75,15 @@ class OptinRepositorySpec
     "inserting a record" should {
       "store the record with field-level encryption" in new TestScope {
         optinRepository.upsert(optinRecord).futureValue
-        val document = optinRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue.head
-        val documentString = document.toString.replaceAll("\\s+", "")
+        val document: Document = optinRepositoryImpl.collection.find[Document]().collect().toFuture().futureValue.head
+        val documentString: String = document.toString.replaceAll("\\s+", "")
 
         documentString should include(s"""status,BsonString{value='${optinRecord.status.value}'}""")
 
         // The agent user ids and names should be encrypted at rest.
         optinRecord.history.map(_.user).foreach { agentUser =>
-          documentString should not include (agentUser.id)
-          documentString should not include (agentUser.name)
+          documentString should not include agentUser.id
+          documentString should not include agentUser.name
         }
       }
     }
@@ -131,7 +134,7 @@ class OptinRepositorySpec
             List(OptinEvent(OptedIn, user, LocalDateTime.now()))
           )
 
-        val testData = Seq.fill(20)(generateRecord)
+        val testData: Seq[OptinRecord] = Seq.fill(20)(generateRecord)
         Future.traverse(testData)(optinRepository.upsert).futureValue
 
         // simulate a newly deployed encryption key
@@ -140,7 +143,8 @@ class OptinRepositorySpec
         optinRepositoryImpl.migrate(batchSize = 5, deadline = patienceConfig.timeout.fromNow).futureValue
 
         // ensure all records were processed correctly
-        val results = optinRepositoryImpl.collection.find().map(_.decryptedValue).toFuture().futureValue
+        val results: Seq[OptinRecord] =
+          optinRepositoryImpl.collection.find().map(_.decryptedValue).toFuture().futureValue
         results should contain theSameElementsAs testData
 
         // the old encryption key can no longer decrypt the record
@@ -149,7 +153,4 @@ class OptinRepositorySpec
       }
     }
   }
-
-  override protected val repository: PlayMongoRepository[SensitiveOptinRecord] =
-    new OptinRepositoryImpl(mongoComponent, KeyRotationCrypto)
 }

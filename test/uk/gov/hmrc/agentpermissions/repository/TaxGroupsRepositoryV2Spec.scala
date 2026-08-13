@@ -35,13 +35,16 @@ import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-class TaxServiceGroupsRepositorySpec
+class TaxGroupsRepositoryV2Spec
     extends TestConstants with PlayMongoRepositorySupport[SensitiveTaxGroup] with CleanMongoCollectionSupport
     with OptionValues with KeyRotationSupport {
 
   given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
   val actorSystem: ActorSystem = ActorSystem()
   given Materializer = Materializer(actorSystem)
+
+  override protected val repository: PlayMongoRepository[SensitiveTaxGroup] =
+    new TaxGroupsRepositoryV2Impl(mongoComponent, KeyRotationCrypto)
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -250,23 +253,24 @@ class TaxServiceGroupsRepositorySpec
 
     "encryption key migration" should {
       "rotate the encryption key for records by reading them out and writing them back again" in new TestScope {
-        def generateRecord =
+        def generateRecord: TaxGroup =
           accessGroup.copy(
             id = GroupId.random(),
             arn = Arn(Random.alphanumeric.take(10).mkString)
           )
 
-        val testData = Seq.fill(20)(generateRecord)
+        val testData: Seq[TaxGroup] = Seq.fill(20)(generateRecord)
         Future.traverse(testData)(groupsRepository.insert).futureValue
 
         // simulate a newly deployed encryption key
         KeyRotationCrypto.rotateSecretKey(to = "eu2IgkfpOI9MYvoG1Q3eoFsWzyHO8fw/bwaSdS+21zg=", keepPreviousKey = true)
 
-        val modified = groupsRepository.migrate(batchSize = 5, deadline = patienceConfig.timeout.fromNow).futureValue
+        val modified: Int =
+          groupsRepository.migrate(batchSize = 5, deadline = patienceConfig.timeout.fromNow).futureValue
         modified shouldBe 20
 
         // ensure all records were processed correctly
-        val results = groupsRepository.collection.find().map(_.decryptedValue).toFuture().futureValue
+        val results: Seq[TaxGroup] = groupsRepository.collection.find().map(_.decryptedValue).toFuture().futureValue
         results should contain theSameElementsAs testData
 
         // the old encryption key can no longer decrypt the record
@@ -275,7 +279,4 @@ class TaxServiceGroupsRepositorySpec
       }
     }
   }
-
-  override protected val repository: PlayMongoRepository[SensitiveTaxGroup] =
-    new TaxGroupsRepositoryV2Impl(mongoComponent, KeyRotationCrypto)
 }
