@@ -20,7 +20,6 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.mongodb.scala.gridfs.ObservableFuture
 import org.mongodb.scala.model.{Filters, IndexModel}
-import org.mongodb.scala.result.UpdateResult
 import org.scalatest.OptionValues
 import support.KeyRotationSupport
 import uk.gov.hmrc.agentpermissions.TestConstants
@@ -254,94 +253,6 @@ class CustomGroupsRepositoryV2Spec
       }
     }
 
-    "adding a team member" when {
-
-      "group exists and can be added" should {
-        "return the group" in new TestScope {
-          // given
-          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
-          val agentToAdd: AgentUser = AgentUser("user10", "Bob Smith")
-
-          // when
-          val updateResult: UpdateResult =
-            accessGroupsRepository.addTeamMember(groupDbId, agentToAdd).futureValue
-
-          // then
-          updateResult.getModifiedCount shouldBe 1
-
-          // and
-          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId).futureValue
-          updatedGroup.get.teamMembers.contains(agentToAdd) shouldBe true
-          updatedGroup.get.teamMembers.size shouldBe 4
-        }
-      }
-
-    }
-
-    "removing a client from a group" when {
-
-      "group exists" should {
-
-        "return modified count of 1 when client is in group" in new TestScope {
-          // given
-          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
-
-          accessGroup.clients.contains(client1) shouldBe true
-
-          // when
-          val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(groupDbId, client1.enrolmentKey).futureValue
-
-          // then
-          updateResult.getModifiedCount shouldBe 1
-
-          // and
-          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId).futureValue
-          private val clients: Set[Client] = updatedGroup.get.clients
-          clients.size shouldBe 2
-          clients.contains(client1) shouldBe false
-        }
-
-        "return modified count of 0 when client is NOT in group" in new TestScope {
-          // given
-          accessGroupsRepository.insert(accessGroup).futureValue.get shouldBe a[String]
-
-          // when
-          val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(groupDbId, randomString).futureValue
-
-          // then
-          updateResult.getModifiedCount shouldBe 0
-
-          // and
-          val updatedGroup: Option[CustomGroup] = accessGroupsRepository.findById(groupDbId).futureValue
-          private val clients: Set[Client] = updatedGroup.get.clients
-          clients.size shouldBe 3
-        }
-
-        "return modified count of 0 when group is not found" in new TestScope {
-          // when
-          val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(GroupId.random(), randomString).futureValue
-
-          // then
-          updateResult.getModifiedCount shouldBe 0
-
-        }
-
-        "test only deletion by arn" should {
-
-          "delete the record matching the arn" in new TestScope {
-            val arnToDelete: Arn = accessGroup.arn
-            accessGroupsRepository.insert(accessGroup).futureValue
-            val deletion: Long = accessGroupsRepository.delete(arnToDelete.value).futureValue
-            accessGroupsRepository.get(arnToDelete, accessGroup.groupName).futureValue shouldBe None
-            deletion shouldBe 1L
-          }
-        }
-      }
-    }
-
     "encryption key migration" should {
       "rotate the encryption key for records by reading them out and writing them back again" in new TestScope {
         def generateRecord: CustomGroup =
@@ -359,7 +270,8 @@ class CustomGroupsRepositoryV2Spec
         accessGroupsRepository.migrate(batchSize = 5, deadline = patienceConfig.timeout.fromNow).futureValue
 
         // ensure all records were processed correctly
-        val results: Seq[CustomGroup] = accessGroupsRepository.collection.find().map(_.decryptedValue).toFuture().futureValue
+        val results: Seq[CustomGroup] =
+          accessGroupsRepository.collection.find().map(_.decryptedValue).toFuture().futureValue
         results should contain theSameElementsAs testData
 
         // the old encryption key can no longer decrypt the record

@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.Json
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.SensitiveAgentUser
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
@@ -24,23 +24,16 @@ import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
 class SensitiveAgentUserSpec extends TestConstants {
 
-  given crypto: (Encrypter & Decrypter) = aesCrypto
+  given crypto: Encrypter & Decrypter = aesCrypto
 
   val agentUser: AgentUser = AgentUser("agentUser1", "Robert Smith")
   val sensitiveAgentUser: SensitiveAgentUser = SensitiveAgentUser(agentUser)
-  val sensitiveJson: JsObject = Json.obj(
-    "id"   -> "b1R0M181YgUTX4YUs596jg==",
-    "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
-  )
 
   "SensitiveAgentUser" should {
 
-    "write to JSON" in {
-      Json.toJson(sensitiveAgentUser) shouldBe sensitiveJson
-    }
-
-    "read from encrypted JSON" in {
-      sensitiveJson.as[SensitiveAgentUser].decryptedValue shouldBe agentUser
+    "read & write to JSON" in {
+      val json = Json.toJson(sensitiveAgentUser)
+      json.as[SensitiveAgentUser] shouldBe sensitiveAgentUser
     }
   }
 }

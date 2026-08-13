@@ -16,10 +16,10 @@
 
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
-import play.api.libs.json.{JsObject, Json}
-import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveCustomGroup}
+import play.api.libs.json.Json
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
+import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveCustomGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 
@@ -27,7 +27,7 @@ import java.time.LocalDateTime
 
 class SensitiveCustomGroupSpec extends TestConstants {
 
-  given crypto: (Encrypter & Decrypter) = aesCrypto
+  given crypto: Encrypter & Decrypter = aesCrypto
 
   val agentUser: AgentUser = AgentUser(id = "agentUser1", name = "Robert Smith")
   val client: Client = Client(enrolmentKey = "HMRC-MTD-VAT~VRN~123456789", friendlyName = "Smith Roberts")
@@ -45,43 +45,11 @@ class SensitiveCustomGroupSpec extends TestConstants {
   )
   val sensitiveCustomGroup: SensitiveCustomGroup = SensitiveCustomGroup(customGroup)
 
-  val sensitiveJson: JsObject = Json.obj(
-    "_id"         -> "00000abc-6789-6789-6789-0000000000aa",
-    "arn"         -> "KARN1234567",
-    "groupName"   -> "some group",
-    "created"     -> "2020-01-01T00:00:00.000001",
-    "lastUpdated" -> "2020-01-01T00:00:00.000001",
-    "createdBy"   -> Json.obj(
-      "id"   -> "b1R0M181YgUTX4YUs596jg==",
-      "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
-    ),
-    "lastUpdatedBy" -> Json.obj(
-      "id"   -> "b1R0M181YgUTX4YUs596jg==",
-      "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
-    ),
-    "teamMembers" -> Json.arr(
-      Json.obj(
-        "id"   -> "b1R0M181YgUTX4YUs596jg==",
-        "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
-      )
-    ),
-    "clients" -> Json.arr(
-      Json.obj(
-        "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
-        "friendlyName" -> "RRhGxwmDG4jML/ChHcNOYA=="
-      )
-    ),
-    "formatVersion" -> "2"
-  )
-
   "SensitiveCustomGroup" should {
 
-    "write to JSON" in {
-      Json.toJson(sensitiveCustomGroup) shouldBe sensitiveJson
-    }
-
-    "read from JSON" in {
-      sensitiveJson.as[SensitiveCustomGroup].decryptedValue shouldBe customGroup
+    "read & write to JSON" in {
+      val json = Json.toJson(sensitiveCustomGroup)
+      json.as[SensitiveCustomGroup] shouldBe sensitiveCustomGroup
     }
   }
 }

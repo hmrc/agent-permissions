@@ -16,29 +16,31 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import com.mongodb.client.result.UpdateResult
-import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.scalamock.handlers.*
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.model.*
 import uk.gov.hmrc.agentpermissions.model.EacdAssignmentsPushStatus.{AssignmentsNotPushed, AssignmentsPushed}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.*
-import uk.gov.hmrc.agentpermissions.model.*
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
-import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.service.AccessGroupCreationStatus.{AccessGroupCreated, AccessGroupCreatedWithoutAssignmentsPushed, AccessGroupExistsForCreation, AccessGroupNotCreated}
 import uk.gov.hmrc.agentpermissions.service.AccessGroupDeletionStatus.{AccessGroupDeleted, AccessGroupDeletedWithoutAssignmentsPushed, AccessGroupNotDeleted}
 import uk.gov.hmrc.agentpermissions.service.AccessGroupUpdateStatus.{AccessGroupNotUpdated, AccessGroupUpdated, AccessGroupUpdatedWithoutAssignmentsPushed}
+import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Random
 
 class CustomGroupsServiceSpec extends TestConstants {
 
   trait TestScope {
+
+    def randomString: String = Random.alphanumeric.take(8).mkString
+
     val arn: Arn = Arn("KARN1234567")
     val user: AgentUser = AgentUser("userId", "userName")
     val groupName = "some group"
@@ -79,7 +81,7 @@ class CustomGroupsServiceSpec extends TestConstants {
         Set.empty
       )
 
-    val clients = Seq(clientVat, clientPpt, clientCgt)
+    val clients: Seq[Client] = Seq(clientVat, clientPpt, clientCgt)
 
     val accessGroupInMongo: CustomGroup = withClientNamesRemoved(accessGroup)
 
@@ -203,28 +205,6 @@ class CustomGroupsServiceSpec extends TestConstants {
         .update(_: Arn, _: String, _: CustomGroup))
         .expects(arn, groupName, *)
         .returning(Future.successful(maybeModifiedCount))
-
-    def mockAddTeamMemberToGroup(
-      groupId: GroupId,
-      member: AgentUser,
-      updatedCount: Int = 1
-    ): CallHandler2[GroupId, AgentUser, Future[UpdateResult]] =
-      (mockAccessGroupsRepository
-        .addTeamMember(_: GroupId, _: AgentUser))
-        .expects(groupId, member)
-        .returning(Future.successful(UpdateResult.acknowledged(updatedCount, updatedCount.toLong, null)))
-
-    def mockAddRemoveClientFromGroup(
-      groupId: GroupId,
-      client: Client,
-      updatedCount: Int = 1
-    ): CallHandler2[GroupId, String, Future[UpdateResult]] = {
-      val updateResult = UpdateResult.acknowledged(updatedCount, updatedCount.toLong, null)
-      (mockAccessGroupsRepository
-        .removeClient(_: GroupId, _: String))
-        .expects(groupId, client.enrolmentKey)
-        .returning(Future.successful(updateResult))
-    }
 
     def mockTaxGroupsServiceGetGroups(
       groups: Seq[TaxGroup]
@@ -736,7 +716,7 @@ class CustomGroupsServiceSpec extends TestConstants {
           Seq(taxServiceAccessGroupPPT, taxServiceAccessGroupTrust, taxServiceAccessGroupCbc)
         )
 
-        val result = accessGroupsService.getUnassignedClients(arn).futureValue
+        val result: Set[Client] = accessGroupsService.getUnassignedClients(arn).futureValue
 
         result shouldBe Set(
           Client(enrolmentKeyVAT, "foo")
@@ -746,7 +726,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       s"DO report as 'unassigned' clients in tax service groups but who are excluded from them" in new TestScope {
         val enrolmentKeyVAT = "HMRC-MTD-VAT~VRN~123456789"
         val enrolmentKeyPPT = "HMRC-PPT-ORG~EtmpRegistrationNumber~XAPPT0000012345"
-        val taxServiceAccessGroup =
+        val taxServiceAccessGroup: TaxGroup =
           taxServiceGroup.copy(service = "HMRC-PPT-ORG", excludedClients = Set(Client(enrolmentKeyPPT, "bar")))
 
         mockUserClientDetailsConnectorGetClients(
@@ -757,7 +737,7 @@ class CustomGroupsServiceSpec extends TestConstants {
         mockAccessGroupsRepositoryGetAll(Seq.empty)
         mockTaxGroupsServiceGetGroups(Seq(taxServiceAccessGroup))
 
-        val result = accessGroupsService.getUnassignedClients(arn).futureValue
+        val result: Set[Client] = accessGroupsService.getUnassignedClients(arn).futureValue
 
         result shouldBe Set(
           Client(enrolmentKeyVAT, "foo"),
@@ -938,7 +918,7 @@ class CustomGroupsServiceSpec extends TestConstants {
           mockAccessGroupsRepositoryUpdate(Some(0))
 
           accessGroupsService
-            .removeTeamMember(accessGroup.id, randomAlphabetic(8), user)
+            .removeTeamMember(accessGroup.id, randomString, user)
             .futureValue shouldBe AccessGroupNotUpdated
         }
         "mongo update count is None" in new TestScope {
@@ -947,7 +927,7 @@ class CustomGroupsServiceSpec extends TestConstants {
           mockAccessGroupsRepositoryUpdate(None)
 
           accessGroupsService
-            .removeTeamMember(accessGroup.id, randomAlphabetic(8), user)
+            .removeTeamMember(accessGroup.id, randomString, user)
             .futureValue shouldBe AccessGroupNotUpdated
         }
       }
@@ -957,7 +937,7 @@ class CustomGroupsServiceSpec extends TestConstants {
       s"return $AccessGroupNotUpdated" in new TestScope {
         mockAccessGroupsRepositoryFindById(None)
         accessGroupsService
-          .removeTeamMember(accessGroup.id, randomAlphabetic(8), user)
+          .removeTeamMember(accessGroup.id, randomString, user)
           .futureValue shouldBe AccessGroupNotUpdated
       }
     }
@@ -984,7 +964,7 @@ class CustomGroupsServiceSpec extends TestConstants {
         mockAucdGetPaginatedClientsForArn(accessGroup.arn, PAGE, PAGE_SIZE, SEARCH, FILTER)(mockedResponse)
 
         // when
-        val response =
+        val response: Option[(GroupSummary, PaginatedList[DisplayClient])] =
           accessGroupsService
             .getGroupByIdWithPageOfClientsToAdd(dbId, PAGE, PAGE_SIZE, SEARCH, FILTER)
             .futureValue

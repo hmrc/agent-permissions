@@ -90,6 +90,6 @@ trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with
 
   // Note: This is simply a randomly-chosen secret key to run tests
   val aesCrypto: Encrypter & Decrypter =
-    SymmetricCryptoFactory.aesCrypto(secretKey = "hWmZq3t6w9zrCeF5JiNcRfUjXn2r5u7x")
+    SymmetricCryptoFactory.aesGcmCrypto(secretKey = "hWmZq3t6w9zrCeF5JiNcRfUjXn2r5u7x")
 
 }
