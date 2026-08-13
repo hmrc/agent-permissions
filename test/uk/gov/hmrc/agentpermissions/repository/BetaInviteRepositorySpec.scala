@@ -18,9 +18,8 @@ package uk.gov.hmrc.agentpermissions.repository
 
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.IndexModel
-import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.TestConstants
-import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
+import uk.gov.hmrc.agentpermissions.model.{Arn, BetaInviteRecord}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, RecordUpdated}
 import uk.gov.hmrc.mongo.logging.ObservableFutureImplicits.SingleObservableFuture
@@ -33,6 +32,9 @@ class BetaInviteRepositorySpec
     extends TestConstants with PlayMongoRepositorySupport[BetaInviteRecord] with CleanMongoCollectionSupport {
 
   given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+
+  override protected val repository: PlayMongoRepository[BetaInviteRecord] =
+    new BetaInviteRepositoryImpl(mongoComponent)
 
   trait TestScope {
     val arn: Arn = Arn("KARN1234567")
@@ -94,7 +96,4 @@ class BetaInviteRepositorySpec
     }
 
   }
-
-  override protected val repository: PlayMongoRepository[BetaInviteRecord] =
-    new BetaInviteRepositoryImpl(mongoComponent)
 }

@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
+import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.{AppConfig, KeyRotationConfig}
 import uk.gov.hmrc.agentpermissions.model.Arn
@@ -49,7 +50,7 @@ class EacdSyncRepositorySpec
       "entry was last updated outside of refresh interval" should {
         "return value" in new TestScope {
 
-          val refreshInterval = mockAppConfig.eacdSyncNotBeforeSeconds
+          val refreshInterval: Int = mockAppConfig.eacdSyncNotBeforeSeconds
           val lastUpdatedAt: Instant = Instant.now().minusSeconds(refreshInterval + 2)
 
           val eacdSyncRecord: EacdSyncRecord = (for {
@@ -93,7 +94,11 @@ class EacdSyncRepositorySpec
     override def useEnrolmentAssignmentsChunkSize: Int = 100
     override def eacdSyncNotBeforeSeconds: Int = 10 // <- The value we care about in this test
 
-    override def keyRotation: KeyRotationConfig = ???
+    override def keyRotation: KeyRotationConfig = KeyRotationConfig(
+      enabled = false,
+      maxTotalDuration = 1.hour,
+      batchSize = 100
+    )
   }
 
 }

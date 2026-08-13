@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.agentpermissions.repository
 
-import org.apache.commons.lang3.RandomStringUtils.randomAlphabetic
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.mongodb.scala.gridfs.ObservableFuture
@@ -35,13 +34,16 @@ import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-class AccessGroupsRepositorySpec
+class CustomGroupsRepositoryV2Spec
     extends TestConstants with PlayMongoRepositorySupport[SensitiveCustomGroup] with CleanMongoCollectionSupport
     with OptionValues with KeyRotationSupport {
 
   given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
   val actorSystem: ActorSystem = ActorSystem()
   given Materializer = Materializer(actorSystem)
+
+  override protected val repository: PlayMongoRepository[SensitiveCustomGroup] =
+    new CustomGroupsRepositoryV2Impl(mongoComponent, KeyRotationCrypto)
 
   trait TestScope {
     val groupDbId: GroupId = GroupId.random()
@@ -74,6 +76,8 @@ class AccessGroupsRepositorySpec
       )
 
     def now: LocalDateTime = LocalDateTime.parse("2020-01-01T00:00:00.000")
+
+    def randomString: String = Random.alphanumeric.take(23).mkString
 
     val accessGroupsRepository: CustomGroupsRepositoryV2Impl = repository.asInstanceOf[CustomGroupsRepositoryV2Impl]
   }
@@ -304,7 +308,7 @@ class AccessGroupsRepositorySpec
 
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(groupDbId, randomAlphabetic(23)).futureValue
+            accessGroupsRepository.removeClient(groupDbId, randomString).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 0
@@ -318,7 +322,7 @@ class AccessGroupsRepositorySpec
         "return modified count of 0 when group is not found" in new TestScope {
           // when
           val updateResult: UpdateResult =
-            accessGroupsRepository.removeClient(GroupId.random(), randomAlphabetic(23)).futureValue
+            accessGroupsRepository.removeClient(GroupId.random(), randomString).futureValue
 
           // then
           updateResult.getModifiedCount shouldBe 0
@@ -340,13 +344,13 @@ class AccessGroupsRepositorySpec
 
     "encryption key migration" should {
       "rotate the encryption key for records by reading them out and writing them back again" in new TestScope {
-        def generateRecord =
+        def generateRecord: CustomGroup =
           accessGroup.copy(
             id = GroupId.random(),
             arn = Arn(Random.alphanumeric.take(10).mkString)
           )
 
-        val testData = Seq.fill(20)(generateRecord)
+        val testData: Seq[CustomGroup] = Seq.fill(20)(generateRecord)
         Future.traverse(testData)(accessGroupsRepository.insert).futureValue
 
         // simulate a newly deployed encryption key
@@ -355,7 +359,7 @@ class AccessGroupsRepositorySpec
         accessGroupsRepository.migrate(batchSize = 5, deadline = patienceConfig.timeout.fromNow).futureValue
 
         // ensure all records were processed correctly
-        val results = accessGroupsRepository.collection.find().map(_.decryptedValue).toFuture().futureValue
+        val results: Seq[CustomGroup] = accessGroupsRepository.collection.find().map(_.decryptedValue).toFuture().futureValue
         results should contain theSameElementsAs testData
 
         // the old encryption key can no longer decrypt the record
@@ -364,7 +368,4 @@ class AccessGroupsRepositorySpec
       }
     }
   }
-
-  override protected val repository: PlayMongoRepository[SensitiveCustomGroup] =
-    new CustomGroupsRepositoryV2Impl(mongoComponent, KeyRotationCrypto)
 }
