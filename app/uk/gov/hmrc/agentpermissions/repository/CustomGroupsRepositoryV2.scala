@@ -19,22 +19,20 @@ package uk.gov.hmrc.agentpermissions.repository
 import com.google.inject.ImplementedBy
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.{Collation, IndexOptions}
-import org.mongodb.scala.bson.Document
 import org.mongodb.scala.model.*
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
-import org.mongodb.scala.result.UpdateResult
 import play.api.Logging
 import play.api.libs.json.Format
-import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, CustomGroup}
-import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveAgentUser, SensitiveCustomGroup}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.CustomGroup
+import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveCustomGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2Impl.*
 import uk.gov.hmrc.agentpermissions.util.{Migrations, PlayMongoMigrations}
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption
-import uk.gov.hmrc.crypto.{Decrypter, Encrypter, PlainText}
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 
@@ -59,13 +57,6 @@ trait CustomGroupsRepositoryV2 extends Migrations {
   def insert(accessGroup: CustomGroup): Future[Option[String]]
   def delete(arn: Arn, groupName: String): Future[Option[Long]]
   def update(arn: Arn, groupName: String, accessGroup: CustomGroup): Future[Option[Long]]
-
-  /* TODO is it possible to update lastUpdated/lastUpdatedBy fields at the same time for addTeamMember and removeClient?
-   *   if only accomplished by update, remove these methods
-   * */
-  def addTeamMember(id: GroupId, toAdd: AgentUser): Future[UpdateResult]
-  def removeClient(groupId: GroupId, clientId: String): Future[UpdateResult]
-
   def delete(arn: String): Future[Long]
 }
 
@@ -94,13 +85,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
       )
     ) with CustomGroupsRepositoryV2 with PlayMongoMigrations with Logging {
 
-  // Ensure that we are using a deterministic cryptographic algorithm, or we won't be able to search on encrypted fields
-  require(
-    crypto.encrypt(PlainText("foo")) == crypto.encrypt(PlainText("foo")),
-    s"Crypto algorithm provided is not deterministic."
-  )
-
-  given theCrypto: (Encrypter & Decrypter) = crypto
+  given theCrypto: Encrypter & Decrypter = crypto
 
   def findById(id: GroupId): Future[Option[CustomGroup]] =
     collection
@@ -155,28 +140,6 @@ class CustomGroupsRepositoryV2Impl @Inject() (
 
   private lazy val replaceOptions: ReplaceOptions =
     new ReplaceOptions().upsert(true).collation(caseInsensitiveCollation)
-
-  def addTeamMember(id: GroupId, agentUser: AgentUser): Future[UpdateResult] =
-    collection
-      .updateOne(
-        filter = Filters.equal("_id", id.toString),
-        update = Updates.addToSet("teamMembers", Codecs.toBson(SensitiveAgentUser(agentUser)))
-      )
-      .head()
-
-  def removeClient(groupId: GroupId, enrolmentKey: String): Future[UpdateResult] =
-    collection
-      .updateOne(
-        filter = Filters.equal("_id", groupId.toString),
-        update = Updates.pullByFilter(
-          Document(
-            "clients" -> Document(
-              "enrolmentKey" -> Codecs.toBson(SensitiveString(enrolmentKey))(using sensitiveStringFormat)
-            )
-          )
-        )
-      )
-      .head()
 
   // test only
   override def delete(arn: String): Future[Long] =

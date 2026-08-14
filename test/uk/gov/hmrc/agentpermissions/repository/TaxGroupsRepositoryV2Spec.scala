@@ -220,7 +220,6 @@ class TaxGroupsRepositoryV2Spec
 
         }
       }
-
     }
 
     "groupExistsForTaxService" when {

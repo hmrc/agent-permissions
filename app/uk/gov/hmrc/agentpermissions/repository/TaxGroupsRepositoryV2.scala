@@ -29,9 +29,10 @@ import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, TaxGroup}
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveAgentUser, SensitiveTaxGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.util.{Migrations, PlayMongoMigrations}
-import uk.gov.hmrc.crypto.{Decrypter, Encrypter, PlainText}
+import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
+import uk.gov.hmrc.mongo.transaction.TransactionConfiguration
 
 import javax.inject.{Inject, Named, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
@@ -72,13 +73,8 @@ class TaxGroupsRepositoryV2Impl @Inject() (
       )
     ) with TaxGroupsRepositoryV2 with PlayMongoMigrations with Logging {
 
-  // Ensure that we are using a deterministic cryptographic algorithm, or we won't be able to search on encrypted fields
-  require(
-    crypto.encrypt(PlainText("foo")) == crypto.encrypt(PlainText("foo")),
-    s"Crypto algorithm provided is not deterministic."
-  )
-
-  given theCrypto: (Encrypter & Decrypter) = crypto
+  given theCrypto: Encrypter & Decrypter = crypto
+  given TransactionConfiguration = TransactionConfiguration.strict
 
   override def findById(id: GroupId): Future[Option[TaxGroup]] =
     collection
@@ -156,6 +152,8 @@ class TaxGroupsRepositoryV2Impl @Inject() (
   private lazy val replaceOptions: ReplaceOptions =
     new ReplaceOptions().upsert(true).collation(caseInsensitiveCollation)
 
+  // Warning: despite being a set this does not deduplicate as set equality uses the non-deterministic hashed string representation
+  // however, even if the frontend allowed a duplicate, the server-side [[AgentUser]] uses a [[Set]] of the decrypted values and will deduplicate them anyway
   override def addTeamMember(id: GroupId, agentUser: AgentUser): Future[UpdateResult] =
     collection
       .updateOne(

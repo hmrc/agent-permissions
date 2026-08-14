@@ -32,10 +32,10 @@ trait KeyRotationSupport extends BeforeAndAfterEach:
   val DefaultSecretKey = "HV6NcLoiRka1OjZmYRtleBa9gxxZeyadSjoHDN1fi+4="
 
   object KeyRotationCrypto extends Encrypter with Decrypter:
-    @volatile private var ref: Encrypter & Decrypter = SymmetricCryptoFactory.aesCrypto(DefaultSecretKey)
+    @volatile private var ref: Encrypter & Decrypter = SymmetricCryptoFactory.aesGcmCrypto(DefaultSecretKey)
 
     def rotateSecretKey(to: String, keepPreviousKey: Boolean = false): Unit =
-      val aes = SymmetricCryptoFactory.aesCrypto(to)
+      val aes = SymmetricCryptoFactory.aesGcmCrypto(to)
       val prev = ref // capture ref before overwriting it
       ref = if !keepPreviousKey then aes else SymmetricCryptoFactory.composeCrypto(aes, Seq(prev))
 

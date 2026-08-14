@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.agentpermissions.repository.storagemodel
 
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.Json
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveTaxGroup}
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, TaxGroup}
@@ -27,7 +27,7 @@ import java.time.LocalDateTime
 
 class SensitiveTaxGroupSpec extends TestConstants {
 
-  given crypto: (Encrypter & Decrypter) = aesCrypto
+  given crypto: Encrypter & Decrypter = aesCrypto
 
   val agentUser: AgentUser = AgentUser(id = "agentUser1", name = "Robert Smith")
   val client: Client = Client(enrolmentKey = "HMRC-MTD-VAT~VRN~123456789", friendlyName = "Smith Roberts")
@@ -47,45 +47,11 @@ class SensitiveTaxGroupSpec extends TestConstants {
   )
   val sensitiveTaxGroup: SensitiveTaxGroup = SensitiveTaxGroup(taxGroup)
 
-  val sensitiveJson: JsObject = Json.obj(
-    "_id"         -> "00000abc-6789-6789-6789-0000000000aa",
-    "arn"         -> "KARN1234567",
-    "groupName"   -> "some group",
-    "created"     -> "2020-01-01T00:00:00.000001",
-    "lastUpdated" -> "2020-01-01T00:00:00.000001",
-    "createdBy"   -> Json.obj(
-      "id"   -> "b1R0M181YgUTX4YUs596jg==",
-      "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
-    ),
-    "lastUpdatedBy" -> Json.obj(
-      "id"   -> "b1R0M181YgUTX4YUs596jg==",
-      "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
-    ),
-    "teamMembers" -> Json.arr(
-      Json.obj(
-        "id"   -> "b1R0M181YgUTX4YUs596jg==",
-        "name" -> "HXjWfzUOh3X5mPEI/Dbo2g=="
-      )
-    ),
-    "service"          -> "HMRC-MTD-VAT",
-    "automaticUpdates" -> true,
-    "excludedClients"  -> Json.arr(
-      Json.obj(
-        "enrolmentKey" -> "ddtpL0YcymEiA6dH+XLNcN2oYy6tDgEBCZrecQlriRE=",
-        "friendlyName" -> "RRhGxwmDG4jML/ChHcNOYA=="
-      )
-    ),
-    "formatVersion" -> "2"
-  )
-
   "SensitiveTaxGroup" should {
 
-    "write to JSON" in {
-      Json.toJson(sensitiveTaxGroup) shouldBe sensitiveJson
-    }
-
-    "read from JSON" in {
-      sensitiveJson.as[SensitiveTaxGroup].decryptedValue shouldBe taxGroup
+    "read & write to JSON" in {
+      val json = Json.toJson(sensitiveTaxGroup)
+      json.as[SensitiveTaxGroup] shouldBe sensitiveTaxGroup
     }
   }
 }
