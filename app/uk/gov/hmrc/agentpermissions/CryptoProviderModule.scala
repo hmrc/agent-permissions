@@ -26,18 +26,8 @@ import java.util.Base64
 class CryptoProviderModule extends Module {
 
   def aesCryptoInstance(configuration: Configuration): Encrypter & Decrypter =
-    val fieldLevelEncryption = configuration.get[Configuration]("fieldLevelEncryption")
-
-    if fieldLevelEncryption.get[Boolean]("enable") then
-      val currentKey = fieldLevelEncryption.get[String]("key")
-      val previousKeys = fieldLevelEncryption.getOptional[Seq[String]]("previousKeys").getOrElse(Nil)
-
-      val ecbDecrypters = previousKeys.map(SymmetricCryptoFactory.aesCrypto)
-
-      SymmetricCryptoFactory.composeCrypto(
-        currentCrypto = SymmetricCryptoFactory.aesGcmCrypto(currentKey),
-        previousDecrypters = ecbDecrypters
-      )
+    if configuration.underlying.getBoolean("fieldLevelEncryption.enable") then
+      SymmetricCryptoFactory.aesGcmCryptoFromConfig("fieldLevelEncryption", configuration.underlying)
     else NoCrypto
 
   def bindings(environment: Environment, configuration: Configuration): Seq[Binding[?]] =
