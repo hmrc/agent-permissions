@@ -20,10 +20,11 @@ import com.google.inject.ImplementedBy
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.Indexes.ascending
 import org.mongodb.scala.model.{Filters, IndexModel, IndexOptions, ReplaceOptions}
-import play.api.Logging
 import play.api.libs.json.{Format, Json}
-import uk.gov.hmrc.agentpermissions.model.Arn
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.play.json.formats.MongoJavatimeFormats
@@ -35,7 +36,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[EacdSyncRepositoryImpl])
 trait EacdSyncRepository {
-  def acquire(arn: Arn): Future[Option[EacdSyncRecord]]
+  def acquire(arn: Arn)(using RequestHeader): Future[Option[EacdSyncRecord]]
 }
 
 @Singleton
@@ -55,9 +56,9 @@ class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent, appConfi
             .expireAfter(appConfig.eacdSyncNotBeforeSeconds.toLong, SECONDS)
         )
       )
-    ) with EacdSyncRepository with Logging {
+    ) with EacdSyncRepository with RequestAwareLogging {
 
-  override def acquire(arn: Arn): Future[Option[EacdSyncRecord]] = {
+  override def acquire(arn: Arn)(using RequestHeader): Future[Option[EacdSyncRecord]] = {
     val newRecord = EacdSyncRecord(arn, Instant.now())
     for {
       // We are doing some overkill sanity deleting of old records as we have had some problems before

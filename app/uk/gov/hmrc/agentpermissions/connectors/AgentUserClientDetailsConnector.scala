@@ -17,17 +17,19 @@
 package uk.gov.hmrc.agentpermissions.connectors
 
 import com.google.inject.ImplementedBy
-import play.api.Logging
 import play.api.http.Status.*
 import play.api.libs.json.Json
 import play.api.libs.ws.JsonBodyWritables.writeableOf_JsValue
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.model.*
 import uk.gov.hmrc.agentpermissions.model.EacdAssignmentsPushStatus.{AssignmentsNotPushed, AssignmentsPushed}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{Client, UserDetails}
-import uk.gov.hmrc.agentpermissions.model.{AgentClientSize, Arn, EacdAssignmentsPushStatus, PaginatedList, UserEnrolmentAssignments}
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
+import uk.gov.hmrc.agentpermissions.util.RequestSupport.given
 import uk.gov.hmrc.http.HttpErrorFunctions.is5xx
 import uk.gov.hmrc.http.client.HttpClientV2
-import uk.gov.hmrc.http.{HeaderCarrier, HttpException, HttpResponse, NotFoundException, StringContextOps, UpstreamErrorResponse}
+import uk.gov.hmrc.http.{HttpException, HttpResponse, NotFoundException, StringContextOps, UpstreamErrorResponse}
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.duration.DurationInt
@@ -36,57 +38,57 @@ import scala.util.{Failure, Success}
 
 @ImplementedBy(classOf[AgentUserClientDetailsConnectorImpl])
 trait AgentUserClientDetailsConnector {
-  def agentSize(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]]
+  def agentSize(arn: Arn)(using RequestHeader, ExecutionContext): Future[Option[Int]]
 
-  def isSingleUserAgency(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]]
+  def isSingleUserAgency(arn: Arn)(using RequestHeader, ExecutionContext): Future[Option[Boolean]]
 
-  def outstandingWorkItemsExist(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]]
+  def outstandingWorkItemsExist(arn: Arn)(using RequestHeader, ExecutionContext): Future[Option[Boolean]]
 
   def outstandingAssignmentsWorkItemsExist(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]]
+  )(using RequestHeader, ExecutionContext): Future[Option[Boolean]]
   def getClients(arn: Arn, sendEmail: Boolean = false, lang: Option[String] = None)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[Option[Seq[Client]]]
 
   def getPaginatedClients(
     arn: Arn
   )(page: Int, pageSize: Int, search: Option[String] = None, filter: Option[String] = None)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[PaginatedList[Client]]
   def pushAssignments(
     assignments: UserEnrolmentAssignments
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus]
+  )(using RequestHeader, ExecutionContext): Future[EacdAssignmentsPushStatus]
 
   def getClientListStatus(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]]
+  )(using RequestHeader, ExecutionContext): Future[Option[Int]]
 
   def clientCountByTaxService(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Map[String, Int]]]
+  )(using RequestHeader, ExecutionContext): Future[Option[Map[String, Int]]]
 
-  def getTeamMembers(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[UserDetails]]
+  def getTeamMembers(arn: Arn)(using RequestHeader, ExecutionContext): Future[Seq[UserDetails]]
 
   def syncTeamMember(arn: Arn, userId: String, expectedAssignments: Seq[String] /* enrolment keys */ )(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[Boolean]
 }
 
 @Singleton
 class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
   appConfig: AppConfig
-) extends AgentUserClientDetailsConnector with Logging {
+) extends AgentUserClientDetailsConnector with RequestAwareLogging {
 
   import uk.gov.hmrc.http.HttpReads.Implicits.*
 
   val aucdBaseUrl = appConfig.agentUserClientDetailsBaseUrl
   private val aucdUrl = s"$aucdBaseUrl/agent-user-client-details"
 
-  override def agentSize(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]] = {
+  override def agentSize(arn: Arn)(using RequestHeader, ExecutionContext): Future[Option[Int]] = {
     val url = s"$aucdUrl/arn/${arn.value}/agent-size"
     httpV2
       .get(url"$url")
@@ -104,7 +106,7 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
 
   override def clientCountByTaxService(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Map[String, Int]]] = {
+  )(using RequestHeader, ExecutionContext): Future[Option[Map[String, Int]]] = {
     val url = s"$aucdUrl/arn/${arn.value}/tax-service-client-count"
 
     httpV2.get(url"$url").execute[HttpResponse].map { response =>
@@ -119,7 +121,7 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
 
   override def isSingleUserAgency(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
+  )(using RequestHeader, ExecutionContext): Future[Option[Boolean]] = {
     val url = s"$aucdUrl/arn/${arn.value}/user-check"
 
     httpV2.get(url"$url").execute[HttpResponse].map { response =>
@@ -137,7 +139,7 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
 
   override def outstandingWorkItemsExist(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
+  )(using RequestHeader, ExecutionContext): Future[Option[Boolean]] = {
     val url = s"$aucdUrl/arn/${arn.value}/work-items-exist"
     httpV2.get(url"$url").execute[HttpResponse].map { response =>
       response.status match {
@@ -154,7 +156,7 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
 
   override def outstandingAssignmentsWorkItemsExist(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Boolean]] = {
+  )(using RequestHeader, ExecutionContext): Future[Option[Boolean]] = {
     val url = s"$aucdUrl/arn/${arn.value}/assignments-work-items-exist"
     httpV2.get(url"$url").execute[HttpResponse].map { response =>
       response.status match {
@@ -170,8 +172,8 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
   }
 
   override def getClients(arn: Arn, sendEmail: Boolean = false, lang: Option[String] = None)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[Option[Seq[Client]]] = {
 
     val params = if sendEmail then "?sendEmail=true" + lang.fold("")("&lang=" + _) else ""
@@ -193,8 +195,8 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
   override def getPaginatedClients(
     arn: Arn
   )(page: Int, pageSize: Int, search: Option[String], filter: Option[String])(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[PaginatedList[Client]] = {
 
     val searchParam = search.fold("")(searchTerm => s"&search=$searchTerm")
@@ -212,7 +214,7 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
 
   override def getClientListStatus(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[Int]] = {
+  )(using RequestHeader, ExecutionContext): Future[Option[Int]] = {
 
     val url = s"$aucdUrl/arn/${arn.value}/client-list-status"
 
@@ -232,7 +234,7 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
 
   override def pushAssignments(
     userEnrolmentAssignments: UserEnrolmentAssignments
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] = {
+  )(using RequestHeader, ExecutionContext): Future[EacdAssignmentsPushStatus] = {
 
     val url = s"$aucdUrl/user-enrolment-assignments"
     httpV2
@@ -254,7 +256,7 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
       }
   }
 
-  def getTeamMembers(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[UserDetails]] = {
+  def getTeamMembers(arn: Arn)(using RequestHeader, ExecutionContext): Future[Seq[UserDetails]] = {
     val url = s"$aucdUrl/arn/${arn.value}/team-members"
     httpV2.get(url"$url").execute[HttpResponse].map { response =>
       response.status match {
@@ -265,8 +267,8 @@ class AgentUserClientDetailsConnectorImpl @Inject() (httpV2: HttpClientV2)(using
   }
 
   def syncTeamMember(arn: Arn, userId: String, expectedAssignments: Seq[String] /* enrolment keys */ )(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[Boolean] = {
     val url = s"$aucdBaseUrl/agent-user-client-details/arn/${arn.value}/user/$userId/ensure-assignments"
     httpV2

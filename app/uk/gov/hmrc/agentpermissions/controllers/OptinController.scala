@@ -96,14 +96,14 @@ class OptinController @Inject() (optinService: OptinService)(using
 
   private def withMatchedArn(providedArn: Arn, authorisedAgent: AuthorisedAgent)(
     body: => Future[Result]
-  ): Future[Result] =
+  )(using RequestHeader): Future[Result] =
     if providedArn == authorisedAgent.arn then body
     else {
       logger.info("Provided ARN did not match with that identified by auth")
       Future.successful(BadRequest)
     }
 
-  private def failureHandler(triedResult: Try[Result]): Future[Result] = triedResult match {
+  private def failureHandler(triedResult: Try[Result])(using RequestHeader): Future[Result] = triedResult match {
     case Success(result) =>
       Future.successful(result)
     case Failure(ex) =>

@@ -16,13 +16,15 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
+import org.scalamock.function.StubFunction3
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.config.{AppConfig, KeyRotationConfig}
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, OptinRepository, TaxGroupsRepositoryV2}
 import uk.gov.hmrc.mongo.lock.{Lock, LockRepository}
 
 import java.time.Instant
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{Deadline, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 
 class KeyRotationServiceSpec extends TestConstants:
@@ -63,9 +65,9 @@ class KeyRotationServiceSpec extends TestConstants:
         noException should be thrownBy:
           keyRotationService.migration.futureValue
 
-        optinRepository.migrate.verify(*, *).never()
-        customGroupsRepository.migrate.verify(*, *).never()
-        taxGroupsRepository.migrate.verify(*, *).never()
+        (optinRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).never()
+        (customGroupsRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).never()
+        (taxGroupsRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).never()
 
     "key rotation is enabled" should:
       "run migrations for optin, custom groups, and tax groups when lock is acquired" in new TestScope:
@@ -76,15 +78,24 @@ class KeyRotationServiceSpec extends TestConstants:
         lockRepository.releaseLock
           .expects(*, *)
           .returning(Future.unit)
-        optinRepository.migrate.when(*, *).returns(Future.successful(100))
-        customGroupsRepository.migrate.when(*, *).returns(Future.successful(100))
-        taxGroupsRepository.migrate.when(*, *).returns(Future.successful(100))
+        (optinRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.successful(100))
+        (customGroupsRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.successful(100))
+        (taxGroupsRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.successful(100))
 
         keyRotationService.migration.futureValue
 
-        optinRepository.migrate.verify(*, *).once()
-        customGroupsRepository.migrate.verify(*, *).once()
-        taxGroupsRepository.migrate.verify(*, *).once()
+        (optinRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).once()
+        (customGroupsRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).once()
+        (taxGroupsRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).once()
 
       "skip migration when lock is not acquired" in new TestScope:
         (() => appConfig.keyRotation).expects().returning(keyRotationConfig).anyNumberOfTimes()
@@ -94,9 +105,9 @@ class KeyRotationServiceSpec extends TestConstants:
         noException should be thrownBy:
           keyRotationService.migration.futureValue
 
-        optinRepository.migrate.verify(*, *).never()
-        customGroupsRepository.migrate.verify(*, *).never()
-        taxGroupsRepository.migrate.verify(*, *).never()
+        (optinRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).never()
+        (customGroupsRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).never()
+        (taxGroupsRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).never()
 
       "stop and fail when optin migration fails" in new TestScope:
         (() => appConfig.keyRotation).expects().returning(keyRotationConfig).anyNumberOfTimes()
@@ -104,14 +115,23 @@ class KeyRotationServiceSpec extends TestConstants:
           .expects(*, *, *)
           .returning(Future.successful(Some(Lock("", "", Instant.now(), Instant.MAX))))
         lockRepository.releaseLock.expects(*, *).returning(Future.unit)
-        optinRepository.migrate.when(*, *).returns(Future.failed(RuntimeException("optin migration failed")))
-        customGroupsRepository.migrate.when(*, *).returns(Future.successful(100))
-        taxGroupsRepository.migrate.when(*, *).returns(Future.successful(100))
+        (optinRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.failed(RuntimeException("optin migration failed")))
+        (customGroupsRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.successful(100))
+        (taxGroupsRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.successful(100))
 
         keyRotationService.migration.failed.futureValue
 
-        customGroupsRepository.migrate.verify(*, *).never()
-        taxGroupsRepository.migrate.verify(*, *).never()
+        (customGroupsRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).never()
+        (taxGroupsRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).never()
 
       "stop and fail when custom groups migration fails" in new TestScope:
         (() => appConfig.keyRotation).expects().returning(keyRotationConfig).anyNumberOfTimes()
@@ -119,16 +139,23 @@ class KeyRotationServiceSpec extends TestConstants:
           .expects(*, *, *)
           .returning(Future.successful(Some(Lock("", "", Instant.now(), Instant.MAX))))
         lockRepository.releaseLock.expects(*, *).returning(Future.unit)
-        optinRepository.migrate.when(*, *).returns(Future.successful(100))
-        customGroupsRepository.migrate
-          .when(*, *)
+        (optinRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.successful(100))
+        (customGroupsRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
           .returns(Future.failed(RuntimeException("custom groups migration failed")))
-        taxGroupsRepository.migrate.when(*, *).returns(Future.successful(100))
+        (taxGroupsRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.successful(100))
 
         keyRotationService.migration.failed.futureValue
 
-        optinRepository.migrate.verify(*, *).once()
-        taxGroupsRepository.migrate.verify(*, *).never()
+        (optinRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).once()
+        (taxGroupsRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).never()
 
       "stop and fail when tax groups migration fails" in new TestScope:
         (() => appConfig.keyRotation).expects().returning(keyRotationConfig).anyNumberOfTimes()
@@ -136,11 +163,20 @@ class KeyRotationServiceSpec extends TestConstants:
           .expects(*, *, *)
           .returning(Future.successful(Some(Lock("", "", Instant.now(), Instant.MAX))))
         lockRepository.releaseLock.expects(*, *).returning(Future.unit)
-        optinRepository.migrate.when(*, *).returns(Future.successful(100))
-        customGroupsRepository.migrate.when(*, *).returns(Future.successful(100))
-        taxGroupsRepository.migrate.when(*, *).returns(Future.failed(RuntimeException("tax groups migration failed")))
+        (optinRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.successful(100))
+        (customGroupsRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.successful(100))
+        (taxGroupsRepository
+          .migrate(_: Int, _: Deadline)(using _: RequestHeader))
+          .when(*, *, *)
+          .returns(Future.failed(RuntimeException("tax groups migration failed")))
 
         keyRotationService.migration.failed.futureValue
 
-        optinRepository.migrate.verify(*, *).once()
-        customGroupsRepository.migrate.verify(*, *).once()
+        (optinRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).once()
+        (customGroupsRepository.migrate(_: Int, _: Deadline)(using _: RequestHeader)).verify(*, *, *).once()

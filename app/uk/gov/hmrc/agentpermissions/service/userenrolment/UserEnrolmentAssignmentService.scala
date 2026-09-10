@@ -17,13 +17,13 @@
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import com.google.inject.ImplementedBy
-import play.api.Logging
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.EacdAssignmentsPushStatus.{AssignmentsNotPushed, AssignmentsPushed}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
 import uk.gov.hmrc.agentpermissions.model.{Arn, EacdAssignmentsPushStatus, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
-import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup}
-import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
@@ -59,14 +59,14 @@ trait UserEnrolmentAssignmentService {
 
   def pushCalculatedAssignments(
     maybeCalculatedAssignments: Option[UserEnrolmentAssignments]
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus]
+  )(using RequestHeader, ExecutionContext): Future[EacdAssignmentsPushStatus]
 }
 
 @Singleton
 class UserEnrolmentAssignmentServiceImpl @Inject() (
   customGroupsRepository: CustomGroupsRepositoryV2,
   agentUserClientDetailsConnector: AgentUserClientDetailsConnector
-) extends UserEnrolmentAssignmentService with Logging {
+) extends UserEnrolmentAssignmentService with RequestAwareLogging {
 
   override def calculateForGroupCreation(
     accessGroup: CustomGroup
@@ -152,7 +152,7 @@ class UserEnrolmentAssignmentServiceImpl @Inject() (
 
   override def pushCalculatedAssignments(
     maybeUserEnrolmentAssignments: Option[UserEnrolmentAssignments]
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[EacdAssignmentsPushStatus] =
+  )(using RequestHeader, ExecutionContext): Future[EacdAssignmentsPushStatus] =
     maybeUserEnrolmentAssignments match {
       case None =>
         Future.successful(AssignmentsNotPushed)

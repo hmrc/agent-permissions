@@ -17,6 +17,7 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.*
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.*
@@ -29,7 +30,6 @@ import uk.gov.hmrc.agentpermissions.service.AccessGroupDeletionStatus.{AccessGro
 import uk.gov.hmrc.agentpermissions.service.AccessGroupUpdateStatus.{AccessGroupNotUpdated, AccessGroupUpdated, AccessGroupUpdatedWithoutAssignmentsPushed}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.service.userenrolment.UserEnrolmentAssignmentService
-import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
 import scala.concurrent.{ExecutionContext, Future}
@@ -88,7 +88,6 @@ class CustomGroupsServiceSpec extends TestConstants {
     val assignedClient: AssignedClient = AssignedClient("service~key~value", None, "user")
 
     given ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-    given HeaderCarrier = HeaderCarrier()
 
     val mockAccessGroupsRepository: CustomGroupsRepositoryV2 = mock[CustomGroupsRepositoryV2]
     val mockUserEnrolmentAssignmentService: UserEnrolmentAssignmentService = mock[UserEnrolmentAssignmentService]
@@ -208,35 +207,35 @@ class CustomGroupsServiceSpec extends TestConstants {
 
     def mockTaxGroupsServiceGetGroups(
       groups: Seq[TaxGroup]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxGroup]]] =
+    ): CallHandler3[Arn, RequestHeader, ExecutionContext, Future[Seq[TaxGroup]]] =
       (mockTaxGroupsService
-        .getAllTaxServiceGroups(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+        .getAllTaxServiceGroups(_: Arn)(using _: RequestHeader, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.successful(groups))
 
     def mockUserClientDetailsConnectorGetClients(
       maybeClients: Option[Seq[Client]]
-    ): CallHandler5[Arn, Boolean, Option[String], HeaderCarrier, ExecutionContext, Future[Option[Seq[Client]]]] =
+    ): CallHandler5[Arn, Boolean, Option[String], RequestHeader, ExecutionContext, Future[Option[Seq[Client]]]] =
       (mockUserClientDetailsConnector
-        .getClients(_: Arn, _: Boolean, _: Option[String])(using _: HeaderCarrier, _: ExecutionContext))
+        .getClients(_: Arn, _: Boolean, _: Option[String])(using _: RequestHeader, _: ExecutionContext))
         .expects(arn, *, *, *, *)
         .returning(Future.successful(maybeClients))
 
     def mockUserEnrolmentAssignmentServicePushCalculatedAssignments(
       eacdAssignmentsPushStatus: EacdAssignmentsPushStatus
-    ): CallHandler3[Option[UserEnrolmentAssignments], HeaderCarrier, ExecutionContext, Future[
+    ): CallHandler3[Option[UserEnrolmentAssignments], RequestHeader, ExecutionContext, Future[
       EacdAssignmentsPushStatus
     ]] =
       (mockUserEnrolmentAssignmentService
-        .pushCalculatedAssignments(_: Option[UserEnrolmentAssignments])(using _: HeaderCarrier, _: ExecutionContext))
+        .pushCalculatedAssignments(_: Option[UserEnrolmentAssignments])(using _: RequestHeader, _: ExecutionContext))
         .expects(*, *, *)
         .returning(Future.successful(eacdAssignmentsPushStatus))
 
     def mockUserClientDetailsConnectorOutstandingAssignmentsWorkItemsExist(
       maybeOutstandingAssignmentsWorkItemsExist: Option[Boolean]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
+    ): CallHandler3[Arn, RequestHeader, ExecutionContext, Future[Option[Boolean]]] =
       (mockUserClientDetailsConnector
-        .outstandingAssignmentsWorkItemsExist(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+        .outstandingAssignmentsWorkItemsExist(_: Arn)(using _: RequestHeader, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.successful(maybeOutstandingAssignmentsWorkItemsExist))
 
@@ -248,38 +247,38 @@ class CustomGroupsServiceSpec extends TestConstants {
       filter: Option[String] = None
     )(mockedResponse: PaginatedList[Client]): CallHandler7[Arn, Int, Int, Option[String], Option[
       String
-    ], HeaderCarrier, ExecutionContext, Future[PaginatedList[Client]]] =
+    ], RequestHeader, ExecutionContext, Future[PaginatedList[Client]]] =
       (mockUserClientDetailsConnector
         .getPaginatedClients(_: Arn)(_: Int, _: Int, _: Option[String], _: Option[String])(using
-          _: HeaderCarrier,
+          _: RequestHeader,
           _: ExecutionContext
         ))
         .expects(arn, page, pageSize, search, filter, *, *)
         .returning(Future.successful(mockedResponse))
 
     def mockAuditServiceAuditEsAssignmentUnassignments()
-      : CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Unit] =
+      : CallHandler3[UserEnrolmentAssignments, RequestHeader, ExecutionContext, Unit] =
       (mockAuditService
-        .auditEsAssignmentUnassignments(_: UserEnrolmentAssignments)(using _: HeaderCarrier, _: ExecutionContext))
+        .auditEsAssignmentUnassignments(_: UserEnrolmentAssignments)(using _: RequestHeader, _: ExecutionContext))
         .expects(*, *, *)
         .returning(())
 
-    def mockAuditServiceAuditAccessGroupCreation(): CallHandler3[CustomGroup, HeaderCarrier, ExecutionContext, Unit] =
+    def mockAuditServiceAuditAccessGroupCreation(): CallHandler3[CustomGroup, RequestHeader, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupCreation(_: CustomGroup)(using _: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupCreation(_: CustomGroup)(using _: RequestHeader, _: ExecutionContext))
         .expects(*, *, *)
         .returning(())
 
-    def mockAuditServiceAuditAccessGroupUpdate(): CallHandler3[CustomGroup, HeaderCarrier, ExecutionContext, Unit] =
+    def mockAuditServiceAuditAccessGroupUpdate(): CallHandler3[CustomGroup, RequestHeader, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupUpdate(_: CustomGroup)(using _: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupUpdate(_: CustomGroup)(using _: RequestHeader, _: ExecutionContext))
         .expects(*, *, *)
         .returning(())
 
     def mockAuditServiceAuditAccessGroupDeletion()
-      : CallHandler5[Arn, String, AgentUser, HeaderCarrier, ExecutionContext, Unit] =
+      : CallHandler5[Arn, String, AgentUser, RequestHeader, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupDeletion(_: Arn, _: String, _: AgentUser)(using _: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupDeletion(_: Arn, _: String, _: AgentUser)(using _: RequestHeader, _: ExecutionContext))
         .expects(*, *, *, *, *)
         .returning(())
 

@@ -17,9 +17,10 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.{Inject, Singleton}
-import play.api.Logging
+import play.api.mvc.Request
 import uk.gov.hmrc.agentpermissions.config.AppConfig
 import uk.gov.hmrc.agentpermissions.repository.*
+import uk.gov.hmrc.agentpermissions.util.{NoRequest, RequestAwareLogging}
 import uk.gov.hmrc.mongo.lock.{LockRepository, LockService}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -33,7 +34,9 @@ class KeyRotationService @Inject (
   customGroupsRepositoryV2: CustomGroupsRepositoryV2,
   taxGroupsRepositoryV2: TaxGroupsRepositoryV2
 )(using ExecutionContext)
-    extends Logging:
+    extends RequestAwareLogging:
+
+  private given Request[?] = NoRequest
 
   private val lockService = LockService(
     lockRepository,

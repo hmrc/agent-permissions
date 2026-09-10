@@ -21,7 +21,8 @@ import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model.Filters.*
 import org.mongodb.scala.model.ReplaceOneModel
 import org.mongodb.scala.model.Sorts.ascending
-import play.api.Logging
+import play.api.mvc.RequestHeader
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
 import uk.gov.hmrc.mongo.play.json.Codecs.DocumentOps
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 import uk.gov.hmrc.mongo.transaction.{TransactionConfiguration, Transactions}
@@ -30,10 +31,10 @@ import scala.concurrent.duration.{Deadline, Duration}
 import scala.concurrent.{ExecutionContext, Future, TimeoutException}
 
 trait Migrations:
-  def migrate(batchSize: Int, deadline: Deadline): Future[Int]
+  def migrate(batchSize: Int, deadline: Deadline)(using RequestHeader): Future[Int]
 
 trait PlayMongoMigrations(using ExecutionContext) extends Migrations with Transactions:
-  self: PlayMongoRepository[?] & Logging =>
+  self: PlayMongoRepository[?] & RequestAwareLogging =>
 
   /** Runs a server-side migration in batches until all records are processed or the deadline is reached.
     *
@@ -53,7 +54,7 @@ trait PlayMongoMigrations(using ExecutionContext) extends Migrations with Transa
     * @return
     *   a future containing the total number of modified documents
     */
-  def migrate(batchSize: Int, deadline: Deadline): Future[Int] =
+  def migrate(batchSize: Int, deadline: Deadline)(using RequestHeader): Future[Int] =
     given TransactionConfiguration = TransactionConfiguration.strict
 
     def asUpdate(document: Document) =

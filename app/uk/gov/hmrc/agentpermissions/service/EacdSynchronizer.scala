@@ -16,16 +16,15 @@
 
 package uk.gov.hmrc.agentpermissions.service
 
-import org.apache.pekko.actor.ActorSystem
 import com.google.inject.ImplementedBy
-import play.api.Logging
-import uk.gov.hmrc.agentpermissions.model.Arn
+import org.apache.pekko.actor.ActorSystem
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.model.accessgroups.*
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, EacdSyncRepository, TaxGroupsRepositoryV2}
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
-import uk.gov.hmrc.agentpermissions.util.GroupOps
-import uk.gov.hmrc.agentpermissions.model.accessgroups.{AccessGroup, AgentUser, CustomGroup, TaxGroup, UserDetails}
-import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.agentpermissions.util.{GroupOps, RequestAwareLogging}
 
 import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
@@ -46,8 +45,8 @@ enum SyncResult {
 @ImplementedBy(classOf[EacdSynchronizerImpl])
 trait EacdSynchronizer {
   def syncWithEacd(arn: Arn, fullSync: Boolean = false)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[Option[Map[SyncResult, Int]]]
 }
 
@@ -59,7 +58,7 @@ class EacdSynchronizerImpl @Inject() (
   eacdSyncRepository: EacdSyncRepository, // TODO consider importing service instead of repository
   auditService: AuditService,
   actorSystem: ActorSystem
-) extends EacdSynchronizer with Logging {
+) extends EacdSynchronizer with RequestAwareLogging {
 
   /** Interrogate EACD to find out whether the stored access groups are referencing any clients or team members who are
     * no longer with the agency. These clients and members should be removed from any groups they are in.
@@ -68,8 +67,8 @@ class EacdSynchronizerImpl @Inject() (
     *   the lists of clients and team members which should removed from access groups.
     */
   private[service] def calculateRemovalSet(arn: Arn, accessGroups: Seq[AccessGroup])(using
-    ec: ExecutionContext,
-    hc: HeaderCarrier
+    RequestHeader,
+    ExecutionContext
   ): Future[RemovalSet] = if accessGroups.isEmpty then Future.successful(RemovalSet(Set.empty, Set.empty))
   else
     for {
@@ -107,10 +106,7 @@ class EacdSynchronizerImpl @Inject() (
     accessGroup: CustomGroup,
     removalSet: RemovalSet,
     whoIsUpdating: AgentUser
-  )(using
-    ec: ExecutionContext,
-    hc: HeaderCarrier
-  ): Future[CustomGroup] = {
+  )(using RequestHeader, ExecutionContext): Future[CustomGroup] = {
     // Step 1. Remove clients in the removal set from the access group.
     val accessGroup1 = {
       val (updatedGroup, clientsRemovedFromGroup) =
@@ -148,10 +144,7 @@ class EacdSynchronizerImpl @Inject() (
     accessGroup: TaxGroup,
     removalSet: RemovalSet,
     whoIsUpdating: AgentUser
-  )(using
-    ec: ExecutionContext,
-    hc: HeaderCarrier
-  ): Future[TaxGroup] = {
+  )(using RequestHeader, ExecutionContext): Future[TaxGroup] = {
     val updatedGroup = accessGroup.copy(
       teamMembers = accessGroup.teamMembers.filterNot(member => removalSet.userIdsToRemove.contains(member.id)),
       excludedClients =
@@ -177,10 +170,7 @@ class EacdSynchronizerImpl @Inject() (
     accessGroup: AccessGroup,
     removalSet: RemovalSet,
     whoIsUpdating: AgentUser
-  )(using
-    ec: ExecutionContext,
-    hc: HeaderCarrier
-  ): Future[AccessGroup] = accessGroup match {
+  )(using RequestHeader, ExecutionContext): Future[AccessGroup] = accessGroup match {
     case customGroup: CustomGroup => applyRemovalSetToCustomGroup(customGroup, removalSet, whoIsUpdating)
     case taxGroup: TaxGroup       => applyRemovalSetToTaxGroup(taxGroup, removalSet, whoIsUpdating)
     case other => throw new RuntimeException(s"Access group is not a CustomGroup or TaxGroup: ${other.toString}")
@@ -189,8 +179,8 @@ class EacdSynchronizerImpl @Inject() (
   /** Force the assigned enrolments in EACD to match those stored here.
     */
   private[service] def doFullSync(arn: Arn, customGroups: Seq[CustomGroup])(using
-    ec: ExecutionContext,
-    hc: HeaderCarrier
+    RequestHeader,
+    ExecutionContext
   ): Future[Unit] = {
     logger.info(s"Starting full sync for $arn.")
     for {
@@ -224,7 +214,8 @@ class EacdSynchronizerImpl @Inject() (
   }
 
   private[service] def persistAccessGroup(accessGroup: AccessGroup)(using
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[SyncResult] = {
     logger.info(
       s"Updating access group of ${accessGroup.arn.value} having name '${accessGroup.groupName}'"
@@ -244,31 +235,29 @@ class EacdSynchronizerImpl @Inject() (
   /** Run the enclosed function only if safe (i.e. there are no outstanding assignment work item and the sync lock can
     * be acquired)
     */
-  def ifSyncShouldOccur[A](arn: Arn)(action: => Future[A])(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): Future[Option[A]] = for {
-    maybeOutstandingAssignmentsWorkItemsExist <-
-      agentUserClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn)
+  def ifSyncShouldOccur[A](arn: Arn)(action: => Future[A])(using RequestHeader, ExecutionContext): Future[Option[A]] =
+    for {
+      maybeOutstandingAssignmentsWorkItemsExist <-
+        agentUserClientDetailsConnector.outstandingAssignmentsWorkItemsExist(arn)
 
-    maybeEacdSyncRecord <- maybeOutstandingAssignmentsWorkItemsExist match {
-                             case None | Some(true) =>
-                               logger.warn(
-                                 "Could not ensure that outstanding assignment queue was empty. Not doing sync"
-                               )
-                               Future.successful(None)
-                             case Some(false) => eacdSyncRepository.acquire(arn)
-                           }
+      maybeEacdSyncRecord <- maybeOutstandingAssignmentsWorkItemsExist match {
+                               case None | Some(true) =>
+                                 logger.warn(
+                                   "Could not ensure that outstanding assignment queue was empty. Not doing sync"
+                                 )
+                                 Future.successful(None)
+                               case Some(false) => eacdSyncRepository.acquire(arn)
+                             }
 
-    result <- maybeEacdSyncRecord match {
-                case None =>
-                  logger.warn("Could not acquire sync record. Not doing sync")
-                  Future.successful(None)
-                case _ =>
-                  logger.info(s"Acquired record for EACD Sync for '${arn.value}'")
-                  action.map(Some(_))
-              }
-  } yield result
+      result <- maybeEacdSyncRecord match {
+                  case None =>
+                    logger.warn("Could not acquire sync record. Not doing sync")
+                    Future.successful(None)
+                  case _ =>
+                    logger.info(s"Acquired record for EACD Sync for '${arn.value}'")
+                    action.map(Some(_))
+                }
+    } yield result
 
   /** Ensure that access groups stored in agent-permissions do not contain any clients or team members that no longer
     * appear to be with the agency (as reported by EACD) Optionally (if requesting a 'full sync') also force the
@@ -278,8 +267,8 @@ class EacdSynchronizerImpl @Inject() (
     *   statuses otherwise
     */
   def syncWithEacd(arn: Arn, fullSync: Boolean)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[Option[Map[SyncResult, Int]]] = ifSyncShouldOccur(arn) {
     val whoIsUpdating = AgentUser(id = "", name = "EACD sync")
     for {

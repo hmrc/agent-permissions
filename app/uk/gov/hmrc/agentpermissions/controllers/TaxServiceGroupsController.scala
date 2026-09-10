@@ -18,22 +18,20 @@ package uk.gov.hmrc.agentpermissions.controllers
 
 import play.api.libs.json.*
 import play.api.mvc.*
-import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.model.{AddMembersToTaxServiceGroupRequest, AddOneTeamMemberToGroupRequest, CreateTaxServiceGroupRequest, UpdateTaxServiceGroupRequest}
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{GroupSummary, TaxGroup}
+import uk.gov.hmrc.agentpermissions.model.*
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.service.*
 import uk.gov.hmrc.agentpermissions.service.TaxServiceGroupCreationStatus.{TaxServiceGroupCreated, TaxServiceGroupExistsForCreation, TaxServiceGroupNotCreated}
 import uk.gov.hmrc.agentpermissions.service.TaxServiceGroupDeletionStatus.{TaxServiceGroupDeleted, TaxServiceGroupNotDeleted}
 import uk.gov.hmrc.agentpermissions.service.TaxServiceGroupUpdateStatus.{TaxServiceGroupNotUpdated, TaxServiceGroupUpdated}
-import uk.gov.hmrc.agentpermissions.model.accessgroups.{GroupSummary, TaxGroup}
 import uk.gov.hmrc.auth.core.AuthorisationException
-import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
+import java.util.UUID
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
-import java.util.UUID
 
 @Singleton()
 class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(using
@@ -240,7 +238,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
   // TODO move to separate GroupAction
   private def withTaxGroup(gid: UUID, authorisedArn: Arn)(
     body: TaxGroup => Future[Result]
-  )(using hc: HeaderCarrier): Future[Result] =
+  )(using RequestHeader): Future[Result] =
     taxGroupsService.getById(GroupId.fromUuid(gid)) flatMap {
       case None =>
         logger.warn(s"Group not found for '$gid', cannot update")
@@ -254,7 +252,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
 
   private def withValidAndMatchingArn(providedArn: Arn, authorisedAgent: AuthorisedAgent)(
     body: Arn => Future[Result]
-  ): Future[Result] =
+  )(using RequestHeader): Future[Result] =
     if !Arn.isValid(providedArn.value) then
       logger.info("Provided ARN is not valid")
       badRequestInvalidArn(providedArn)
@@ -286,7 +284,7 @@ class TaxServiceGroupsController @Inject() (taxGroupsService: TaxGroupsService)(
       BadRequest(Json.obj("message" -> JsString(s"Group name length exceeds maximum allowed $MAX_LENGTH_GROUP_NAME")))
     )
 
-  private def failureHandler(triedResult: Try[Result]): Future[Result] = triedResult match {
+  private def failureHandler(triedResult: Try[Result])(using RequestHeader): Future[Result] = triedResult match {
     case Success(result) =>
       Future.successful(result)
     case Failure(ex: AuthorisationException) =>

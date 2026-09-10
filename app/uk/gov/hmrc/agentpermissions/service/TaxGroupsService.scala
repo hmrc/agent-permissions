@@ -17,14 +17,14 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
-import play.api.Logging
-import uk.gov.hmrc.agentpermissions.model.Arn
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, GroupSummary, TaxGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
-import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, GroupSummary, TaxGroup}
-import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
 
 import java.time.LocalDateTime
 import javax.inject.{Inject, Singleton}
@@ -34,50 +34,47 @@ import scala.concurrent.{ExecutionContext, Future}
 trait TaxGroupsService {
   def clientCountForAvailableTaxServices(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]]
+  )(using RequestHeader, ExecutionContext): Future[Map[String, Int]]
 
-  def clientCountForTaxGroups(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]]
+  def clientCountForTaxGroups(arn: Arn)(using RequestHeader, ExecutionContext): Future[Map[String, Int]]
 
-  def getById(id: GroupId)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxGroup]]
+  def getById(id: GroupId)(using RequestHeader, ExecutionContext): Future[Option[TaxGroup]]
 
   def create(
     taxGroup: TaxGroup
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[TaxServiceGroupCreationStatus]
+  )(using RequestHeader, ExecutionContext): Future[TaxServiceGroupCreationStatus]
 
   def getAllTaxServiceGroups(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[TaxGroup]]
+  )(using RequestHeader, ExecutionContext): Future[Seq[TaxGroup]]
 
   // unused? get(groupId) seems to be the same as getById(id) - will be same for AccessGroupService
-  def getByName(arn: Arn, groupName: String)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxGroup]]
+  def getByName(arn: Arn, groupName: String)(using RequestHeader, ExecutionContext): Future[Option[TaxGroup]]
 
-  def getByService(arn: Arn, service: String)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): Future[Option[TaxGroup]]
+  def getByService(arn: Arn, service: String)(using RequestHeader, ExecutionContext): Future[Option[TaxGroup]]
 
   def getTaxGroupSummariesForTeamMember(arn: Arn, userId: String)(using
     ec: ExecutionContext
   ): Future[Seq[GroupSummary]]
 
   def delete(arn: Arn, groupName: String, agentUser: AgentUser)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[TaxServiceGroupDeletionStatus]
 
   def update(arn: Arn, groupName: String, taxGroup: TaxGroup, whoIsUpdating: AgentUser)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus]
 
   def addMemberToGroup(groupId: GroupId, agentUser: AgentUser)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus]
 
   def removeTeamMember(groupId: GroupId, teamMemberId: String, whoIsUpdating: AgentUser)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus]
 
 }
@@ -87,11 +84,11 @@ class TaxGroupsServiceImpl @Inject() (
   taxServiceGroupsRepository: TaxGroupsRepositoryV2,
   agentUserClientDetailsConnector: AgentUserClientDetailsConnector,
   auditService: AuditService
-) extends TaxGroupsService with Logging {
+) extends TaxGroupsService with RequestAwareLogging {
 
   override def clientCountForAvailableTaxServices(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]] =
+  )(using RequestHeader, ExecutionContext): Future[Map[String, Int]] =
     agentUserClientDetailsConnector.clientCountByTaxService(arn).flatMap {
       case Some(fullMap) =>
         Future
@@ -111,7 +108,7 @@ class TaxGroupsServiceImpl @Inject() (
 
   override def clientCountForTaxGroups(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Map[String, Int]] =
+  )(using RequestHeader, ExecutionContext): Future[Map[String, Int]] =
     for {
       fullCount         <- agentUserClientDetailsConnector.clientCountByTaxService(arn)
       existingTaxGroups <- getAllTaxServiceGroups(arn)
@@ -145,13 +142,13 @@ class TaxGroupsServiceImpl @Inject() (
 
   override def getById(
     id: GroupId
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Option[TaxGroup]] =
+  )(using RequestHeader, ExecutionContext): Future[Option[TaxGroup]] =
     taxServiceGroupsRepository
       .findById(id)
 
   override def create(
     taxGroup: TaxGroup
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[TaxServiceGroupCreationStatus] =
+  )(using RequestHeader, ExecutionContext): Future[TaxServiceGroupCreationStatus] =
     taxServiceGroupsRepository.getByService(taxGroup.arn, taxGroup.service) flatMap {
       case Some(_) =>
         Future.successful(TaxServiceGroupCreationStatus.TaxServiceGroupExistsForCreation)
@@ -170,19 +167,16 @@ class TaxGroupsServiceImpl @Inject() (
 
   override def getAllTaxServiceGroups(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[TaxGroup]] =
+  )(using RequestHeader, ExecutionContext): Future[Seq[TaxGroup]] =
     taxServiceGroupsRepository
       .get(arn)
 
-  override def getByName(arn: Arn, groupName: String)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): Future[Option[TaxGroup]] =
+  override def getByName(arn: Arn, groupName: String)(using RequestHeader, ExecutionContext): Future[Option[TaxGroup]] =
     taxServiceGroupsRepository.get(arn, groupName)
 
   override def getByService(arn: Arn, service: String)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[Option[TaxGroup]] =
     taxServiceGroupsRepository
       .getByService(arn, service)
@@ -195,8 +189,8 @@ class TaxGroupsServiceImpl @Inject() (
   } yield usersGroups.map(GroupSummary.of)
 
   override def delete(arn: Arn, groupName: String, agentUser: AgentUser)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[TaxServiceGroupDeletionStatus] =
     for {
       maybeDeletedCount             <- taxServiceGroupsRepository.delete(arn, groupName)
@@ -210,8 +204,8 @@ class TaxGroupsServiceImpl @Inject() (
     } yield taxServiceGroupDeletionStatus
 
   override def update(arn: Arn, groupName: String, taxGroup: TaxGroup, whoIsUpdating: AgentUser)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus] =
     for {
       accessGroupWithWhoIsUpdating <- mergeWhoIsUpdating(taxGroup, whoIsUpdating)
@@ -237,8 +231,8 @@ class TaxGroupsServiceImpl @Inject() (
     Future.successful(taxGroup.copy(lastUpdated = LocalDateTime.now(), lastUpdatedBy = whoIsUpdating))
 
   override def addMemberToGroup(groupId: GroupId, agentUser: AgentUser)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus] =
     taxServiceGroupsRepository
       .addTeamMember(groupId, agentUser)
@@ -248,8 +242,8 @@ class TaxGroupsServiceImpl @Inject() (
       })
 
   def removeTeamMember(groupId: GroupId, teamMemberId: String, whoIsUpdating: AgentUser)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[TaxServiceGroupUpdateStatus] =
     taxServiceGroupsRepository
       .findById(groupId)

@@ -17,36 +17,32 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
-import play.api.Logging
-import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
-import uk.gov.hmrc.agentpermissions.repository.{BetaInviteRepository, UpsertType}
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
-import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.agentpermissions.model.{Arn, BetaInviteRecord}
+import uk.gov.hmrc.agentpermissions.repository.{BetaInviteRepository, UpsertType}
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
-
 @ImplementedBy(classOf[BetaInviteServiceImpl])
+
 trait BetaInviteService {
 
-  def hideBetaInvite(arn: Arn, user: AgentUser)(using
-    ec: ExecutionContext,
-    headerCarrier: HeaderCarrier
-  ): Future[Option[UpsertType]]
+  def hideBetaInvite(arn: Arn, user: AgentUser)(using RequestHeader, ExecutionContext): Future[Option[UpsertType]]
 
-  def hideBetaInviteCheck(arn: Arn, user: AgentUser)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Boolean]
+  def hideBetaInviteCheck(arn: Arn, user: AgentUser)(using RequestHeader, ExecutionContext): Future[Boolean]
 }
 
 @Singleton
 class BetaInviteServiceImpl @Inject() (
   betaInviteRepository: BetaInviteRepository,
   betaInviteRecordBuilder: BetaInviteRecordBuilder
-) extends BetaInviteService with Logging {
+) extends BetaInviteService with RequestAwareLogging {
 
   override def hideBetaInvite(arn: Arn, user: AgentUser)(using
-    ec: ExecutionContext,
-    headerCarrier: HeaderCarrier
+    RequestHeader,
+    ExecutionContext
   ): Future[Option[UpsertType]] =
     for {
       maybeExistingBetaInviteRecord <- betaInviteRepository.get(user)
@@ -62,10 +58,7 @@ class BetaInviteServiceImpl @Inject() (
 
     } yield maybeUpsertResult
 
-  override def hideBetaInviteCheck(arn: Arn, user: AgentUser)(using
-    ec: ExecutionContext,
-    hc: HeaderCarrier
-  ): Future[Boolean] =
+  override def hideBetaInviteCheck(arn: Arn, user: AgentUser)(using RequestHeader, ExecutionContext): Future[Boolean] =
     for {
       maybeBetaInviteRecord <- betaInviteRepository.get(user)
     } yield maybeBetaInviteRecord.fold(false)(_.hideBetaInvite)

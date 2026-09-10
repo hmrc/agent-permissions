@@ -17,11 +17,12 @@
 package uk.gov.hmrc.agentpermissions.service.userenrolment
 
 import org.scalamock.handlers.{CallHandler1, CallHandler2, CallHandler3}
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.EacdAssignmentsPushStatus.{AssignmentsNotPushed, AssignmentsPushed}
-import uk.gov.hmrc.agentpermissions.model.{Arn, EacdAssignmentsPushStatus, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, CustomGroup}
+import uk.gov.hmrc.agentpermissions.model.{Arn, EacdAssignmentsPushStatus, UserEnrolmentAssignments}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2
 import uk.gov.hmrc.http.HeaderCarrier
@@ -66,9 +67,9 @@ class UserEnrolmentAssignmentServiceSpec extends TestConstants {
 
     def mockUserClientDetailsConnectorPushAssignments(
       pushStatus: EacdAssignmentsPushStatus
-    ): CallHandler3[UserEnrolmentAssignments, HeaderCarrier, ExecutionContext, Future[EacdAssignmentsPushStatus]] =
+    ): CallHandler3[UserEnrolmentAssignments, RequestHeader, ExecutionContext, Future[EacdAssignmentsPushStatus]] =
       (mockUserClientDetailsConnector
-        .pushAssignments(_: UserEnrolmentAssignments)(using _: HeaderCarrier, _: ExecutionContext))
+        .pushAssignments(_: UserEnrolmentAssignments)(using _: RequestHeader, _: ExecutionContext))
         .expects(userEnrolmentAssignments, *, *)
         .anyNumberOfTimes()
         .returning(Future.successful(pushStatus))

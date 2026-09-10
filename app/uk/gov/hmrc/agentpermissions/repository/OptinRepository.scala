@@ -21,11 +21,10 @@ import com.mongodb.client.model.{IndexOptions, ReplaceOptions}
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.Indexes.ascending
-import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveOptinRecord}
 import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, RecordUpdated}
-import uk.gov.hmrc.agentpermissions.util.{Migrations, PlayMongoMigrations}
+import uk.gov.hmrc.agentpermissions.util.{Migrations, PlayMongoMigrations, RequestAwareLogging}
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
@@ -54,7 +53,7 @@ class OptinRepositoryImpl @Inject() (
       indexes = Seq(
         IndexModel(ascending("arn"), new IndexOptions().name("arnIdx").unique(true))
       )
-    ) with OptinRepository with PlayMongoMigrations with Logging {
+    ) with OptinRepository with PlayMongoMigrations with RequestAwareLogging {
 
   def get(arn: Arn): Future[Option[OptinRecord]] =
     collection.find(equal("arn", arn.value)).headOption().map(_.map(_.decryptedValue))

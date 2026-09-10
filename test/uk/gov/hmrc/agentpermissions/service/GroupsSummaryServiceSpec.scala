@@ -17,12 +17,13 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.{CallHandler2, CallHandler3}
-import uk.gov.hmrc.agentpermissions.model.Arn
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.TestConstants
+import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.model.accessgroups.*
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.service.audit.AuditService
-import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup, GroupSummary, TaxGroup}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDateTime
@@ -125,25 +126,25 @@ class GroupsSummaryServiceSpec extends TestConstants {
 
     def mockTaxGroupsServiceGetAllGroups(
       groups: Seq[TaxGroup]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[TaxGroup]]] =
+    ): CallHandler3[Arn, RequestHeader, ExecutionContext, Future[Seq[TaxGroup]]] =
       (mockTaxGroupsService
-        .getAllTaxServiceGroups(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+        .getAllTaxServiceGroups(_: Arn)(using _: RequestHeader, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.successful(groups))
 
     def mockTaxGroupsServiceGetClientCountForAllGroups(
       clientsCounts: Map[String, Int]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Map[String, Int]]] =
+    ): CallHandler3[Arn, RequestHeader, ExecutionContext, Future[Map[String, Int]]] =
       (mockTaxGroupsService
-        .clientCountForTaxGroups(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+        .clientCountForTaxGroups(_: Arn)(using _: RequestHeader, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.successful(clientsCounts))
 
     def mockCustomGroupsServiceGetAllGroups(
       groups: Seq[CustomGroup]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Seq[CustomGroup]]] =
+    ): CallHandler3[Arn, RequestHeader, ExecutionContext, Future[Seq[CustomGroup]]] =
       (mockCustomGroupsService
-        .getAllCustomGroups(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+        .getAllCustomGroups(_: Arn)(using _: RequestHeader, _: ExecutionContext))
         .expects(arn, *, *)
         .returning(Future.successful(groups))
 
