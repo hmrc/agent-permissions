@@ -17,21 +17,21 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
-import play.api.Logging
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
 import uk.gov.hmrc.agentpermissions.model.accessgroups.GroupSummary
-import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.agentpermissions.repository.TaxGroupsRepositoryV2
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[GroupSummaryServiceImpl])
 trait GroupSummaryService {
-  def getAllGroupSummaries(arn: Arn)(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]]
+  def getAllGroupSummaries(arn: Arn)(using RequestHeader, ExecutionContext): Future[Seq[GroupSummary]]
   def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[Seq[GroupSummary]]
   def getAllGroupSummariesForTeamMember(arn: Arn, userId: String)(using
     ec: ExecutionContext
@@ -44,11 +44,11 @@ class GroupSummaryServiceImpl @Inject() (
   taxGroupsRepo: TaxGroupsRepositoryV2,
   customGroupsService: CustomGroupsService,
   taxGroupsService: TaxGroupsService
-) extends GroupSummaryService with Logging {
+) extends GroupSummaryService with RequestAwareLogging {
 
   override def getAllGroupSummaries(
     arn: Arn
-  )(using hc: HeaderCarrier, ec: ExecutionContext): Future[Seq[GroupSummary]] =
+  )(using RequestHeader, ExecutionContext): Future[Seq[GroupSummary]] =
     for {
       customGroups <- customGroupsService.getAllCustomGroups(arn)
       customSummaries = customGroups.map(GroupSummary.of)
@@ -63,8 +63,8 @@ class GroupSummaryServiceImpl @Inject() (
     } yield combinedSorted
 
   override def getAllGroupSummariesForClient(arn: Arn, enrolmentKey: String)(using
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+    RequestHeader,
+    ExecutionContext
   ): Future[Seq[GroupSummary]] = {
     val service =
       if enrolmentKey.contains("HMRC-TERS") then "HMRC-TERS"

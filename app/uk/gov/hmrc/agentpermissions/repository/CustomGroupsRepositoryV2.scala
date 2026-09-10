@@ -23,13 +23,12 @@ import org.mongodb.scala.model.*
 import org.mongodb.scala.model.CollationStrength.SECONDARY
 import org.mongodb.scala.model.Filters.{and, equal}
 import org.mongodb.scala.model.Indexes.{ascending, compoundIndex}
-import play.api.Logging
 import play.api.libs.json.Format
 import uk.gov.hmrc.agentpermissions.model.accessgroups.CustomGroup
 import uk.gov.hmrc.agentpermissions.model.{Arn, SensitiveCustomGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.CustomGroupsRepositoryV2Impl.*
-import uk.gov.hmrc.agentpermissions.util.{Migrations, PlayMongoMigrations}
+import uk.gov.hmrc.agentpermissions.util.{Migrations, PlayMongoMigrations, RequestAwareLogging}
 import uk.gov.hmrc.crypto.Sensitive.SensitiveString
 import uk.gov.hmrc.crypto.json.JsonEncryption
 import uk.gov.hmrc.crypto.{Decrypter, Encrypter}
@@ -83,7 +82,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
         // Sensitive string codec so we can operate on individual string fields
         Codecs.playFormatCodec(sensitiveStringFormat(using crypto))
       )
-    ) with CustomGroupsRepositoryV2 with PlayMongoMigrations with Logging {
+    ) with CustomGroupsRepositoryV2 with PlayMongoMigrations with RequestAwareLogging {
 
   given theCrypto: Encrypter & Decrypter = crypto
 

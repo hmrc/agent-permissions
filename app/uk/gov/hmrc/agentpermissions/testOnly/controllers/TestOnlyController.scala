@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.agentpermissions.testOnly.controllers
 
-import play.api.Logging
-import play.api.mvc.{Action, AnyContent, ControllerComponents}
+import play.api.mvc.{Action, AnyContent, ControllerComponents, Request}
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, OptinRepository}
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import javax.inject.{Inject, Singleton}
@@ -29,9 +29,10 @@ class TestOnlyController @Inject() (
   customGroupsRepositoryV2: CustomGroupsRepositoryV2,
   optinRepository: OptinRepository
 )(using ec: ExecutionContext, cc: ControllerComponents)
-    extends BackendController(cc) with Logging {
+    extends BackendController(cc) with RequestAwareLogging {
 
-  def delete(arn: String): Action[AnyContent] = Action.async { _ =>
+  def delete(arn: String): Action[AnyContent] = Action.async { request =>
+    given Request[?] = request
     for {
       a <- customGroupsRepositoryV2.delete(arn)
       b <- optinRepository.delete(arn)

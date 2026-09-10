@@ -17,26 +17,26 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import com.google.inject.ImplementedBy
-import play.api.Logging
-import uk.gov.hmrc.agentpermissions.model.Arn
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.*
 import uk.gov.hmrc.agentpermissions.model.accessgroups.optin.OptinStatus.*
-import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
 @ImplementedBy(classOf[OptedInStatusHandlerImpl])
 trait OptedInStatusHandler {
-  def identifyStatus(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]]
+  def identifyStatus(arn: Arn)(using RequestHeader, ExecutionContext): Future[Option[OptinStatus]]
 }
 
 @Singleton
 class OptedInStatusHandlerImpl @Inject() (agentUserClientDetailsConnector: AgentUserClientDetailsConnector)
-    extends OptedInStatusHandler with Logging {
+    extends OptedInStatusHandler with RequestAwareLogging {
 
-  def identifyStatus(arn: Arn)(using ec: ExecutionContext, hc: HeaderCarrier): Future[Option[OptinStatus]] =
+  def identifyStatus(arn: Arn)(using RequestHeader, ExecutionContext): Future[Option[OptinStatus]] =
     for {
       maybeSingleUser                       <- agentUserClientDetailsConnector.isSingleUserAgency(arn)
       maybeOptinStatus: Option[OptinStatus] <- {

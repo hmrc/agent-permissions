@@ -17,6 +17,7 @@
 package uk.gov.hmrc.agentpermissions.service
 
 import org.scalamock.handlers.CallHandler3
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
 import uk.gov.hmrc.agentpermissions.model.Arn
@@ -37,18 +38,18 @@ class OptedInStatusHandlerSpec extends TestConstants {
 
     def mockUserClientDetailsConnectorCheckGroupAssignments(
       maybeSingleUser: Option[Boolean]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
+    ): CallHandler3[Arn, RequestHeader, ExecutionContext, Future[Option[Boolean]]] =
       (mockUserClientDetailsConnector
-        .isSingleUserAgency(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, headerCarrier, executionContext)
+        .isSingleUserAgency(_: Arn)(using _: RequestHeader, _: ExecutionContext))
+        .expects(arn, *, executionContext)
         .returning(Future.successful(maybeSingleUser))
 
     def mockUserClientDetailsConnectorOutstandingWorkItemsExist(
       maybeWorkItemsExist: Option[Boolean]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
+    ): CallHandler3[Arn, RequestHeader, ExecutionContext, Future[Option[Boolean]]] =
       (mockUserClientDetailsConnector
-        .outstandingWorkItemsExist(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
-        .expects(arn, headerCarrier, executionContext)
+        .outstandingWorkItemsExist(_: Arn)(using _: RequestHeader, _: ExecutionContext))
+        .expects(arn, *, executionContext)
         .returning(Future.successful(maybeWorkItemsExist))
   }
 

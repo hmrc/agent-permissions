@@ -18,16 +18,16 @@ package uk.gov.hmrc.agentpermissions.service
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
-import org.scalamock.handlers.{CallHandler1, CallHandler3, CallHandler4}
-import uk.gov.hmrc.agentpermissions.model.Arn
+import org.scalamock.handlers.{CallHandler2, CallHandler3, CallHandler4}
+import play.api.mvc.RequestHeader
 import uk.gov.hmrc.agentpermissions.TestConstants
 import uk.gov.hmrc.agentpermissions.connectors.AgentUserClientDetailsConnector
+import uk.gov.hmrc.agentpermissions.model.Arn
+import uk.gov.hmrc.agentpermissions.model.accessgroups.*
 import uk.gov.hmrc.agentpermissions.models.GroupId
 import uk.gov.hmrc.agentpermissions.repository.{CustomGroupsRepositoryV2, EacdSyncRecord, EacdSyncRepository, TaxGroupsRepositoryV2}
-import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 import uk.gov.hmrc.agentpermissions.service.AccessGroupUpdateStatus.{AccessGroupNotUpdated, AccessGroupUpdated}
-import uk.gov.hmrc.agentpermissions.model.accessgroups.*
-import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.agentpermissions.service.audit.AuditService
 
 import java.time.{Instant, LocalDateTime}
 import scala.concurrent.{ExecutionContext, Future}
@@ -70,11 +70,11 @@ class EacdSynchronizerSpec extends TestConstants {
       (mockAccessGroupsRepository.get(_: Arn)).expects(arn).returning(Future.successful(customGroups))
       (stubTaxServiceGroupsRepository.get(_: Arn)).when(arn).returns(Future.successful(Seq.empty))
       (stubUserClientDetailsConnector
-        .getClients(_: Arn, _: Boolean, _: Option[String])(using _: HeaderCarrier, _: ExecutionContext))
+        .getClients(_: Arn, _: Boolean, _: Option[String])(using _: RequestHeader, _: ExecutionContext))
         .when(arn, *, *, *, *)
         .returns(Future.successful(Some(Seq(Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "")))))
       (stubUserClientDetailsConnector
-        .getTeamMembers(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+        .getTeamMembers(_: Arn)(using _: RequestHeader, _: ExecutionContext))
         .when(arn, *, *)
         .returns(Future.successful(Seq(UserDetails(Some(agentUser1.id)))))
 
@@ -98,11 +98,11 @@ class EacdSynchronizerSpec extends TestConstants {
           val accessGroups: Seq[CustomGroup] = Seq(accessGroup1)
 
           (stubUserClientDetailsConnector
-            .getClients(_: Arn, _: Boolean, _: Option[String])(using _: HeaderCarrier, _: ExecutionContext))
+            .getClients(_: Arn, _: Boolean, _: Option[String])(using _: RequestHeader, _: ExecutionContext))
             .when(arn, *, *, *, *)
             .returns(Future.successful(Some(Seq(Client(s"$serviceVat~$serviceIdentifierKeyVat~101747641", "")))))
           (stubUserClientDetailsConnector
-            .getTeamMembers(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+            .getTeamMembers(_: Arn)(using _: RequestHeader, _: ExecutionContext))
             .when(arn, *, *)
             .returns(Future.successful(Seq(UserDetails(Some(agentUser1.id)))))
           (stubTaxServiceGroupsRepository.get(_: Arn)).when(arn).returns(Future.successful(Seq.empty))
@@ -129,7 +129,7 @@ class EacdSynchronizerSpec extends TestConstants {
           val accessGroups: Seq[CustomGroup] = Seq(accessGroup1)
 
           (stubUserClientDetailsConnector
-            .getClients(_: Arn, _: Boolean, _: Option[String])(using _: HeaderCarrier, _: ExecutionContext))
+            .getClients(_: Arn, _: Boolean, _: Option[String])(using _: RequestHeader, _: ExecutionContext))
             .when(arn, *, *, *, *)
             .returns(
               Future.successful(
@@ -143,7 +143,7 @@ class EacdSynchronizerSpec extends TestConstants {
               )
             )
           (stubUserClientDetailsConnector
-            .getTeamMembers(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+            .getTeamMembers(_: Arn)(using _: RequestHeader, _: ExecutionContext))
             .when(arn, *, *)
             .returns(
               Future.successful(
@@ -177,7 +177,7 @@ class EacdSynchronizerSpec extends TestConstants {
         )
 
         (stubUserClientDetailsConnector
-          .getClients(_: Arn, _: Boolean, _: Option[String])(using _: HeaderCarrier, _: ExecutionContext))
+          .getClients(_: Arn, _: Boolean, _: Option[String])(using _: RequestHeader, _: ExecutionContext))
           .when(arn, *, *, *, *)
           .returns(
             Future.successful(
@@ -190,7 +190,7 @@ class EacdSynchronizerSpec extends TestConstants {
             )
           )
         (stubUserClientDetailsConnector
-          .getTeamMembers(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+          .getTeamMembers(_: Arn)(using _: RequestHeader, _: ExecutionContext))
           .when(arn, *, *)
           .returns(
             Future.successful(
@@ -328,7 +328,7 @@ class EacdSynchronizerSpec extends TestConstants {
 
     "fail when EACD client list cannot be retrieved" in new TestScope {
       (stubUserClientDetailsConnector
-        .getClients(_: Arn, _: Boolean, _: Option[String])(using _: HeaderCarrier, _: ExecutionContext))
+        .getClients(_: Arn, _: Boolean, _: Option[String])(using _: RequestHeader, _: ExecutionContext))
         .when(arn, *, *, *, *)
         .returns(Future.successful(None))
 
@@ -343,7 +343,7 @@ class EacdSynchronizerSpec extends TestConstants {
     "'full sync'" should {
       "call AUCD once for each member" in new TestScope {
         (stubUserClientDetailsConnector
-          .getTeamMembers(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+          .getTeamMembers(_: Arn)(using _: RequestHeader, _: ExecutionContext))
           .when(arn, *, *)
           .returns(
             Future.successful(
@@ -355,7 +355,7 @@ class EacdSynchronizerSpec extends TestConstants {
             )
           )
         (stubUserClientDetailsConnector
-          .syncTeamMember(_: Arn, _: String, _: Seq[String])(using _: HeaderCarrier, _: ExecutionContext))
+          .syncTeamMember(_: Arn, _: String, _: Seq[String])(using _: RequestHeader, _: ExecutionContext))
           .when(*, *, *, *, *)
           .returns(Future.successful(true))
 
@@ -370,15 +370,15 @@ class EacdSynchronizerSpec extends TestConstants {
           .futureValue
 
         (stubUserClientDetailsConnector
-          .syncTeamMember(_: Arn, _: String, _: Seq[String])(using _: HeaderCarrier, _: ExecutionContext))
+          .syncTeamMember(_: Arn, _: String, _: Seq[String])(using _: RequestHeader, _: ExecutionContext))
           .verify(arn, agentUser1.id, Seq(clientVat.enrolmentKey), *, *)
           .once()
         (stubUserClientDetailsConnector
-          .syncTeamMember(_: Arn, _: String, _: Seq[String])(using _: HeaderCarrier, _: ExecutionContext))
+          .syncTeamMember(_: Arn, _: String, _: Seq[String])(using _: RequestHeader, _: ExecutionContext))
           .verify(arn, agentUser2.id, Seq(clientVat.enrolmentKey, clientCgt.enrolmentKey), *, *)
           .once()
         (stubUserClientDetailsConnector
-          .syncTeamMember(_: Arn, _: String, _: Seq[String])(using _: HeaderCarrier, _: ExecutionContext))
+          .syncTeamMember(_: Arn, _: String, _: Seq[String])(using _: RequestHeader, _: ExecutionContext))
           .verify(arn, "aThirdUserNotInAnyGroup", Seq.empty, *, *)
           .once()
       }
@@ -408,7 +408,6 @@ class EacdSynchronizerSpec extends TestConstants {
     val actorSystem: ActorSystem = ActorSystem("test")
 
     given ExecutionContext = ExecutionContext.Implicits.global
-    given HeaderCarrier = HeaderCarrier()
 
     val eacdSynchronizer =
       new EacdSynchronizerImpl(
@@ -470,27 +469,27 @@ class EacdSynchronizerSpec extends TestConstants {
         .when(arn, groupName, *)
         .returns(Future.successful(maybeModifiedCount))
 
-    def expectAuditClientsRemoval(): CallHandler4[CustomGroup, Set[Client], HeaderCarrier, ExecutionContext, Unit] =
+    def expectAuditClientsRemoval(): CallHandler4[CustomGroup, Set[Client], RequestHeader, ExecutionContext, Unit] =
       (mockAuditService
-        .auditAccessGroupClientsRemoval(_: CustomGroup, _: Set[Client])(using _: HeaderCarrier, _: ExecutionContext))
+        .auditAccessGroupClientsRemoval(_: CustomGroup, _: Set[Client])(using _: RequestHeader, _: ExecutionContext))
         .expects(*, *, *, *)
         .returning(())
 
     def expectAuditExcludedClientsRemoval()
-      : CallHandler4[TaxGroup, Set[Client], HeaderCarrier, ExecutionContext, Unit] =
+      : CallHandler4[TaxGroup, Set[Client], RequestHeader, ExecutionContext, Unit] =
       (mockAuditService
         .auditAccessGroupExcludedClientsRemoval(_: TaxGroup, _: Set[Client])(using
-          _: HeaderCarrier,
+          _: RequestHeader,
           _: ExecutionContext
         ))
         .expects(*, *, *, *)
         .returning(())
 
     def expectAuditTeamMembersRemoval()
-      : CallHandler4[CustomGroup, Set[AgentUser], HeaderCarrier, ExecutionContext, Unit] =
+      : CallHandler4[CustomGroup, Set[AgentUser], RequestHeader, ExecutionContext, Unit] =
       (mockAuditService
         .auditAccessGroupTeamMembersRemoval(_: CustomGroup, _: Set[AgentUser])(using
-          _: HeaderCarrier,
+          _: RequestHeader,
           _: ExecutionContext
         ))
         .expects(*, *, *, *)
@@ -498,21 +497,22 @@ class EacdSynchronizerSpec extends TestConstants {
 
     def outstandingAssignmentsWorkItemsExist(
       itemsExist: Option[Boolean]
-    ): CallHandler3[Arn, HeaderCarrier, ExecutionContext, Future[Option[Boolean]]] =
+    ): CallHandler3[Arn, RequestHeader, ExecutionContext, Future[Option[Boolean]]] =
       (stubUserClientDetailsConnector
-        .outstandingAssignmentsWorkItemsExist(_: Arn)(using _: HeaderCarrier, _: ExecutionContext))
+        .outstandingAssignmentsWorkItemsExist(_: Arn)(using _: RequestHeader, _: ExecutionContext))
         .when(arn, *, *)
         .returns(Future.successful(itemsExist))
 
-    def syncRepoCanBeAcquired(): CallHandler1[Arn, Future[Option[EacdSyncRecord]]]#Derived = (stubEacdSyncRepository
-      .acquire(_: Arn))
-      .when(arn)
-      .returns(Future.successful(Some(EacdSyncRecord(arn, Instant.now()))))
-
-    def syncRepoCannotBeAcquired(): CallHandler1[Arn, Future[Option[EacdSyncRecord]]]#Derived =
+    def syncRepoCanBeAcquired(): CallHandler2[Arn, RequestHeader, Future[Option[EacdSyncRecord]]] =
       (stubEacdSyncRepository
-        .acquire(_: Arn))
-        .when(arn)
+        .acquire(_: Arn)(using _: RequestHeader))
+        .when(arn, *)
+        .returns(Future.successful(Some(EacdSyncRecord(arn, Instant.now()))))
+
+    def syncRepoCannotBeAcquired(): CallHandler2[Arn, RequestHeader, Future[Option[EacdSyncRecord]]] =
+      (stubEacdSyncRepository
+        .acquire(_: Arn)(using _: RequestHeader))
+        .when(arn, *)
         .returns(Future.successful(None))
   }
 

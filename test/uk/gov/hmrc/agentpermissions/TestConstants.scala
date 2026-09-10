@@ -20,6 +20,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import play.api.mvc.Request
+import play.api.test.FakeRequest
 import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.accessgroups.{AgentUser, Client, CustomGroup, TaxGroup}
 import uk.gov.hmrc.agentpermissions.models.GroupId
@@ -28,6 +30,9 @@ import uk.gov.hmrc.crypto.{Decrypter, Encrypter, SymmetricCryptoFactory}
 import java.time.LocalDateTime
 
 trait TestConstants extends AnyWordSpecLike with Matchers with ScalaFutures with MockFactory with IntegrationPatience {
+
+  given Request[?] = FakeRequest()
+
   val arn: Arn = Arn("XARN8686099")
 
   val serviceVat = "HMRC-MTD-VAT"

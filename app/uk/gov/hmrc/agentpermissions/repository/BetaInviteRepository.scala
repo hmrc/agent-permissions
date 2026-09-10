@@ -21,10 +21,10 @@ import com.mongodb.client.model.{IndexOptions, ReplaceOptions}
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.IndexModel
 import org.mongodb.scala.model.Indexes.ascending
-import play.api.Logging
 import uk.gov.hmrc.agentpermissions.model.BetaInviteRecord
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 import uk.gov.hmrc.agentpermissions.repository.UpsertType.{RecordInserted, RecordUpdated}
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
@@ -50,7 +50,7 @@ class BetaInviteRepositoryImpl @Inject() (
       indexes = Seq(
         IndexModel(ascending("agentUserId"), new IndexOptions().name("agentUserIdx").unique(true))
       )
-    ) with BetaInviteRepository with Logging {
+    ) with BetaInviteRepository with RequestAwareLogging {
 
   def get(agentUser: AgentUser): Future[Option[BetaInviteRecord]] =
     collection.find(equal("agentUserId", agentUser.id)).headOption().map(_.map(_.copy()))

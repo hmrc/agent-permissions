@@ -16,13 +16,14 @@
 
 package uk.gov.hmrc.agentpermissions.controllers
 
-import play.api.mvc.Request
-import play.api.{Configuration, Environment, Logging}
-import uk.gov.hmrc.agentpermissions.model.Arn
+import play.api.mvc.{Request, RequestHeader}
+import play.api.{Configuration, Environment}
 import uk.gov.hmrc.agentpermissions.config.AppConfig
+import uk.gov.hmrc.agentpermissions.model.Arn
 import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
-import uk.gov.hmrc.auth.core.AuthProvider.GovernmentGateway
+import uk.gov.hmrc.agentpermissions.util.RequestAwareLogging
 import uk.gov.hmrc.auth.core.*
+import uk.gov.hmrc.auth.core.AuthProvider.GovernmentGateway
 import uk.gov.hmrc.auth.core.retrieve.v2.Retrievals.{allEnrolments, credentialRole, credentials}
 import uk.gov.hmrc.auth.core.retrieve.{Credentials, ~}
 import uk.gov.hmrc.http.HeaderCarrier
@@ -38,7 +39,7 @@ class AuthAction @Inject() (
   val env: Environment,
   val config: Configuration
 )(using appConfig: AppConfig)
-    extends AuthorisedFunctions with Logging {
+    extends AuthorisedFunctions with RequestAwareLogging {
 
   private val agentEnrolment = "HMRC-AS-AGENT"
   private val agentReferenceNumberIdentifier = "AgentReferenceNumber"
@@ -88,7 +89,9 @@ class AuthAction @Inject() (
       ) // TODO: Setting name field as blank until AgentUser is removed completely (See APB-8252)
     )
 
-  private def failureHandler(triedResult: Try[Option[AuthorisedAgent]]): Future[Option[AuthorisedAgent]] =
+  private def failureHandler(
+    triedResult: Try[Option[AuthorisedAgent]]
+  )(using RequestHeader): Future[Option[AuthorisedAgent]] =
     triedResult match {
       case Success(maybeAuthorisedAgent) =>
         Future.successful(maybeAuthorisedAgent)
