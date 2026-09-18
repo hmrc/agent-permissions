@@ -18,7 +18,6 @@ package uk.gov.hmrc.agentpermissions.model.accessgroups.optin
 
 import play.api.libs.json.*
 import uk.gov.hmrc.agentpermissions.model.Arn
-import uk.gov.hmrc.agentpermissions.model.accessgroups.AgentUser
 
 import java.time.LocalDateTime
 
@@ -62,7 +61,7 @@ object OptinEventType {
   given Writes[OptinEventType] = (o: OptinEventType) => JsString(o.value)
 }
 
-case class OptinEvent(optinEventType: OptinEventType, user: AgentUser, eventDateTime: LocalDateTime)
+case class OptinEvent(optinEventType: OptinEventType, eventDateTime: LocalDateTime)
 
 object OptinEvent {
   given OFormat[OptinEvent] = Json.format[OptinEvent]
