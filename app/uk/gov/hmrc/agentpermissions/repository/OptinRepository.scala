@@ -54,7 +54,7 @@ class OptinRepositoryImpl @Inject() (
     ) with OptinRepository with PlayMongoMigrations with RequestAwareLogging {
 
   def get(arn: Arn): Future[Option[OptinRecord]] =
-    collection.find(equal("arn", arn.value)).headOption()
+    collection.find(equal("arn", arn.value)).toFuture().map(_.headOption)
 
   def upsert(optinRecord: OptinRecord): Future[Option[UpsertType]] =
     collection

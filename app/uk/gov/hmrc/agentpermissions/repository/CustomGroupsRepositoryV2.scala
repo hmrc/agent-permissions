@@ -90,7 +90,8 @@ class CustomGroupsRepositoryV2Impl @Inject() (
     collection
       .find(Filters.equal("_id", id.toString))
       .map(_.decryptedValue)
-      .headOption()
+      .toFuture()
+      .map(_.headOption)
 
   def get(arn: Arn): Future[Seq[CustomGroup]] =
     collection
@@ -105,7 +106,8 @@ class CustomGroupsRepositoryV2Impl @Inject() (
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)))
       .collation(caseInsensitiveCollation)
       .map(_.decryptedValue)
-      .headOption()
+      .toFuture()
+      .map(_.headOption)
 
   def insert(customGroup: CustomGroup): Future[Option[String]] =
     collection
