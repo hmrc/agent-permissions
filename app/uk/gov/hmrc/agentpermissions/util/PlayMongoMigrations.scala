@@ -80,7 +80,7 @@ trait PlayMongoMigrations(using ExecutionContext) extends Migrations with Transa
           updates = documents.flatMap(asUpdate)
 
           resultsOrNone <-
-            if updates.nonEmpty then collection.bulkWrite(session, updates).headOption()
+            if updates.nonEmpty then collection.bulkWrite(session, updates).toFutureOption()
             else Future.successful(None)
 
         yield resultsOrNone.map: results =>

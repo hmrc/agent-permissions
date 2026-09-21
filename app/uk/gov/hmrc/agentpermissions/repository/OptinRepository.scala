@@ -59,7 +59,7 @@ class OptinRepositoryImpl @Inject() (
   def upsert(optinRecord: OptinRecord): Future[Option[UpsertType]] =
     collection
       .replaceOne(equal("arn", optinRecord.arn.value), optinRecord, upsertOptions)
-      .headOption()
+      .toFutureOption()
       .map(
         _.map(result =>
           result.getModifiedCount match {

@@ -112,7 +112,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
   def insert(customGroup: CustomGroup): Future[Option[String]] =
     collection
       .insertOne(SensitiveCustomGroup(customGroup))
-      .headOption()
+      .toFutureOption()
       .map(_.map(_.getInsertedId.asString().getValue))
       .recoverWith { case _: MongoWriteException =>
         Future.successful(None)
@@ -124,7 +124,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
         and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),
         deleteOptions
       )
-      .headOption()
+      .toFutureOption()
       .map(_.map(_.getDeletedCount))
 
   def update(arn: Arn, groupName: String, customGroup: CustomGroup): Future[Option[Long]] =
@@ -134,7 +134,7 @@ class CustomGroupsRepositoryV2Impl @Inject() (
         SensitiveCustomGroup(customGroup),
         replaceOptions
       )
-      .headOption()
+      .toFutureOption()
       .map(_.map(_.getModifiedCount))
 
   private lazy val deleteOptions: DeleteOptions = new DeleteOptions().collation(caseInsensitiveCollation)

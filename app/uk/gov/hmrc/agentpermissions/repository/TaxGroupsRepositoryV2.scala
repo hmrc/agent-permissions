@@ -79,7 +79,8 @@ class TaxGroupsRepositoryV2Impl @Inject() (
     collection
       .find(Filters.equal("_id", id.toString))
       .map(_.decryptedValue)
-      .headOption()
+      .toFuture()
+      .map(_.headOption)
 
   override def get(arn: Arn): Future[Seq[TaxGroup]] =
     collection
@@ -95,14 +96,16 @@ class TaxGroupsRepositoryV2Impl @Inject() (
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)))
       .collation(caseInsensitiveCollation)
       .map(_.decryptedValue)
-      .headOption()
+      .toFuture()
+      .map(_.headOption)
 
   override def getByService(arn: Arn, service: String): Future[Option[TaxGroup]] =
     collection
       .find(and(equal(FIELD_ARN, arn.value), equal(FIELD_SERVICE, service)))
       .collation(caseInsensitiveCollation)
       .map(_.decryptedValue)
-      .headOption()
+      .toFuture()
+      .map(_.headOption)
 
   def groupExistsForTaxService(arn: Arn, service: String): Future[Boolean] = {
     // Services as 1 entity with multiple enrolments stored as single group
@@ -121,7 +124,7 @@ class TaxGroupsRepositoryV2Impl @Inject() (
   override def insert(accessGroup: TaxGroup): Future[Option[String]] =
     collection
       .insertOne(SensitiveTaxGroup(accessGroup))
-      .headOption()
+      .toFutureOption()
       .map(_.map(_.getInsertedId.asString().getValue))
       .recoverWith { case _: MongoWriteException =>
         Future.successful(None)
@@ -133,7 +136,7 @@ class TaxGroupsRepositoryV2Impl @Inject() (
         and(equal(FIELD_ARN, arn.value), equal(FIELD_GROUPNAME, groupName)),
         deleteOptions
       )
-      .headOption()
+      .toFutureOption()
       .map(_.map(_.getDeletedCount))
 
   override def update(arn: Arn, groupName: String, accessGroup: TaxGroup): Future[Option[Long]] =
@@ -143,7 +146,7 @@ class TaxGroupsRepositoryV2Impl @Inject() (
         SensitiveTaxGroup(accessGroup),
         replaceOptions
       )
-      .headOption()
+      .toFutureOption()
       .map(_.map(_.getModifiedCount))
 
   private lazy val deleteOptions: DeleteOptions = new DeleteOptions().collation(caseInsensitiveCollation)

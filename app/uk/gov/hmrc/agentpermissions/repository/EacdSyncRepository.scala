@@ -75,7 +75,7 @@ class EacdSyncRepositoryImpl @Inject() (mongoComponent: MongoComponent, appConfi
                           case Nil =>
                             collection
                               .replaceOne(equal("arn", arn.value), newRecord, ReplaceOptions().upsert(true))
-                              .headOption()
+                              .toFutureOption()
                               .map(_.map(_ => newRecord))
                           case _ =>
                             logger.debug(s"Cannot acquire as an un-expired record already exists in the collection")
