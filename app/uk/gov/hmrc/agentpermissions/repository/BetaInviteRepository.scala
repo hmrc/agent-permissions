@@ -53,12 +53,12 @@ class BetaInviteRepositoryImpl @Inject() (
     ) with BetaInviteRepository with RequestAwareLogging {
 
   def get(agentUser: AgentUser): Future[Option[BetaInviteRecord]] =
-    collection.find(equal("agentUserId", agentUser.id)).headOption().map(_.map(_.copy()))
+    collection.find(equal("agentUserId", agentUser.id)).toFuture().map(_.headOption).map(_.map(_.copy()))
 
   def upsert(betaInviteRecord: BetaInviteRecord): Future[Option[UpsertType]] =
     collection
       .replaceOne(equal("agentUserId", betaInviteRecord.agentUserId), betaInviteRecord, upsertOptions)
-      .headOption()
+      .toFutureOption()
       .map(
         _.map(result =>
           result.getModifiedCount match {
